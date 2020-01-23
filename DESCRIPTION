@@ -1,0 +1,23 @@
+Package: igseq
+Type: Package
+Title: Immunoglobulin Analysis
+Version: 0.1.0
+Authors@R: person("Jesse", "Connell", email = "ancon@upenn.edu", role = c("aut", "cre"))
+Description: Helper functions for antibody sequence analysis with our IgSeq protocol.
+License: file LICENSE
+LazyData: TRUE
+Encoding: UTF-8
+Language: en-US
+Imports:
+  Biostrings (>= 2.38.4),
+  ggplot2 (>= 3.1.1),
+  dnar (>= 0.1),
+  dplyr (>= 0.8),
+  reshape2 (>= 1.4.3),
+  levenR (>= 0.2.0),
+  magrittr (>= 1.5)
+Remotes:
+  github::sherrillmix/dnar
+RoxygenNote: 6.1.1
+Suggests: 
+    testthat
