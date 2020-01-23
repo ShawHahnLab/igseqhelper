@@ -14,13 +14,14 @@ parse_gene <- function(txt) {
 #' itself be a list containing two things: one entry named "slug" set to the
 #' long alphanumeric string for the workbook, and a second entry named "sheets"
 #' containing the integer GID for each sheet to download with names set to the
-#' names of the sheets.
+#' names of the sheets.  (The slug and the sheet GID are to the left and right
+#' of "/pub?gid=" in the published URL.
 #'
-#' @param google_sheets nested list structure like in
-#'   \code{\link{GOOGLE_SHEETS}}
+#' @param google_sheets nested list structure
 #' @param prefix directory to put CSV files in.  If \code{NULL}, defaults to
 #' "metadata/" in the current working directory. 
 #' @export
+#' @describeIn update_metadata Update metadata based on list
 update_metadata <- function(google_sheets, prefix=NULL) {
   if (is.null(prefix)) {
     prefix <- "metadata"
@@ -42,4 +43,15 @@ update_metadata <- function(google_sheets, prefix=NULL) {
       write.csv(data, path_file, quote = FALSE, row.names = FALSE)
     }
   }
+}
+
+#' @describeIn update_metadata Update metadata based on list
+#' @param fp file path to YAML providing Google Sheet identifiers
+#' @param prefix directory to put CSV files in.  If \code{NULL}, defaults to
+#' "metadata/" in the current working directory.
+#' @export
+update_metadata_via_yaml <- function(fp, prefix=NULL) {
+  text <- readChar(fp, file.info(fp)$size)
+  google_sheets <- yaml::yaml.load(text)
+  update_metadata(google_sheets, prefix)
 }
