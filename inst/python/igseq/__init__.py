@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Rhesus Macaque Immunoglobulin G Analysis
+Immunoglobulin Sequence Data Analysis
 
 Various Python helpers for our analysis here, particularly to use in Snakemake
 rules.  See also the igseq R package.
@@ -35,18 +35,6 @@ LOGGER = logging.getLogger(__name__)
 #logging.basicConfig(level=0)
 
 R_PKG_INST, R_PKG_PATH = __find_r_pkg()
-
-# Alleles for germline V(D)J for heavy and light chains for our antibodies of
-# interest.  Should be sequence IDs present in the reference FASTA files.
-ALLELES = {
-    "heavy": {
-        "V": "IGHV4-ABB-S*01_S8200", # 10.1016/j.cell.2019.06.030
-        "D": "IGHD3-1*01", # or possibly IGHD3-4*01, or Chaim's IGHD3-9
-        "J": "IGHJ2*01"},
-    "light": {
-        "V": "IGLV1-7*01",
-        "J": "IGLJ2*01"} # or possibly IGLJ3*01
-    }
 
 def load_primers(fp_in):
     """Load primer metadata CSV.
@@ -109,10 +97,3 @@ def trim_alignment_to(fasta_fp_in, fasta_fp_out, seq_id):
     with open(fasta_fp_out, "w") as f_out:
         for record in SeqIO.parse(fasta_fp_in, "fasta"):
             SeqIO.write(record[start:end], f_out, "fasta")
-
-# simple name/seq dict
-PRIMERS = load_primers(R_PKG_INST/"metadata/primers.csv")
-# key is run, entries are lists of sample dicts
-SAMPLES = load_samples(R_PKG_INST/"metadata/samples.csv", PRIMERS)
-# key is run, entries are dicts
-RUNS = load_runs(R_PKG_INST/"metadata/runs.csv")
