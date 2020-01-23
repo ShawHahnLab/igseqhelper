@@ -2,21 +2,16 @@
 Helpers for trimming raw reads.
 """
 
-from igseq import SAMPLES
 from igseq.util import revcmp
 
-def adapter_fwd(sample_name, samples=None):
+def adapter_fwd(sample_name, samples):
     """Get the adapter sequence to trim off the end of R1."""
     # The first round PCR primer occurs just *after* the beginning of R2, so
     # we'll trim that off the end of R1.
-    if not samples:
-        samples = SAMPLES
     return "TCCACCAAGGGCCCATCGGTCTTCCCCCTGGC"
 
-def adapter_rev(sample_name, samples=None):
+def adapter_rev(sample_name, samples):
     """Get the adapter sequence to trim off the end of R2."""
-    if not samples:
-        samples = SAMPLES
     # Reverse is trickier than forward.  The 2nd round PCR Forward Primer 1 /
     # P5 Sequencing Primer Site occurs just *before* the beginning of R1, so we
     # could cut on that, but we don't want to leave a dangling barcode segment
