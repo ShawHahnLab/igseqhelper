@@ -11,6 +11,8 @@ dependencies:
   - snakemake
   - vsearch
   - cutadapt
+  # requirements for IgDiscover
+  - igdiscover
   # requirements for pRESTO
   - pip
   - numpy>=1.8
