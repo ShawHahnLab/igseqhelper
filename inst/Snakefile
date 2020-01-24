@@ -1,0 +1,25 @@
+"""
+Processing steps from raw read data to finalized antibody results.
+"""
+
+import sys
+# TODO how to reliably find the python module relative to this Snakefile?
+# The working directory will be wherever the original Snakefile is stored
+# (could be anywhere) and __file__ is set to one of the Snakemake python source
+# files.  This method will only work if our Snakefile in alongside the igseq
+# directory.
+sys.path.append("igseq/inst/python")
+import igseq
+from snakemake.utils import R
+from igseq import (load_primers, load_samples, load_runs)
+RINST = igseq.R_PKG_INST
+
+wildcard_constraints:
+    sample="[A-Za-z0-9]+",
+    run="[-_A-Za-z0-9]+"
+
+include: "snakemake-rules/data.smk"
+include: "snakemake-rules/presto.smk"
+include: "snakemake-rules/igdiscover.smk"
+include: "snakemake-rules/sonar.smk"
+include: "snakemake-rules/reporting.smk"

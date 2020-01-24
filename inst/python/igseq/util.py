@@ -30,3 +30,15 @@ def get_clade_seq_ids(tree_fp, query_ids, tree_fmt="nexus"):
     ids = [node.name for node in clade.get_terminals()]
     ids = [re.sub("^'(.*)'$", "\\1", seq_id) for seq_id in ids]
     return ids
+
+# Vaguely based on a few answers to https://stackoverflow.com/questions/952914
+# Why did I need this again?
+def flatten(iterable):
+    """Take a nested iterable and retun a flat list with its contents."""
+    flat = []
+    for obj in iterable:
+        try:
+            flat.extend(flatten(obj))
+        except TypeError:
+            flat.append(obj)
+    return flat
