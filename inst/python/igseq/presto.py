@@ -56,7 +56,7 @@ def prep_primers_fwd(fp_csv_in, fp_fwd_out):
     # portion after the barcode.
     fmtfwd = lambda s: s.lstrip("N")[8:]
     primers = load_primers(fp_csv_in)
-    primers = {key: fmtfwd(primers[key]) for key in primers if "P5_" in key}
+    primers = {key: fmtfwd(primers[key]) for key in primers if "P5" in key}
     # If the're all the same, as I expect, just store one.
     if len(set(primers.values())) == 1:
         primers = {"Fwd": list(primers.values())[0]}
