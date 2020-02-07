@@ -1,9 +1,14 @@
 ### Reporting
 
-rule fastq_counts:
+rule fastq_gz_counts:
     output: "{prefix}.fastq.gz.counts"
     input: "{prefix}.fastq.gz"
     shell: "zcat {input} | wc -l | awk -v OFS=, -v f={input} '{{print f,$0/4}}' > {output}"
+
+rule fasta_gz_counts:
+    output: "{prefix}.fasta.gz.counts"
+    input: "{prefix}.fasta.gz"
+    shell: "zgrep -c '^>' {input} | awk -v OFS=, -v f={input} '{{print f,$0}}' > {output}"
 
 rule fasta_counts:
     output: "{prefix}.fasta.counts"
