@@ -12,6 +12,12 @@ dependencies:
   - vsearch
   - cutadapt
   - rpy2
+  # For R package
+  - r-devtools
+  - r-ggplot2
+  - r-dplyr
+  - r-reshape2
+  - bioconductor-biostrings
   # requirements for IgDiscover
   - igdiscover
   # requirements for pRESTO
