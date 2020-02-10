@@ -84,9 +84,11 @@ def get_data(runid, outdir, runs):
     # Get data from URLs
     else:
         url = runs[runid].get("URL")
+        # If there's a unified URL, it's a zip file with R2/R2/I1 inside.
         if url:
             LOGGER.info("get_data: downloading single zip")
             shell("cd $(dirname {outdir}) && wget -q '{url}' && unzip \"$(basename '{url}')\"")
+        # If there are separate URLs, they're the R1/R2/I1 fastq.gz themselves.
         else:
             urls = {key: runs[runid].get(key) for key in ("URLR1", "URLR2", "URLI1")}
             if urls["URLR1"] and urls["URLR2"] and urls["URLI1"]:
@@ -94,12 +96,15 @@ def get_data(runid, outdir, runs):
                 urlr1 = urls["URLR1"]
                 urlr2 = urls["URLR2"]
                 urli1 = urls["URLI1"]
+                outr1 = outfiles["R1"].name
+                outr2 = outfiles["R2"].name
+                outi1 = outfiles["I1"].name
                 shell(
                     """
                         cd {outdir}
-                        wget -q '{urlr1}' && unzip $(basename '{urlr1}')
-                        wget -q '{urlr2}' && unzip $(basename '{urlr2}')
-                        wget -q '{urli1}' && unzip $(basename '{urli1}')
+                        wget -q '{urlr1}' && mv $(basename '{urlr1}') {outr1}
+                        wget -q '{urlr2}' && mv $(basename '{urlr2}') {outr2}
+                        wget -q '{urli1}' && mv $(basename '{urli1}') {outi1}
                     """)
             else:
                 raise ValueError("Need raw data or URLs for run %s" % runid)
