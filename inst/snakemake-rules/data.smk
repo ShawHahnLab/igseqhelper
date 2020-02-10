@@ -44,6 +44,13 @@ rule all_get_data:
         files=expand("data/{run}/" + RAW, run = SAMPLES.keys(), rp = ["R1", "R2", "I1"]),
         metadata=lambda w: checkpoints.get_metadata.get().output
 
+rule all_get_metadata:
+    input:
+       samples="metadata/samples.csv",
+       specimens="metadata/specimens.csv",
+       sequences="metadata/sequences.csv",
+       runs="metadata/runs.csv"
+
 rule get_data:
     """Get data files for a run.
 
