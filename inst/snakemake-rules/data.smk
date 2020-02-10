@@ -2,6 +2,8 @@
 Handlers for data/metadata
 """
 
+from pathlib import Path
+
 PRIMERS = {}
 SAMPLES = {}
 RUNS = {}
@@ -28,16 +30,39 @@ RAW = "Undetermined_S0_L001_{rp}_001.fastq.gz"
 rule all_get_data:
     input: expand("data/{run}/" + RAW, run = SAMPLES.keys(), rp = ["R1", "R2", "I1"])
 
-# Run Illumina's bcl2fastq to create R1/R2/I1 files.  Add location of bcl2fatq
-# to PATH if needed.
+# If raw data is available locally, run Illumina's bcl2fastq to create R1/R2/I1
+# files.  (Add location of bcl2fatq to PATH if needed.)  If not, download from
+# URLs listed in metadata.
 rule get_data:
     output: expand("data/{run}/" + RAW, run = "{run}", rp = ["R1", "R2", "I1"])
-    shell:
-        """
-            bcl2fastq --create-fastq-for-index-reads \
-                -R /seq/runs/{wildcards.run} \
-                -o $(dirname {output[0]})
-        """
+    run:
+        rundir = Path("/seq/runs/{wildcards.run}")
+        if rundir.is_dir():
+            shell(
+                """
+                    bcl2fastq --create-fastq-for-index-reads \
+                        -R /seq/runs/{wildcards.run} \
+                        -o $(dirname {output[0]})
+                """)
+        else:
+            url = RUNS[wildcards.run].get("URL")
+            if url:
+                shell("cd data/{wildcards.run} && wget '%s' && unzip {wildcards.run}.zip" % url)
+            else:
+                url_r1 = RUNS[wildcards.run].get("URLR1")
+                url_r2 = RUNS[wildcards.run].get("URLR2")
+                url_i1 = RUNS[wildcards.run].get("URLI1")
+                if url_r1 and url_r2 and url_r3:
+                    shell(
+                        """
+                            cd data/{wildcards.run}
+                            wget '%s' && unzip {wildcards.run}_R1.zip
+                            wget '%s' && unzip {wildcards.run}_R2.zip
+                            wget '%s' && unzip {wildcards.run}_I1.zip
+                        """ % (url_r1, url_r2, url_i1))
+                else: 
+                    raise ValueError("Need raw data or URLs for run %s" % wildcards.run)
+
 
 rule get_metadata:
     output: expand("metadata/{sheet}.csv", sheet = ["samples", "specimens", "primers", "runs"])
