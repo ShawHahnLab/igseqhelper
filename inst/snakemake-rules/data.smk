@@ -3,6 +3,7 @@ Handlers for data/metadata
 """
 
 from pathlib import Path
+from igseq.data import (load_sequences, load_samples, load_runs, get_data)
 
 def _setup_metadata(fp_primers, fp_samples, fp_runs):
     global SEQUENCES, SAMPLES, RUNS, SAMPLES_ALL
@@ -32,41 +33,13 @@ ALLELES = {"heavy": {"V": "", "D": "", "J": ""}, "light": {"V": "", "J": ""}}
 
 RAW = "Undetermined_S0_L001_{rp}_001.fastq.gz"
 
-def get_data(runid, outdir):
-    """Get the raw data files for a single run, either from local disk or from URLs."""
-    LOGGER.info("get_data: runid %s", runid)
-    LOGGER.info("get_data: outdir %s", outdir)
-    rundir = Path("/seq/runs" / runid)
-    if rundir.is_dir():
-        LOGGER.info("get_data: running bcl2fastq")
-        shell(
-            """
-                bcl2fastq --create-fastq-for-index-reads \
-                    -R /seq/runs/%s \
-                    -o %s
-            """ % (runid, outdir))
-    else:
-        url = RUNS[runid].get("URL")
-        if url:
-            LOGGER.info("get_data: downloading single zip")
-            shell("cd data/{wildcards.run} && wget '%s' && unzip {wildcards.run}.zip" % url)
-        else:
-            url_r1 = RUNS[runid].get("URLR1")
-            url_r2 = RUNS[runid].get("URLR2")
-            url_i1 = RUNS[runid].get("URLI1")
-            if url_r1 and url_r2 and url_r3:
-                LOGGER.info("get_data: downloading separate zips")
-                shell(
-                    """
-                        cd data/{wildcards.run}
-                        wget '%s' && unzip %s_R1.zip
-                        wget '%s' && unzip %s_R2.zip
-                        wget '%s' && unzip %s_I1.zip
-                    """ % (url_r1, runid, url_r2, runid, url_i1, runid))
-            else:
-                raise ValueError("Need raw data or URLs for run %s" % runid)
 
 rule all_get_data:
+    """Get data files for all sequencing runs.
+
+    This lists the metadata checkpoint output as input so that we know what the
+    sequencing runs are before running the rule.
+    """
     input:
         files=expand("data/{run}/" + RAW, run = SAMPLES.keys(), rp = ["R1", "R2", "I1"]),
         metadata=lambda w: checkpoints.get_metadata.get().output
@@ -80,9 +53,10 @@ rule get_data:
     """
     output: expand("data/{run}/" + RAW, run = "{run}", rp = ["R1", "R2", "I1"])
     input: lambda w: checkpoints.get_metadata.get().output
-    run: get_data(wildcards.run, Path(output[0]).parent)
+    run: get_data(wildcards.run, Path(output[0]).parent, RUNS)
 
 checkpoint get_metadata:
+    """Create CSV files from Google sheets based on metadata YAML."""
     output:
        samples="metadata/samples.csv",
        specimens="metadata/specimens.csv",
@@ -94,4 +68,4 @@ checkpoint get_metadata:
           devtools::load_all("igseq")
           update_metadata_via_yaml("{input}", ".")
           """)
-        _setup_metadata(input.sequences, input.samples, input.runs)
+        _setup_metadata(output.sequences, output.samples, output.runs)

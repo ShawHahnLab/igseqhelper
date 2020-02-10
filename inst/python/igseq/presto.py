@@ -8,7 +8,7 @@ provides helper functions for preparing input files.
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from igseq import load_sequences
+from igseq.data import load_sequences
 
 PRESTO_OPTS = {
     "assembly": {
