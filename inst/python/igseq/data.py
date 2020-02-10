@@ -111,10 +111,13 @@ def get_data(runid, outdir, runs):
     # Check files against expected checksums, if present.
     md5s = {key: runs[runid].get(key) for key in ("MD5R1", "MD5R2", "MD5I1")}
     if md5s["MD5R1"] and not md5s["MD5R1"] == md5(outfiles["R1"]):
+        outfiles["R1"].rename(str(outfiles["R1"]) + ".failed")
         raise ValueError("MD5 mismatch on %s" % outfiles["R1"])
     if md5s["MD5R2"] and not md5s["MD5R2"] == md5(outfiles["R2"]):
+        outfiles["R2"].rename(str(outfiles["R2"]) + ".failed")
         raise ValueError("MD5 mismatch on %s" % outfiles["R2"])
     if md5s["MD5I1"] and not md5s["MD5I1"] == md5(outfiles["I1"]):
+        outfiles["I1"].rename(str(outfiles["I1"]) + ".failed")
         raise ValueError("MD5 mismatch on %s" % outfiles["I1"])
 
 def md5(fp_in):
