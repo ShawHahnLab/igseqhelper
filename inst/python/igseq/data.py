@@ -67,14 +67,14 @@ def get_data(runid, outdir, runs):
         shell(
             """
                 bcl2fastq --create-fastq-for-index-reads \
-                    -R /seq/runs/%s \
-                    -o %s
-            """ % (runid, outdir))
+                    -R /seq/runs/{runid} \
+                    -o {outdir}
+            """)
     else:
         url = runs[runid].get("URL")
         if url:
             LOGGER.info("get_data: downloading single zip")
-            shell("cd data/{wildcards.run} && wget '%s' && unzip {wildcards.run}.zip" % url)
+            shell("cd data/{runid} && wget '{url}' && unzip {runid}.zip")
         else:
             url_r1 = runs[runid].get("URLR1")
             url_r2 = runs[runid].get("URLR2")
@@ -83,10 +83,10 @@ def get_data(runid, outdir, runs):
                 LOGGER.info("get_data: downloading separate zips")
                 shell(
                     """
-                        cd data/{wildcards.run}
-                        wget '%s' && unzip %s_R1.zip
-                        wget '%s' && unzip %s_R2.zip
-                        wget '%s' && unzip %s_I1.zip
-                    """ % (url_r1, runid, url_r2, runid, url_i1, runid))
+                        cd data/{runid}
+                        wget '{url_r1}' && unzip {runid}_R1.zip
+                        wget '{url_r2}' && unzip {runid}_R2.zip
+                        wget '{url_i1}' && unzip {runid}_I1.zip
+                    """)
             else:
                 raise ValueError("Need raw data or URLs for run %s" % runid)
