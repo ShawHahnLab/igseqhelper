@@ -5,6 +5,7 @@ Helpers for handling data and metadata.
 import csv
 import re
 import logging
+import hashlib
 from pathlib import Path
 from snakemake.shell import shell
 
@@ -58,11 +59,21 @@ def load_runs(fp_in):
     return runs
 
 def get_data(runid, outdir, runs):
-    """Get the raw data files for a single run, either from local disk or from URLs."""
+    """Get the raw data files for a single run, either from local disk or from URLs.
+
+    runid: Illumina Run ID
+    outdir: run directory to save fastq.gz to
+    runs: dictionary of per-run metadata
+    """
     LOGGER.info("get_data: runid %s", runid)
     LOGGER.info("get_data: outdir %s", outdir)
     rundir = Path("/seq/runs") / runid
-    if rundir.is_dir():
+    outfiles = {
+        "R1": Path(outdir) / "Undetermined_S0_L001_R1_001.fastq.gz",
+        "R2": Path(outdir) / "Undetermined_S0_L001_R2_001.fastq.gz",
+        "I1": Path(outdir) / "Undetermined_S0_L001_I1_001.fastq.gz"}
+    # Get data from raw run data
+    if rundir.is_dir() and False:
         LOGGER.info("get_data: running bcl2fastq")
         shell(
             """
@@ -70,23 +81,42 @@ def get_data(runid, outdir, runs):
                     -R /seq/runs/{runid} \
                     -o {outdir}
             """)
+    # Get data from URLs
     else:
         url = runs[runid].get("URL")
         if url:
             LOGGER.info("get_data: downloading single zip")
-            shell("cd data/{runid} && wget '{url}' && unzip {runid}.zip")
+            shell("cd $(dirname {outdir}) && wget -q '{url}' && unzip \"$(basename '{url}')\"")
         else:
-            url_r1 = runs[runid].get("URLR1")
-            url_r2 = runs[runid].get("URLR2")
-            url_i1 = runs[runid].get("URLI1")
-            if url_r1 and url_r2 and url_i1:
+            urls = {key: runs[runid].get(key) for key in ("URLR1", "URLR2", "URLI1")}
+            if urls["URLR1"] and urls["URLR2"] and urls["URLI1"]:
                 LOGGER.info("get_data: downloading separate zips")
+                urlr1 = urls["URLR1"]
+                urlr2 = urls["URLR2"]
+                urli1 = urls["URLI1"]
                 shell(
                     """
-                        cd data/{runid}
-                        wget '{url_r1}' && unzip {runid}_R1.zip
-                        wget '{url_r2}' && unzip {runid}_R2.zip
-                        wget '{url_i1}' && unzip {runid}_I1.zip
+                        cd {outdir}
+                        wget -q '{urlr1}' && unzip $(basename '{urlr1}')
+                        wget -q '{urlr2}' && unzip $(basename '{urlr2}')
+                        wget -q '{urli1}' && unzip $(basename '{urli1}')
                     """)
             else:
                 raise ValueError("Need raw data or URLs for run %s" % runid)
+    # Check files against expected checksums, if present.
+    md5s = {key: runs[runid].get(key) for key in ("MD5R1", "MD5R2", "MD5I1")}
+    if md5s["MD5R1"] and not md5s["MD5R1"] == md5(outfiles["R1"]):
+        raise ValueError("MD5 mismatch on %s" % outfiles["R1"])
+    if md5s["MD5R2"] and not md5s["MD5R2"] == md5(outfiles["R2"]):
+        raise ValueError("MD5 mismatch on %s" % outfiles["R2"])
+    if md5s["MD5I1"] and not md5s["MD5I1"] == md5(outfiles["I1"]):
+        raise ValueError("MD5 mismatch on %s" % outfiles["I1"])
+
+def md5(fp_in):
+    """Get MD5 checksum of a file as a hex string."""
+    # https://stackoverflow.com/a/3431838/4499968
+    hash_md5 = hashlib.md5()
+    with open(fp_in, "rb") as f_in:
+        for chunk in iter(lambda: f_in.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
