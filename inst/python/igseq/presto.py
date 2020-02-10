@@ -8,7 +8,7 @@ provides helper functions for preparing input files.
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from igseq import load_primers
+from igseq import load_sequences
 
 PRESTO_OPTS = {
     "assembly": {
@@ -52,32 +52,6 @@ PRESTO_OPTS = {
 
 def prep_primers_fwd(fp_csv_in, fp_fwd_out):
     """Take our primer CSV and create fwd FASTA for pRESTO."""
-    # Load in the primers, keeping only the forward cases, and trimming to the
-    # portion after the barcode.
-    fmtfwd = lambda s: s.lstrip("N")[8:]
-    primers = load_primers(fp_csv_in)
-    primers = {key: fmtfwd(primers[key]) for key in primers if "P5" in key}
-    # If the're all the same, as I expect, just store one.
-    if len(set(primers.values())) == 1:
-        primers = {"Fwd": list(primers.values())[0]}
-    mkseq = lambda key: SeqRecord(Seq(primers[key]), id=key, description="")
-    fwd = [mkseq(key) for key in primers]
+    sequences = load_sequences(fp_csv_in)
+    fwd = SeqRecord(Seq(sequences["5PIIA"]), id="5PIIA", description="")
     SeqIO.write(fwd, fp_fwd_out, "fasta")
-
-def prep_primers_full(fp_csv_in, fp_fwd_out, fp_rev_out):
-    """Take our primer CSV and create fwd/rev FASTA for pRESTO.
-
-    I don't think we actually have anything to use for the reverse case because
-    of how our libraries were prepared.  See prep_primers_fwd instead.
-    """
-    primers = load_primers(fp_csv_in)
-    fwd_keys = [key for key in primers if "P5_" in key]
-    fmtfwd = lambda s: s.lstrip("N")[8:]
-    fmtrev = lambda s: s
-    mkseqfwd = lambda key: SeqRecord(Seq(fmtfwd(primers[key])), id=key, description="")
-    mkseqrev = lambda key: SeqRecord(Seq(fmtrev(primers[key])), id=key, description="")
-    fwd = [mkseqfwd(key) for key in fwd_keys]
-    SeqIO.write(fwd, fp_fwd_out, "fasta")
-    rev_keys = [key for key in primers if "P7_" in key]
-    rev = [mkseqrev(key) for key in rev_keys]
-    SeqIO.write(rev, fp_rev_out, "fasta")

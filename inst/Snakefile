@@ -11,7 +11,7 @@ import sys
 sys.path.append("igseq/inst/python")
 import igseq
 from snakemake.utils import R
-from igseq import (load_primers, load_samples, load_runs)
+from igseq import (load_sequences, load_samples, load_runs)
 RINST = igseq.R_PKG_INST
 
 wildcard_constraints:

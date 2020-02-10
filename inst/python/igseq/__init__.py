@@ -36,18 +36,18 @@ LOGGER = logging.getLogger(__name__)
 
 R_PKG_INST, R_PKG_PATH = __find_r_pkg()
 
-def load_primers(fp_in):
-    """Load primer metadata CSV.
+def load_sequences(fp_in):
+    """Load sequence metadata CSV.
 
-    Output is a simple name/seq dict.
+    Output is a dictionary of sequence names to sequences and their attributes.
     """
     with open(fp_in) as f_in:
         reader = csv.DictReader(f_in)
-        primers = {row["PrimerName"]: row["PrimerSeq"] for row in reader}
-    return primers
+        seqs = {row["Name"]: row for row in reader}
+    return seqs
 
-def load_samples(fp_in, primers=None):
-    """Load sample metadata CSV and optionally link to primer data.
+def load_samples(fp_in, sequences=None):
+    """Load sample metadata CSV and optionally link to barcode data.
 
     Output is a dict where key is run, entries are lists of sample dicts.
     """
@@ -58,16 +58,15 @@ def load_samples(fp_in, primers=None):
             if not row["Run"] in samples:
                 samples[row["Run"]] = []
             samples[row["Run"]].append(row)
-    if primers:
+    if sequences:
         for run in samples:
             samps = samples[run]
             for samp in samps:
-                samp["PrimerFwdSeq"] = primers.get(samp["PrimerFwd"])
-                samp["PrimerRevSeq"] = primers.get(samp["PrimerRev"])
-                bclen = len(samp["PrimerFwdSeq"]) - len(samp["PrimerFwdSeq"].lstrip("N")) + 8
-                samp["BarcodeFwd"] = samp["PrimerFwdSeq"][0:bclen]
-                samp["BarcodeRev"] = samp["PrimerRevSeq"][25:(25+8)]
-                samp["BarcodePair"] = "%s %s" % (samp["BarcodeFwd"], samp["BarcodeRev"])
+                bc_fwd = sequences.get(samp["BarcodeFwd"])
+                bc_rev = sequences.get(samp["BarcodeRev"])
+                samp["BarcodeFwdSeq"] = re.sub(" ", "", bc_fwd)
+                samp["BarcodeRevSeq"] = re.sub(" ", "", bc_rev)
+                samp["BarcodePair"] = "%s %s" % (samp["BarcodeFwdSeq"], samp["BarcodeRevSeq"])
 
     return samples
 

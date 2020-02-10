@@ -5,11 +5,11 @@ Handlers for data/metadata
 from pathlib import Path
 
 def _setup_metadata(fp_primers, fp_samples, fp_runs):
-    global PRIMERS SAMPLES RUNS SAMPLES_ALL
-    # simple name/seq dict
-    PRIMERS = load_primers("metadata/primers.csv")
+    global SEQUENCES SAMPLES RUNS SAMPLES_ALL
+    # key is sequence name, entries are dicts
+    SEQUENCES = load_sequences("metadata/sequences.csv")
     # key is run, entries are lists of sample dicts
-    SAMPLES = load_samples("metadata/samples.csv", PRIMERS)
+    SAMPLES = load_samples("metadata/samples.csv", SEQUENCES)
     # key is run, entries are dicts
     RUNS = load_runs("metadata/runs.csv")
     # A set of all unique samples
@@ -21,7 +21,7 @@ try:
     _setup_metadata("metadata/sequences.csv", "metadata/samples.csv", "metadata/runs.csv")
 except FileNotFoundError:
     print("Skipping metadata loading; be sure to run get_metadata rule.")
-    PRIMERS = {}
+    SEQUENCES = {}
     SAMPLES = {}
     RUNS = {}
     SAMPLES_ALL = set()

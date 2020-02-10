@@ -111,8 +111,8 @@ rule presto_data:
 
 rule presto_primers:
     output: fwd="presto/vprimers.fasta"
-    input: primers="metadata/primers.csv"
-    run: prep_primers_fwd(input.primers, output.fwd)
+    input: sequences="metadata/sequences.csv"
+    run: prep_primers_fwd(input.sequences, output.fwd)
 
 ### Paired-end Assembly
 
