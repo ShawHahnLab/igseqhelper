@@ -4,11 +4,8 @@ Handlers for data/metadata
 
 from pathlib import Path
 
-PRIMERS = {}
-SAMPLES = {}
-RUNS = {}
-SAMPLES_ALL = set()
-try:
+def _setup_metadata(fp_primers, fp_samples, fp_runs):
+    global PRIMERS SAMPLES RUNS SAMPLES_ALL
     # simple name/seq dict
     PRIMERS = load_primers("metadata/primers.csv")
     # key is run, entries are lists of sample dicts
@@ -16,11 +13,19 @@ try:
     # key is run, entries are dicts
     RUNS = load_runs("metadata/runs.csv")
     # A set of all unique samples
+    SAMPLES_ALL = set()
     for samps in SAMPLES.values():
         SAMPLES_ALL = SAMPLES_ALL | set([s["Sample"] for s in samps])
+
+try:
+    _setup_metadata("metadata/sequences.csv", "metadata/samples.csv", "metadata/runs.csv")
 except FileNotFoundError:
     print("Skipping metadata loading; be sure to run get_metadata rule.")
-    
+    PRIMERS = {}
+    SAMPLES = {}
+    RUNS = {}
+    SAMPLES_ALL = set()
+
 SAMPLES_H = []
 SAMPLES_L = []
 ALLELES = {"heavy": {"V": "", "D": "", "J": ""}, "light": {"V": "", "J": ""}}
@@ -35,6 +40,7 @@ rule all_get_data:
 # URLs listed in metadata.
 rule get_data:
     output: expand("data/{run}/" + RAW, run = "{run}", rp = ["R1", "R2", "I1"])
+    input: lambda w: checkpoints.get_metadata.get().output
     run:
         rundir = Path("/seq/runs/{wildcards.run}")
         if rundir.is_dir():
@@ -64,10 +70,16 @@ rule get_data:
                     raise ValueError("Need raw data or URLs for run %s" % wildcards.run)
 
 
-rule get_metadata:
-    output: expand("metadata/{sheet}.csv", sheet = ["samples", "specimens", "primers", "runs"])
+checkpoint get_metadata:
+    output:
+       samples="metadata/samples.csv"
+       specimens="metadata/specimens.csv"
+       sequences="metadata/sequences.csv"
+       runs="metadata/runs.csv"
     input: "metadata.yml"
-    run: R("""
-            devtools::load_all("igseq")
-            update_metadata_via_yaml("{input}", ".")
-            """)
+    run:
+        R("""
+          devtools::load_all("igseq")
+          update_metadata_via_yaml("{input}", ".")
+          """)
+        _setup_metadata(input.sequences, input.samples, input.runs)

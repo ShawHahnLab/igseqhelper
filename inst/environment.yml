@@ -8,9 +8,10 @@ dependencies:
   - clustalw
   - pear
   - seqmagick
-  - snakemake
+  - snakemake>=5.4
   - vsearch
   - cutadapt
+  - rpy2
   # requirements for IgDiscover
   - igdiscover
   # requirements for pRESTO
