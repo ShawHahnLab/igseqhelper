@@ -10,9 +10,13 @@ import sys
 # directory.
 sys.path.append("igseq/inst/python")
 import igseq
+import logging
 from snakemake.utils import R
 from igseq import (load_sequences, load_samples, load_runs)
 RINST = igseq.R_PKG_INST
+
+LOGGER = logging.getLogger(__name__)
+logging.basicConfig(level = logging.INFO)
 
 wildcard_constraints:
     sample="[A-Za-z0-9]+",

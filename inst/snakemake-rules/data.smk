@@ -32,43 +32,55 @@ ALLELES = {"heavy": {"V": "", "D": "", "J": ""}, "light": {"V": "", "J": ""}}
 
 RAW = "Undetermined_S0_L001_{rp}_001.fastq.gz"
 
-rule all_get_data:
-    input: expand("data/{run}/" + RAW, run = SAMPLES.keys(), rp = ["R1", "R2", "I1"])
+def get_data(runid, outdir):
+    """Get the raw data files for a single run, either from local disk or from URLs."""
+    LOGGER.info("get_data: runid %s", runid)
+    LOGGER.info("get_data: outdir %s", outdir)
+    rundir = Path("/seq/runs" / runid)
+    if rundir.is_dir():
+        LOGGER.info("get_data: running bcl2fastq")
+        shell(
+            """
+                bcl2fastq --create-fastq-for-index-reads \
+                    -R /seq/runs/%s \
+                    -o %s
+            """ % (runid, outdir))
+    else:
+        url = RUNS[runid].get("URL")
+        if url:
+            LOGGER.info("get_data: downloading single zip")
+            shell("cd data/{wildcards.run} && wget '%s' && unzip {wildcards.run}.zip" % url)
+        else:
+            url_r1 = RUNS[runid].get("URLR1")
+            url_r2 = RUNS[runid].get("URLR2")
+            url_i1 = RUNS[runid].get("URLI1")
+            if url_r1 and url_r2 and url_r3:
+                LOGGER.info("get_data: downloading separate zips")
+                shell(
+                    """
+                        cd data/{wildcards.run}
+                        wget '%s' && unzip %s_R1.zip
+                        wget '%s' && unzip %s_R2.zip
+                        wget '%s' && unzip %s_I1.zip
+                    """ % (url_r1, runid, url_r2, runid, url_i1, runid))
+            else:
+                raise ValueError("Need raw data or URLs for run %s" % runid)
 
-# If raw data is available locally, run Illumina's bcl2fastq to create R1/R2/I1
-# files.  (Add location of bcl2fatq to PATH if needed.)  If not, download from
-# URLs listed in metadata.
+rule all_get_data:
+    input:
+        files=expand("data/{run}/" + RAW, run = SAMPLES.keys(), rp = ["R1", "R2", "I1"]),
+        metadata=lambda w: checkpoints.get_metadata.get().output
+
 rule get_data:
+    """Get data files for a run.
+
+    If raw data is available locally, run Illumina's bcl2fastq to create R1/R2/I1
+    files.  (Add location of bcl2fatq to PATH if needed.)  If not, download from
+    URLs listed in metadata.
+    """
     output: expand("data/{run}/" + RAW, run = "{run}", rp = ["R1", "R2", "I1"])
     input: lambda w: checkpoints.get_metadata.get().output
-    run:
-        rundir = Path("/seq/runs/{wildcards.run}")
-        if rundir.is_dir():
-            shell(
-                """
-                    bcl2fastq --create-fastq-for-index-reads \
-                        -R /seq/runs/{wildcards.run} \
-                        -o $(dirname {output[0]})
-                """)
-        else:
-            url = RUNS[wildcards.run].get("URL")
-            if url:
-                shell("cd data/{wildcards.run} && wget '%s' && unzip {wildcards.run}.zip" % url)
-            else:
-                url_r1 = RUNS[wildcards.run].get("URLR1")
-                url_r2 = RUNS[wildcards.run].get("URLR2")
-                url_i1 = RUNS[wildcards.run].get("URLI1")
-                if url_r1 and url_r2 and url_r3:
-                    shell(
-                        """
-                            cd data/{wildcards.run}
-                            wget '%s' && unzip {wildcards.run}_R1.zip
-                            wget '%s' && unzip {wildcards.run}_R2.zip
-                            wget '%s' && unzip {wildcards.run}_I1.zip
-                        """ % (url_r1, url_r2, url_i1))
-                else: 
-                    raise ValueError("Need raw data or URLs for run %s" % wildcards.run)
-
+    run: get_data(wildcards.run, Path(output[0]).parent)
 
 checkpoint get_metadata:
     output:
