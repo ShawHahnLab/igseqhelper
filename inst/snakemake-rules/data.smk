@@ -5,7 +5,7 @@ Handlers for data/metadata
 from pathlib import Path
 
 def _setup_metadata(fp_primers, fp_samples, fp_runs):
-    global SEQUENCES SAMPLES RUNS SAMPLES_ALL
+    global SEQUENCES, SAMPLES, RUNS, SAMPLES_ALL
     # key is sequence name, entries are dicts
     SEQUENCES = load_sequences("metadata/sequences.csv")
     # key is run, entries are lists of sample dicts
@@ -72,9 +72,9 @@ rule get_data:
 
 checkpoint get_metadata:
     output:
-       samples="metadata/samples.csv"
-       specimens="metadata/specimens.csv"
-       sequences="metadata/sequences.csv"
+       samples="metadata/samples.csv",
+       specimens="metadata/specimens.csv",
+       sequences="metadata/sequences.csv",
        runs="metadata/runs.csv"
     input: "metadata.yml"
     run:
