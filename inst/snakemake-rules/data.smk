@@ -3,29 +3,35 @@ Handlers for data/metadata
 """
 
 from pathlib import Path
-from igseq.data import (load_sequences, load_samples, load_runs, get_data)
+from igseq.data import (load_samples, load_specimens, load_runs, load_sequences, get_data)
 
-def _setup_metadata(fp_primers, fp_samples, fp_runs):
-    global SEQUENCES, SAMPLES, RUNS, SAMPLES_ALL
+def _setup_metadata(fp_samples, fp_specimens, fp_runs, fp_sequences):
+    global SEQUENCES, SPECIMENS, SAMPLES, RUNS
     # key is sequence name, entries are dicts
-    SEQUENCES = load_sequences("metadata/sequences.csv")
-    # key is run, entries are lists of sample dicts
-    SAMPLES = load_samples("metadata/samples.csv", SEQUENCES)
+    SEQUENCES = load_sequences(fp_sequences)
+    # key is specimen name, entries are dicts
+    SPECIMENS = load_specimens(fp_specimens)
     # key is run, entries are dicts
-    RUNS = load_runs("metadata/runs.csv")
-    # A set of all unique samples
-    SAMPLES_ALL = set()
-    for samps in SAMPLES.values():
-        SAMPLES_ALL = SAMPLES_ALL | set([s["Sample"] for s in samps])
+    RUNS = load_runs(fp_runs)
+    # key is sample, entries are nested dictionaries of sample attributes and
+    # other info above
+    SAMPLES = load_samples(
+        fp_samples,
+        specimens=SPECIMENS,
+        runs=RUNS,
+        sequences=SEQUENCES)
 
 try:
-    _setup_metadata("metadata/sequences.csv", "metadata/samples.csv", "metadata/runs.csv")
+    _setup_metadata(
+        "metadata/samples.csv",
+        "metadata/specimens.csv",
+        "metadata/runs.csv",
+        "metadata/sequences.csv")
 except FileNotFoundError:
     print("Skipping metadata loading; be sure to run get_metadata rule.")
     SEQUENCES = {}
     SAMPLES = {}
     RUNS = {}
-    SAMPLES_ALL = set()
 
 SAMPLES_H = []
 SAMPLES_L = []
@@ -67,12 +73,12 @@ checkpoint get_metadata:
     output:
        samples="metadata/samples.csv",
        specimens="metadata/specimens.csv",
-       sequences="metadata/sequences.csv",
-       runs="metadata/runs.csv"
+       runs="metadata/runs.csv",
+       sequences="metadata/sequences.csv"
     input: "metadata.yml"
     run:
         R("""
           devtools::load_all("igseq")
           update_metadata_via_yaml("{input}", ".")
           """)
-        _setup_metadata(output.sequences, output.samples, output.runs)
+        _setup_metadata(output.samples, output.specimens, output.runs, output.sequences)

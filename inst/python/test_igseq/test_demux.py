@@ -19,10 +19,19 @@ class TestDemux(unittest.TestCase):
 
     def setUp(self):
         self.record = "perfect"
-        self.samples = [
-            {"Sample": "sample1", "BarcodeFwd": "NNNNNAACTCTAA", "BarcodeRev": "CGGGAAGA"},
-            {"Sample": "sample2", "BarcodeFwd": "NNNNNNAAGGCCCT", "BarcodeRev": "TGCAACAA"},
-            {"Sample": "sample3", "BarcodeFwd": "NNNNNNNAATATGTC", "BarcodeRev": "CATCTGTG"}]
+        self.samples = {
+            "sample1": {
+                "Sample": "sample1",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNAACTCTAA"},
+                "BarcodeRevAttrs": {"Seq": "CGGGAAGA"}},
+            "sample2": {
+                "Sample": "sample2",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNNAAGGCCCT"},
+                "BarcodeRevAttrs": {"Seq": "TGCAACAA"}},
+            "sample3": {
+                "Sample": "sample3",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNNNAATATGTC"},
+                "BarcodeRevAttrs": {"Seq": "CATCTGTG"}}}
         prefix = ["F", "M05588:232:000000000-CLL8M:1:1101:19922:1593", "CGGGCTAAGGCCCT"]
         stream_fwd = "\n".join([
             "\t".join(prefix + ["NNNNNNAAGGCCCT", "8.0", "*"]),
@@ -33,7 +42,7 @@ class TestDemux(unittest.TestCase):
             "\t".join(prefix + ["TGCAACAA", "8.0", "*"]),
             "\t".join(prefix + ["CGGGAAGA", "4.0", ""]),
             "\t".join(prefix + ["CATCTGTG", "3.0", ""])]) + "\n"
-        names = [s["Sample"] for s in self.samples] + ["unassigned"]
+        names = sorted(self.samples.keys()) + ["unassigned"]
         self.expected = {
             "sample": "sample2",
             "demuxed_data":  {
@@ -71,13 +80,14 @@ class TestDemux(unittest.TestCase):
         value, and should see TSV logged to the supplied stream for each
         barcode considered.
         """
-        barcodes_fwd = [s["BarcodeFwd"] for s in self.samples]
+        keys = sorted(self.samples.keys())
+        barcodes_fwd = [self.samples[s]["BarcodeFwdAttrs"]["Seq"] for s in keys]
         stream = StringIO()
         record = self.load_input()
         assigned = assign_barcode_fwd(record["R1"][0], barcodes_fwd, send_stats=stream)
-        for samp in self.samples:
-            if samp["Sample"] == self.expected["sample"]:
-                barcode_expected = samp["BarcodeFwd"]
+        for samp_name, sample in self.samples.items():
+            if samp_name == self.expected["sample"]:
+                barcode_expected = sample["BarcodeFwdAttrs"]["Seq"]
         self.assertEqual(assigned, barcode_expected)
         self.assertEqual(stream.getvalue(), self.expected["stream_fwd"])
 
@@ -88,13 +98,14 @@ class TestDemux(unittest.TestCase):
         value, and should see TSV logged to the supplied stream for each
         barcode considered.
         """
-        barcodes_rev = [s["BarcodeRev"] for s in self.samples]
+        keys = sorted(self.samples.keys())
+        barcodes_rev = [self.samples[s]["BarcodeRevAttrs"]["Seq"] for s in keys]
         stream = StringIO()
         record = self.load_input()
         assigned = assign_barcode_rev(record["I1"][0], barcodes_rev, send_stats=stream)
-        for samp in self.samples:
-            if samp["Sample"] == self.expected["sample"]:
-                barcode_expected = samp["BarcodeRev"]
+        for samp_name, sample in self.samples.items():
+            if samp_name == self.expected["sample"]:
+                barcode_expected = sample["BarcodeRevAttrs"]["Seq"]
         self.assertEqual(assigned, barcode_expected)
         self.assertEqual(stream.getvalue(), self.expected["stream_rev"])
 
@@ -131,7 +142,7 @@ class TestDemux(unittest.TestCase):
         gzp = lambda f: gzip.open(Path(outdir) / f, "rt")
         parse = lambda f: SeqIO.parse(f, "fastq")
         sample_data = {}
-        for sample in self.samples:
+        for sample in self.samples.values():
             with gzp("%s.R1.fastq.gz" % sample["Sample"]) as r1_in, \
                     gzp("%s.R2.fastq.gz" % sample["Sample"]) as r2_in, \
                     gzp("%s.I1.fastq.gz" % sample["Sample"]) as i1_in:
@@ -154,10 +165,19 @@ class TestDemuxRevcmp(TestDemux):
 
     def setUp(self):
         self.record = "revcmp"
-        self.samples = [
-            {"Sample": "sample1", "BarcodeFwd": "NNNNNAACTCTAA", "BarcodeRev": "CGGGAAGA"},
-            {"Sample": "sample2", "BarcodeFwd": "NNNNNNAAGGCCCT", "BarcodeRev": "TGCAACAA"},
-            {"Sample": "sample3", "BarcodeFwd": "NNNNNNNAATATGTC", "BarcodeRev": "CATCTGTG"}]
+        self.samples = {
+            "sample1": {
+                "Sample": "sample1",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNAACTCTAA"},
+                "BarcodeRevAttrs": {"Seq": "CGGGAAGA"}},
+            "sample2": {
+                "Sample": "sample2",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNNAAGGCCCT"},
+                "BarcodeRevAttrs": {"Seq": "TGCAACAA"}},
+            "sample3": {
+                "Sample": "sample3",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNNNAATATGTC"},
+                "BarcodeRevAttrs": {"Seq": "CATCTGTG"}}}
         prefix = ["F", "M00281:569:000000000-CN8J9:1:1101:16840:1816", "TCGGGAACTCTAA"]
         stream_fwd = "\n".join([
             "\t".join(prefix + ["NNNNNAACTCTAA", "8.0", "*"]),
@@ -168,7 +188,7 @@ class TestDemuxRevcmp(TestDemux):
             "\t".join(prefix + ["CGGGAAGA", "8.0", "*"]),
             "\t".join(prefix + ["TGCAACAA", "4.0", ""]),
             "\t".join(prefix + ["CATCTGTG", "2.0", ""])]) + "\n"
-        names = [s["Sample"] for s in self.samples] + ["unassigned"]
+        names = sorted(self.samples.keys()) + ["unassigned"]
         self.expected = {
             "sample": "sample1",
             "demuxed_data":  {
@@ -200,26 +220,28 @@ class TestDemuxRevcmp(TestDemux):
             }
 
     def test_assign_barcode_fwd(self):
-        barcodes_fwd = [s["BarcodeFwd"] for s in self.samples]
+        keys = sorted(self.samples.keys())
+        barcodes_fwd = [self.samples[s]["BarcodeFwdAttrs"]["Seq"] for s in keys]
         stream = StringIO()
         record = self.load_input()
         r1rec = record["R1"][0].reverse_complement(id=True)
         assigned = assign_barcode_fwd(r1rec, barcodes_fwd, send_stats=stream)
-        for samp in self.samples:
-            if samp["Sample"] == self.expected["sample"]:
-                barcode_expected = samp["BarcodeFwd"]
+        for samp_name, sample in self.samples.items():
+            if samp_name == self.expected["sample"]:
+                barcode_expected = sample["BarcodeFwdAttrs"]["Seq"]
         self.assertEqual(assigned, barcode_expected)
         self.assertEqual(stream.getvalue(), self.expected["stream_fwd"])
 
     def test_assign_barcode_rev(self):
-        barcodes_rev = [s["BarcodeRev"] for s in self.samples]
+        keys = sorted(self.samples.keys())
+        barcodes_rev = [self.samples[s]["BarcodeRevAttrs"]["Seq"] for s in keys]
         stream = StringIO()
         record = self.load_input()
         i1rec = record["I1"][0].reverse_complement(id=True)
         assigned = assign_barcode_rev(i1rec, barcodes_rev, send_stats=stream)
-        for samp in self.samples:
-            if samp["Sample"] == self.expected["sample"]:
-                barcode_expected = samp["BarcodeRev"]
+        for samp_name, sample in self.samples.items():
+            if samp_name == self.expected["sample"]:
+                barcode_expected = sample["BarcodeRevAttrs"]["Seq"]
         self.assertEqual(assigned, barcode_expected)
         self.assertEqual(stream.getvalue(), self.expected["stream_rev"])
 
@@ -245,10 +267,19 @@ class TestDemuxIDMismatch(TestDemux):
 
     def setUp(self):
         self.record = "idmismatch"
-        self.samples = [
-            {"Sample": "sample1", "BarcodeFwd": "NNNNNAACTCTAA", "BarcodeRev": "CGGGAAGA"},
-            {"Sample": "sample2", "BarcodeFwd": "NNNNNNAAGGCCCT", "BarcodeRev": "TGCAACAA"},
-            {"Sample": "sample3", "BarcodeFwd": "NNNNNNNAATATGTC", "BarcodeRev": "CATCTGTG"}]
+        self.samples = {
+            "sample1": {
+                "Sample": "sample1",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNAACTCTAA"},
+                "BarcodeRevAttrs": {"Seq": "CGGGAAGA"}},
+            "sample2": {
+                "Sample": "sample2",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNNAAGGCCCT"},
+                "BarcodeRevAttrs": {"Seq": "TGCAACAA"}},
+            "sample3": {
+                "Sample": "sample3",
+                "BarcodeFwdAttrs": {"Seq": "NNNNNNNAATATGTC"},
+                "BarcodeRevAttrs": {"Seq": "CATCTGTG"}}}
         prefix = ["F", "M05588:232:000000000-CLL8M:1:1101:19922:1593", "CGGGCTAAGGCCCT"]
         stream_fwd = "\n".join([
             "\t".join(prefix + ["NNNNNNAAGGCCCT", "8.0", "*"]),

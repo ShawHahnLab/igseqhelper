@@ -10,25 +10,17 @@ See also:
  * https://presto.readthedocs.io/en/stable/workflows/Greiff2014_Workflow.html
 """
 
-from igseq.demux import demux
 from igseq.trim import (adapter_fwd, adapter_rev)
 from igseq.presto import (PRESTO_OPTS, prep_primers_fwd)
 
-TARGET_PRESTO_DEMUX = expand("presto/demux/{run}/{sample}.{rp}.fastq.gz",
-    sample = SAMPLES_ALL,
-    run = RUNS.keys(),
-    rp = ["R1", "R2", "I1"])
 TARGET_PRESTO_TRIMMED = expand("presto/trim/{run}/{sample}.{rp}.fastq.gz",
-    sample = SAMPLES_ALL,
+    sample = SAMPLES.keys(),
     run = RUNS.keys(),
     rp = ["R1", "R2"])
-TARGET_PRESTO_DATA = expand("presto/data/{sample}_1.fastq", sample=SAMPLES_ALL)
-TARGET_PRESTO_ASSEMBLY = expand("presto/assemble/{sample}_assemble-pass.fastq", sample=SAMPLES_ALL)
-TARGET_PRESTO_QC = expand("presto/qual/{sample}-FWD_primers-pass.fastq", sample=SAMPLES_ALL)
-TARGET_PRESTO_ALL = expand("presto/collapse/{sample}_atleast-2.fastq", sample=SAMPLES_ALL)
-
-rule all_presto_demux:
-    input: TARGET_PRESTO_DEMUX
+TARGET_PRESTO_DATA = expand("presto/data/{sample}_1.fastq", sample=SAMPLES.keys())
+TARGET_PRESTO_ASSEMBLY = expand("presto/assemble/{sample}_assemble-pass.fastq", sample=SAMPLES.keys())
+TARGET_PRESTO_QC = expand("presto/qual/{sample}-FWD_primers-pass.fastq", sample=SAMPLES.keys())
+TARGET_PRESTO_ALL = expand("presto/collapse/{sample}_atleast-2.fastq", sample=SAMPLES.keys())
 
 rule all_presto_trim:
     input: TARGET_PRESTO_TRIMMED
@@ -47,26 +39,6 @@ rule all_presto:
 
 ### Before pRESTO: demultiplex, trim reads, and gather input data
 
-# This will separate out samples by barcode, and will trim the forward barcode
-# from the start of the forward read.  In an ideal world we could use
-# cutadapt's features to demultiplex and trim in one go, but it doesn't look
-# like it has any option to do this mixed R1/I1 barcoding thing.
-rule presto_demux:
-    output: expand("presto/demux/{{run}}/{sample}.{rp}.fastq.gz", sample = SAMPLES_ALL, rp = ["R1", "R2", "I1"])
-    input:
-        r1="data/{run}/Undetermined_S0_L001_R1_001.fastq.gz",
-        r2="data/{run}/Undetermined_S0_L001_R2_001.fastq.gz",
-        i1="data/{run}/Undetermined_S0_L001_I1_001.fastq.gz"
-    params: outdir="presto/demux/{run}"
-    log: "logs/demux.{run}.tsv"
-    run:
-        revcmp = RUNS[wildcards.run]["ReverseComplement"] == "1"
-        with open(log[0], "w") as f_log:
-            demux(
-                samples = SAMPLES[wildcards.run],
-                fps = {"R1": input.r1, "R2": input.r2, "I1": input.i1},
-                outdir=params.outdir, output_files=output,
-                revcmp=revcmp, send_stats=f_log)
 
 # This will trim off everything from the ends of R1 and R2 that isn't part of
 # the biological sequence (so, barcodes + primers) and will apply a slight

@@ -22,6 +22,7 @@ wildcard_constraints:
     run="[-_A-Za-z0-9]+"
 
 include: "snakemake-rules/data.smk"
+include: "snakemake-rules/demux.smk"
 include: "snakemake-rules/presto.smk"
 include: "snakemake-rules/igdiscover.smk"
 include: "snakemake-rules/sonar.smk"

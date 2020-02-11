@@ -2,8 +2,8 @@
 Helpers for handling data and metadata.
 """
 
-import csv
 import re
+import csv
 import logging
 import hashlib
 from pathlib import Path
@@ -17,46 +17,82 @@ def load_sequences(fp_in):
     Output is a dictionary of sequence names to sequences and their attributes.
     """
     LOGGER.info("load_sequences: fp_in %s", fp_in)
-    with open(fp_in) as f_in:
-        reader = csv.DictReader(f_in)
-        seqs = {row["Name"]: row for row in reader}
-    return seqs
+    sequences = _load_csv(fp_in, "Name")
+    # remove any spaces in the sequence content
+    for _, seq_data in sequences.items():
+        seq_data["Seq"] = re.sub(" ", "", seq_data["Seq"])
+    return sequences
 
-def load_samples(fp_in, sequences=None):
+def load_runs(fp_in):
+    """Load run metadata CSV.
+
+    Output is a dictionary of run IDs to run attributes.
+    """
+    LOGGER.info("load_runs: fp_in %s", fp_in)
+    return _load_csv(fp_in, "Run")
+
+def load_specimens(fp_in):
+    """Load specimen metadata CSV.
+
+    Output is a dictionary of specimen names to their attributes.
+    """
+    LOGGER.info("load_specimens: fp_in %s", fp_in)
+    return _load_csv(fp_in, "Specimen")
+
+def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     """Load sample metadata CSV and optionally link to barcode data.
 
     Output is a dict where key is run, entries are lists of sample dicts.
+    Output is a dictionary of sample names to sample attributes.  If
+    dictionaries for specimens, runs, or sequences are given, those are joined
+    to the sample attributes as nested dictionaries for each sample.
     """
     LOGGER.info("load_samples: fp_in %s", fp_in)
+    LOGGER.info("load_samples: runs %s...", str(runs)[0:60])
     LOGGER.info("load_samples: sequences %s...", str(sequences)[0:60])
-    samples = {}
-    with open(fp_in) as f_in:
-        reader = csv.DictReader(f_in)
-        for row in reader:
-            if not row["Run"] in samples:
-                samples[row["Run"]] = []
-            samples[row["Run"]].append(row)
-    if sequences:
-        for run in samples:
-            samps = samples[run]
-            for samp in samps:
-                bc_fwd = sequences.get(samp["BarcodeFwd"])
-                bc_rev = sequences.get(samp["BarcodeRev"])
-                samp["BarcodeFwdSeq"] = re.sub(" ", "", bc_fwd["Seq"])
-                samp["BarcodeRevSeq"] = re.sub(" ", "", bc_rev["Seq"])
-                samp["BarcodePair"] = "%s %s" % (samp["BarcodeFwdSeq"], samp["BarcodeRevSeq"])
-
+    samples = _load_csv(fp_in, "Sample")
+    for sample_name, sample in samples.items():
+        if sequences:
+            bc_fwd = sequences.get(sample["BarcodeFwd"])
+            if bc_fwd:
+                sample["BarcodeFwdAttrs"] = bc_fwd.copy()
+            else:
+                LOGGER.error("Missing BarcodeFwd for sample %s", sample_name)
+            bc_rev = sequences.get(sample["BarcodeFwd"])
+            if bc_rev:
+                sample["BarcodeRevAttrs"] = bc_rev.copy()
+            else:
+                LOGGER.error("Missing BarcodeRev for sample %s", sample_name)
+        if runs:
+            run = runs.get(sample["Run"])
+            if run:
+                sample["RunAttrs"] = run.copy()
+            else:
+                LOGGER.error("Missing Run for sample %s", sample_name)
+        if specimens:
+            specimen = specimens.get(sample["Specimen"])
+            if specimen:
+                sample["SpecimenAttrs"] = specimen.copy()
+            else:
+                LOGGER.error("Missing Specimen for sample %s", sample_name)
     return samples
 
-def load_runs(fp_in):
-    """Load run metadata CSV."""
-    LOGGER.info("load_runs: fp_in %s", fp_in)
+def _load_csv(fp_in, key=None):
+    """Generic CSV to dictionary.
+
+    Assumes first row is header names.  If key is given, that column is used as
+    the key for the top-level dictionary output.  If not, the first column is
+    used.
+    """
+    LOGGER.debug("_load_csv: fp_in %s", fp_in)
     with open(fp_in) as f_in:
-        runs = {}
+        entries = {}
         reader = csv.DictReader(f_in)
+        if not key:
+            key = reader.fieldnames[0]
         for row in reader:
-            runs[row["Run"]] = row
-    return runs
+            entries[row[key]] = row
+    return entries
 
 def get_data(runid, outdir, runs):
     """Get the raw data files for a single run, either from local disk or from URLs.
