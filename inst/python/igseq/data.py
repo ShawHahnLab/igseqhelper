@@ -58,7 +58,7 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
                 sample["BarcodeFwdAttrs"] = bc_fwd.copy()
             else:
                 LOGGER.error("Missing BarcodeFwd for sample %s", sample_name)
-            bc_rev = sequences.get(sample["BarcodeFwd"])
+            bc_rev = sequences.get(sample["BarcodeRev"])
             if bc_rev:
                 sample["BarcodeRevAttrs"] = bc_rev.copy()
             else:
