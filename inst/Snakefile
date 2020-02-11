@@ -23,6 +23,7 @@ wildcard_constraints:
 
 include: "snakemake-rules/data.smk"
 include: "snakemake-rules/demux.smk"
+include: "snakemake-rules/trim.smk"
 include: "snakemake-rules/presto.smk"
 include: "snakemake-rules/igdiscover.smk"
 include: "snakemake-rules/sonar.smk"

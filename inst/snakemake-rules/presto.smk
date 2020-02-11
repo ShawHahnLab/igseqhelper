@@ -10,20 +10,12 @@ See also:
  * https://presto.readthedocs.io/en/stable/workflows/Greiff2014_Workflow.html
 """
 
-from igseq.trim import (adapter_fwd, adapter_rev)
 from igseq.presto import (PRESTO_OPTS, prep_primers_fwd)
 
-TARGET_PRESTO_TRIMMED = expand("presto/trim/{run}/{sample}.{rp}.fastq.gz",
-    sample = SAMPLES.keys(),
-    run = RUNS.keys(),
-    rp = ["R1", "R2"])
 TARGET_PRESTO_DATA = expand("presto/data/{sample}_1.fastq", sample=SAMPLES.keys())
 TARGET_PRESTO_ASSEMBLY = expand("presto/assemble/{sample}_assemble-pass.fastq", sample=SAMPLES.keys())
 TARGET_PRESTO_QC = expand("presto/qual/{sample}-FWD_primers-pass.fastq", sample=SAMPLES.keys())
 TARGET_PRESTO_ALL = expand("presto/collapse/{sample}_atleast-2.fastq", sample=SAMPLES.keys())
-
-rule all_presto_trim:
-    input: TARGET_PRESTO_TRIMMED
 
 rule all_presto_data:
     input: TARGET_PRESTO_DATA
@@ -39,42 +31,13 @@ rule all_presto:
 
 ### Before pRESTO: demultiplex, trim reads, and gather input data
 
-
-# This will trim off everything from the ends of R1 and R2 that isn't part of
-# the biological sequence (so, barcodes + primers) and will apply a slight
-# quality threshold.  This ensures that pRESTO's alignment step has the best
-# chance possible of properly pairing reads and that no technical bits have any
-# chance of getting mixed in with the biological sequence content.
-rule presto_trim:
-    output:
-        r1="presto/trim/{run}/{sample}.R1.fastq.gz",
-        r2="presto/trim/{run}/{sample}.R2.fastq.gz"
-    input:
-        r1="presto/demux/{run}/{sample}.R1.fastq.gz",
-        r2="presto/demux/{run}/{sample}.R2.fastq.gz"
-    threads: 4
-    params:
-        adapter_R1=lambda w: adapter_fwd(w.sample, SAMPLES),
-        adapter_R2=lambda w: adapter_rev(w.sample, SAMPLES),
-        # https://cutadapt.readthedocs.io/en/stable/guide.html#quality-trimming
-        # https://cutadapt.readthedocs.io/en/stable/algorithms.html#quality-trimming-algorithm
-        quality_cutoff=10
-    log: "logs/trim.{run}.{sample}.log"
-    shell:
-        """
-            cutadapt --cores {threads} --quality-cutoff {params.quality_cutoff} \
-                -a {params.adapter_R1} -A {params.adapter_R2} \
-                -o {output.r1} -p {output.r2} \
-                {input.r1} {input.r2} > {log}
-        """
-
 rule presto_data:
     output:
         r1="presto/data/{sample}_1.fastq",
         r2="presto/data/{sample}_2.fastq"
     input:
-        r1=expand("presto/trim/{run}/{{sample}}.R1.fastq.gz", run = RUNS.keys()),
-        r2=expand("presto/trim/{run}/{{sample}}.R2.fastq.gz", run = RUNS.keys())
+        r1=expand("trim/{run}/{{sample}}.R1.fastq.gz", run = RUNS.keys()),
+        r2=expand("trim/{run}/{{sample}}.R2.fastq.gz", run = RUNS.keys())
     shell:
         """
             zcat {input.r1} > {output.r1}
