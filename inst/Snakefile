@@ -21,6 +21,7 @@ wildcard_constraints:
     sample="[A-Za-z0-9]+",
     run="[-_A-Za-z0-9]+"
 
+include: "snakemake-rules/counts.smk"
 include: "snakemake-rules/data.smk"
 include: "snakemake-rules/demux.smk"
 include: "snakemake-rules/qc.smk"
