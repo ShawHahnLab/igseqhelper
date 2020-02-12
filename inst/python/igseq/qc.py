@@ -28,7 +28,7 @@ def make_qualtrim_grid(fqgz_in, qual_breaks=None, len_breaks=None):
     qual_breaks = sorted(qual_breaks)[::-1]
     # Go from lowest to highets length
     if not len_breaks:
-        len_breaks = list(range(0, 510, 10))
+        len_breaks = list(range(0, 401))
     len_breaks = sorted(len_breaks)
 
     tally = {b: {lenb: 0 for lenb in len_breaks} for b in qual_breaks}
