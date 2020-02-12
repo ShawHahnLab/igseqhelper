@@ -17,7 +17,7 @@ def load_sequences(fp_in):
     Output is a dictionary of sequence names to sequences and their attributes.
     """
     LOGGER.info("load_sequences: fp_in %s", fp_in)
-    sequences = _load_csv(fp_in, "Name")
+    sequences = load_csv(fp_in, "Name")
     # remove any spaces in the sequence content
     for _, seq_data in sequences.items():
         seq_data["Seq"] = re.sub(" ", "", seq_data["Seq"])
@@ -29,7 +29,7 @@ def load_runs(fp_in):
     Output is a dictionary of run IDs to run attributes.
     """
     LOGGER.info("load_runs: fp_in %s", fp_in)
-    return _load_csv(fp_in, "Run")
+    return load_csv(fp_in, "Run")
 
 def load_specimens(fp_in):
     """Load specimen metadata CSV.
@@ -37,7 +37,7 @@ def load_specimens(fp_in):
     Output is a dictionary of specimen names to their attributes.
     """
     LOGGER.info("load_specimens: fp_in %s", fp_in)
-    return _load_csv(fp_in, "Specimen")
+    return load_csv(fp_in, "Specimen")
 
 def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     """Load sample metadata CSV and optionally link to barcode data.
@@ -50,7 +50,7 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     LOGGER.info("load_samples: fp_in %s", fp_in)
     LOGGER.info("load_samples: runs %s...", str(runs)[0:60])
     LOGGER.info("load_samples: sequences %s...", str(sequences)[0:60])
-    samples = _load_csv(fp_in, "Sample")
+    samples = load_csv(fp_in, "Sample")
     for sample_name, sample in samples.items():
         if sequences:
             bc_fwd = sequences.get(sample["BarcodeFwd"])
@@ -77,14 +77,14 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
                 LOGGER.error("Missing Specimen for sample %s", sample_name)
     return samples
 
-def _load_csv(fp_in, key=None):
+def load_csv(fp_in, key=None):
     """Generic CSV to dictionary.
 
     Assumes first row is header names.  If key is given, that column is used as
     the key for the top-level dictionary output.  If not, the first column is
     used.
     """
-    LOGGER.debug("_load_csv: fp_in %s", fp_in)
+    LOGGER.debug("load_csv: fp_in %s", fp_in)
     with open(fp_in) as f_in:
         entries = {}
         reader = csv.DictReader(f_in)
