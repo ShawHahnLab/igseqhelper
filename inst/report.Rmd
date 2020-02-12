@@ -1,0 +1,65 @@
+---
+title: "IgSeq Analysis"
+author: "Jesse Connell"
+date: \today
+output: pdf_document
+geometry: margin=1.5cm
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+if (! "ROOT" %in% ls()) {
+  ROOT <- normalizePath(file.path(getwd(), "../.."))  
+}
+devtools::load_all(file.path(ROOT, "igseq"))
+```
+
+# Run Performance and Read Depth
+
+```{r}
+counts_by_sample <- read.csv(file.path(ROOT, "reporting/counts_by_sample.csv"), header = TRUE, stringsAsFactors = FALSE)
+counts_by_sample <- subset(counts_by_sample, Sample != "unassigned")
+counts_by_run <- read.csv(file.path(ROOT, "reporting/counts_by_run.csv"), header = TRUE, stringsAsFactors = FALSE)
+```
+
+We aim for a 50/50 ratio of library to PhiX. Assuming the unassigned reads are
+all PhiX, we expect to see close to 1.0 for the below ratios.
+
+```{r}
+knitr::kable(counts_by_run, digits = 3, row.names = FALSE)
+```
+
+The libraries are prepared with a goal of roughly ten reads for every one cell,
+so we expect to see 10 or more for the below ratios.
+
+```{r}
+knitr::kable(counts_by_sample, digits = 3, row.names = FALSE)
+```
+
+```{r}
+qualgrids_r1 <- list()
+qualgrids_r2 <- list()
+for (idx in 1:nrow(counts_by_sample)) {
+  prefix <- file.path(
+    ROOT,
+    "qc-prev",
+    counts_by_sample$Run[idx],
+    paste0("qualtrim.", counts_by_sample$Sample[idx]))
+  qualgrids_r1 <- c(qualgrids_r1, list(load_qualgrid(paste0(prefix, ".R1.csv"))))
+  qualgrids_r2 <- c(qualgrids_r2, list(load_qualgrid(paste0(prefix, ".R2.csv"))))
+}
+names(qualgrids_r1) <- counts_by_sample$Sample
+names(qualgrids_r2) <- counts_by_sample$Sample
+```
+
+```{r fig.width = 3.7, fig.height = 3, dev="png", dpi=150}
+for (sample in counts_by_sample$Sample) {
+  if (sum(qualgrids_r1[[sample]]) > 100) {
+  plot_qualgrid(qualgrids_r1[[sample]], main=paste(sample, "R1"),
+                legend = FALSE, show_rownames = FALSE)
+  plot_qualgrid(qualgrids_r2[[sample]], main=paste(sample, "R2"))
+  cat("\n\n")  
+  }
+  
+}
+```
