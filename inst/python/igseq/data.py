@@ -21,6 +21,12 @@ def load_sequences(fp_in):
     # remove any spaces in the sequence content
     for _, seq_data in sequences.items():
         seq_data["Seq"] = re.sub(" ", "", seq_data["Seq"])
+    # check for duplicate sequence content
+    seqs_unique = {entry["Seq"] for entry in sequences.values()}
+    if len(seqs_unique) != len(sequences.values()):
+        msg = "Duplicate entries in CSV %s in Seq column" % fp_in
+        LOGGER.critical(msg)
+        raise ValueError(msg)
     return sequences
 
 def load_runs(fp_in):
@@ -51,6 +57,11 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     LOGGER.info("load_samples: runs %s...", str(runs)[0:60])
     LOGGER.info("load_samples: sequences %s...", str(sequences)[0:60])
     samples = load_csv(fp_in, "Sample")
+    unique_keys = {(row["BarcodeFwd"], row["BarcodeRev"], row["Run"]) for row in samples.values()}
+    if len(unique_keys) != len(samples.values()):
+        msg = "Duplicate entries in CSV %s for BarcodeFwd/BarcodeRev/Run combinations" % fp_in
+        LOGGER.critical(msg)
+        raise ValueError(msg)
     for sample_name, sample in samples.items():
         if sequences:
             bc_fwd = sequences.get(sample["BarcodeFwd"])
@@ -91,7 +102,13 @@ def load_csv(fp_in, key=None):
         if not key:
             key = reader.fieldnames[0]
         for row in reader:
-            entries[row[key]] = row
+            row_key = row[key]
+            if row_key in entries:
+                msg = "Duplicate keys in CSV %s under column %s (value %s)" % (
+                    fp_in, key, row_key)
+                LOGGER.critical(msg)
+                raise ValueError(msg)
+            entries[row_key] = row
     return entries
 
 def get_data(runid, outdir, runs):

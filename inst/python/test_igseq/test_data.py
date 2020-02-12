@@ -3,6 +3,7 @@ Test data and metadata functions.
 """
 
 import unittest
+import logging
 import igseq.data
 from test_igseq.util import ROOT
 
@@ -108,26 +109,44 @@ class TestMetadataDuplicates(TestMetadata):
     """Test metadata spreadsheets that have duplicated entries.
 
     This shouldn't be allowed, since each type of thing should have exactly one row per thing.
+    There are a few additional types of duplicates to test for: for sequences,
+    neither the name nor the sequence itself should occur more than once.  For
+    samples, the combination of barcodes and run ID should be unique.
     """
 
     def setUp(self):
         self.path = ROOT / "metadata_duplicates"
 
     def test_load_sequences(self):
-        with self.assertRaises(ValueError):
-            igseq.data.load_sequences(self.path / "sequences.csv")
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(ValueError):
+                igseq.data.load_sequences(self.path / "sequences.csv")
+        # But also, we shouldn't have any duplicated sequences.
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(ValueError):
+                igseq.data.load_sequences(self.path / "sequences_dup_seq.csv")
 
     def test_load_runs(self):
-        with self.assertRaises(ValueError):
-            igseq.data.load_runs(self.path / "runs.csv")
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(ValueError):
+                igseq.data.load_runs(self.path / "runs.csv")
 
     def test_load_specimens(self):
-        with self.assertRaises(ValueError):
-            igseq.data.load_specimens(self.path / "specimens.csv")
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(ValueError):
+                igseq.data.load_specimens(self.path / "specimens.csv")
 
     def test_load_samples_basic(self):
-        with self.assertRaises(ValueError):
-            igseq.data.load_samples(self.path / "samples.csv")
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(ValueError):
+                igseq.data.load_samples(self.path / "samples.csv")
+        # But also, we shouldn't have any duplicated combinations of
+        # BarcodeFwd, BarcodeRev, and Run.  In this case the supposed sample7
+        # is indistinguishable from sample1 because  it's in the same run with
+        # the same barcodes.
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(ValueError):
+                igseq.data.load_samples(self.path / "samples_dup_barcodes.csv")
 
     def test_load_samples_joined(self):
         self.skipTest("not yet implemented")
