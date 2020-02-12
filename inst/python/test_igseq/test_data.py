@@ -6,12 +6,12 @@ import unittest
 import igseq.data
 from test_igseq.util import ROOT
 
-METADATA = ROOT / "metadata"
 
 class TestMetadata(unittest.TestCase):
     """Basic tests for metadata loading from spreadsheets."""
 
     def setUp(self):
+        self.path = ROOT / "metadata"
         self.expected = {
             "sequences": {
                 "cols": ["Name", "Seq", "Use", "Annotation", "Direction", "Notes"],
@@ -39,22 +39,22 @@ class TestMetadata(unittest.TestCase):
 
     def test_load_sequences(self):
         """Test loading sequences CSV."""
-        sequences = igseq.data.load_sequences(METADATA / "sequences.csv")
+        sequences = igseq.data.load_sequences(self.path / "sequences.csv")
         self.check_metadata(sequences, self.expected["sequences"], "Name")
 
     def test_load_runs(self):
         """Test loading runs CSV."""
-        runs = igseq.data.load_runs(METADATA / "runs.csv")
+        runs = igseq.data.load_runs(self.path / "runs.csv")
         self.check_metadata(runs, self.expected["runs"], "Run")
 
     def test_load_specimens(self):
         """Test loading specimens CSV."""
-        specimens = igseq.data.load_specimens(METADATA / "specimens.csv")
+        specimens = igseq.data.load_specimens(self.path / "specimens.csv")
         self.check_metadata(specimens, self.expected["specimens"], "Specimen")
 
     def test_load_samples_basic(self):
         """Test loading samples CSV, by itself."""
-        samples = igseq.data.load_samples(METADATA / "samples.csv")
+        samples = igseq.data.load_samples(self.path / "samples.csv")
         self.check_metadata(samples, self.expected["samples"], "Sample")
 
     def check_metadata(self, obs, exp, key):
@@ -79,10 +79,10 @@ class TestMetadata(unittest.TestCase):
         metadata plus additional nested dictionaries filled in from the other
         CSV files.
         """
-        specimens = igseq.data.load_specimens(METADATA / "specimens.csv")
-        runs = igseq.data.load_runs(METADATA / "runs.csv")
-        sequences = igseq.data.load_sequences(METADATA / "sequences.csv")
-        samples = igseq.data.load_samples(METADATA / "samples.csv", specimens, runs, sequences)
+        specimens = igseq.data.load_specimens(self.path / "specimens.csv")
+        runs = igseq.data.load_runs(self.path / "runs.csv")
+        sequences = igseq.data.load_sequences(self.path / "sequences.csv")
+        samples = igseq.data.load_samples(self.path / "samples.csv", specimens, runs, sequences)
         # Check the same sort of rows/columns things as above, but also the nested metadata
         nested_items = {
             "SpecimenAttrs": "specimens",
@@ -102,3 +102,32 @@ class TestMetadata(unittest.TestCase):
             # Excluding those nested keys, the sample attributes should still match up as before.
             keys = [key for key in keys if key not in nested_items.keys()]
             self.assertEqual(keys, self.expected["samples"]["cols"])
+
+
+class TestMetadataDuplicates(TestMetadata):
+    """Test metadata spreadsheets that have duplicated entries.
+
+    This shouldn't be allowed, since each type of thing should have exactly one row per thing.
+    """
+
+    def setUp(self):
+        self.path = ROOT / "metadata_duplicates"
+
+    def test_load_sequences(self):
+        with self.assertRaises(ValueError):
+            igseq.data.load_sequences(self.path / "sequences.csv")
+
+    def test_load_runs(self):
+        with self.assertRaises(ValueError):
+            igseq.data.load_runs(self.path / "runs.csv")
+
+    def test_load_specimens(self):
+        with self.assertRaises(ValueError):
+            igseq.data.load_specimens(self.path / "specimens.csv")
+
+    def test_load_samples_basic(self):
+        with self.assertRaises(ValueError):
+            igseq.data.load_samples(self.path / "samples.csv")
+
+    def test_load_samples_joined(self):
+        self.skipTest("not yet implemented")
