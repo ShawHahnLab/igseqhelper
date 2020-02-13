@@ -11,7 +11,7 @@ def counts_sample_summary(
     rows = []
     for runid in runs.keys():
         for sample in samples_per_run[runid] + ["unassigned"]:
-            key = "counts/demux-prev/{run}/{sample}.I1.fastq.gz.counts".format(
+            key = "counts/demux/{run}/{sample}.I1.fastq.gz.counts".format(
                 run=runid,
                 sample=sample)
             cts = int(counts[key]["NumSequences"])

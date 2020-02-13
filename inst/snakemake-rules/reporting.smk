@@ -6,7 +6,7 @@ from igseq.reporting import counts_sample_summary, counts_run_summary
 TARGET_REPORT_COUNTS = []
 for runid in RUNS.keys():
     TARGET_REPORT_COUNTS.extend(expand(
-        "counts/demux-prev/{run}/{sample}.{rp}.fastq.gz.counts",
+        "counts/demux/{run}/{sample}.{rp}.fastq.gz.counts",
         sample=SAMPLES_PER_RUN[runid] + ["unassigned"],
         run=runid,
         rp=["R1", "R2", "I1"]))
