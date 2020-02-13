@@ -4,10 +4,13 @@ Various QC checks.
 
 from igseq.qc import make_qualtrim_csv
 
-TARGET_QUALTRIM_GRID = expand("qc/{run}/qualtrim.{sample}.{rp}.csv",
-    sample = SAMPLES.keys(),
-    run = RUNS.keys(),
-    rp = ["R1", "R2"])
+TARGET_QUALTRIM_GRID = []
+for runid in RUNS.keys():
+    TARGET_QUALTRIM_GRID.extend(expand(
+        "qc/{run}/qualtrim.{sample}.{rp}.csv",
+        sample=SAMPLES_PER_RUN[runid],
+        run=runid,
+        rp=["R1", "R2"]))
 
 rule all_qualtrim_grid:
     input: TARGET_QUALTRIM_GRID
