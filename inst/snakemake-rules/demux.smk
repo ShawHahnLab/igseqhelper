@@ -8,6 +8,9 @@ SAMPLES_PER_RUN = {}
 # Inspired by the for loop that makes rules on the fly from IgDiscover:
 # https://github.com/NBISweden/IgDiscover/blob/master/src/igdiscover/Snakefile#L387
 # Thanks!
+# NOTE: be very careful not to reference loop variables directly in the rule
+# definition.  Instead save objects as parameters so they're tied to a specific
+# iteration.
 # This way each rule only needs to create output files specific to that run.
 # Before that I had every single sample from every single run, just because of
 # how Snakemake works.  Checkpoint rules might be another way to handle this.
@@ -33,6 +36,7 @@ for runid in RUNS.keys():
             i1="data/{run}/Undetermined_S0_L001_I1_001.fastq.gz".format(run=runid)
         params:
             samples=samples,
+            revcmp=revcmp,
             outdir="demux/{run}".format(run=runid)
         log: "logs/demux.{run}.tsv".format(run=runid)
         run:
@@ -41,7 +45,7 @@ for runid in RUNS.keys():
                     samples=params.samples,
                     fps = {"R1": input.r1, "R2": input.r2, "I1": input.i1},
                     outdir=params.outdir, output_files=output,
-                    revcmp=revcmp, send_stats=f_log)
+                    revcmp=params.revcmp, send_stats=f_log)
 
 TARGET_DEMUX = []
 for runid in RUNS.keys():
