@@ -2,14 +2,15 @@
 Summarizing and reporting helper functions.
 """
 import csv
-from igseq.data import load_csv
+from igseq.data import load_csv, get_samples_per_run
 
 def counts_sample_summary(
-        file_counts_in, counts_sample_summary_out, samples, runs, samples_per_run):
+        file_counts_in, counts_sample_summary_out, samples):
     """Take a list of sequence counts for fastq.gz files and summarize per-sample."""
+    samples_per_run = get_samples_per_run(samples)
     counts = load_csv(file_counts_in)
     rows = []
-    for runid in runs.keys():
+    for runid in samples_per_run:
         for sample in samples_per_run[runid] + ["unassigned"]:
             key = "counts/demux/{run}/{sample}.I1.fastq.gz.counts".format(
                 run=runid,

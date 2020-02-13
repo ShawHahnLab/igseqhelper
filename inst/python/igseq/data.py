@@ -181,3 +181,13 @@ def md5(fp_in):
         for chunk in iter(lambda: f_in.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+def get_samples_per_run(samples):
+    """Make a dictionary of run names -> lists of sample names."""
+    samples_per_run = {}
+    for sample_name, sample_attrs in samples.items():
+        runid = sample_attrs["Run"]
+        if not runid in samples_per_run:
+            samples_per_run[runid] = []
+        samples_per_run[runid].append(sample_name)
+    return samples_per_run

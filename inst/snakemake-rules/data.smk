@@ -3,7 +3,7 @@ Handlers for data/metadata
 """
 
 from pathlib import Path
-from igseq.data import (load_samples, load_specimens, load_runs, load_sequences, get_data)
+from igseq.data import (load_samples, load_specimens, load_runs, load_sequences, get_data, get_samples_per_run)
 
 def _setup_metadata(fp_samples, fp_specimens, fp_runs, fp_sequences):
     global SEQUENCES, SPECIMENS, SAMPLES, RUNS
@@ -39,6 +39,21 @@ ALLELES = {"heavy": {"V": "", "D": "", "J": ""}, "light": {"V": "", "J": ""}}
 
 RAW = "Undetermined_S0_L001_{rp}_001.fastq.gz"
 
+def outputs_per_run(pattern, samples):
+    """Helper to produce output filenames specific to run/sample combos.
+
+    Give a string pattern with {run} and {sample} and the dictionary of sample
+    information and the right run/sample combinations will be filled in.  Be
+    sure to escape any other template variables like {{rp}}.
+    """
+    samples_per_run = get_samples_per_run(samples)
+    target = []
+    for runid in samples_per_run.keys():
+        target.extend(expand(
+            pattern,
+            sample=samples_per_run[runid],
+            run=runid))
+    return target
 
 rule all_get_data:
     """Get data files for all sequencing runs.
