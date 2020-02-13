@@ -7,10 +7,9 @@ barcode arguments.
 
 from igseq.trim import (adapter_fwd, adapter_rev)
 
-TARGET_TRIMMED = expand("trim/{run}/{sample}.{rp}.fastq.gz",
-    sample = SAMPLES.keys(),
-    run = RUNS.keys(),
-    rp = ["R1", "R2"])
+TARGET_TRIMMED = expand(
+    outputs_per_run("trim/{run}/{sample}.{{rp}}.fastq.gz", SAMPLES),
+    rp=["R1", "R2"])
 
 rule all_trim:
     input: TARGET_TRIMMED
