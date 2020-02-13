@@ -19,6 +19,8 @@ LOGGER = logging.getLogger(__name__)
 
 wildcard_constraints:
     sample="[A-Za-z0-9]+",
+    specimen="[A-Za-z0-9]+",
+    subject="[A-Za-z0-9]+",
     run="[-_A-Za-z0-9]+"
 
 include: "snakemake-rules/counts.smk"
