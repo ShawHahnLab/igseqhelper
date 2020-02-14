@@ -11,6 +11,10 @@ from snakemake.shell import shell
 
 LOGGER = logging.getLogger(__name__)
 
+class MetadataError(Exception):
+    """Errors related to missing or invalid metadata."""
+
+
 def load_sequences(fp_in):
     """Load sequence metadata CSV.
 

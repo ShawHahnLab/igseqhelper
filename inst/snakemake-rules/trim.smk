@@ -28,8 +28,8 @@ rule trim:
         r2="demux/{run}/{sample}.R2.fastq.gz"
     threads: 4
     params:
-        adapter_R1=lambda w: adapter_fwd(w.sample, SAMPLES),
-        adapter_R2=lambda w: adapter_rev(w.sample, SAMPLES),
+        adapter_R1=lambda w: adapter_fwd(SAMPLES[w.sample], SEQUENCES),
+        adapter_R2=lambda w: adapter_rev(SAMPLES[w.sample], SEQUENCES),
         # https://cutadapt.readthedocs.io/en/stable/guide.html#quality-trimming
         # https://cutadapt.readthedocs.io/en/stable/algorithms.html#quality-trimming-algorithm
         quality_cutoff=10
