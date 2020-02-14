@@ -8,6 +8,7 @@ def adapter_fwd(sample_name, samples):
     """Get the adapter sequence to trim off the end of R1."""
     # The first round PCR primer occurs just *after* the beginning of R2, so
     # we'll trim that off the end of R1.
+    # TODO this should be handled via sequences.csv
     return "TCCACCAAGGGCCCATCGGTCTTCCCCCTGGC"
 
 def adapter_rev(sample_name, samples):
@@ -20,22 +21,10 @@ def adapter_rev(sample_name, samples):
     # include the barcode for each specific sample as part of the adapter here.
     # Note that the "N" characters in the barcode sequences should be handled
     # just fine by cutadapt.
+    # TODO this should be handled via sequences.csv
     p5seq = "AGATCGGAAGAGCGTCGTGTAGGGAAAGA" # (reverse complemented)
-    # Extract the (should be "the" but my wonky metadata handling means we
-    # could run into multiple, so we'll check against that) forward barcode to
-    # use as part of the adapter.
-    bcs = []
-    for runid in samples:
-        for samp in samples[runid]:
-            if samp["Sample"] == sample_name:
-                bcs.append(samp["BarcodeFwd"])
-    bcs = set(bcs)
-    if len(bcs) > 1:
-        raise ValueError(
-            ("sample %s barcoded differently in different "
-             "runs (%s), cleanup your metadata!") % (sample_name, str(bcs)))
-    if len(bcs) == 0:
-        raise ValueError("No barcode found for sample %s" % sample_name)
+
+    barcode = samples[sample_name]["BarcodeFwdAttrs"]["Seq"]
     # Reverse complement the barcode and prepend to the constant region.
-    barcode = revcmp(bcs.pop())
+    barcode = revcmp(barcode)
     return barcode + p5seq
