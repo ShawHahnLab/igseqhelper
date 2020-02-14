@@ -55,3 +55,18 @@ def prep_primers_fwd(fp_csv_in, fp_fwd_out):
     sequences = load_sequences(fp_csv_in)
     fwd = SeqRecord(Seq(sequences["5PIIA"]), id="5PIIA", description="")
     SeqIO.write(fwd, fp_fwd_out, "fasta")
+
+def specimens_per_sample(pattern, samples, cell_type_keep="IgG+"):
+    """Make list of filenames for all specimens of a given cell type."""
+    target = []
+    for samp_items in samples.values():
+        spec_name = samp_items["Specimen"]
+        cell_type = samp_items["SpecimenAttrs"]["CellType"]
+        chain = samp_items["Chain"]
+        chain_type = samp_items["Type"]
+        if cell_type_keep in cell_type:
+            target.extend(pattern.format(
+                chain=chain,
+                chain_type=chain_type,
+                specimen=spec_name))
+    return target
