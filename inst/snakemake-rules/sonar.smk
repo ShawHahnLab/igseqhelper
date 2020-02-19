@@ -1,27 +1,34 @@
 import igseq.sonar
 
-TARGET_SONAR_PREP = \
-    expand("sonar-analysis/heavy/{sample}/{sample}.fastq", sample = SAMPLES_H) + \
-    expand("sonar-analysis/light/{sample}/{sample}.fastq", sample = SAMPLES_L)
 
-TARGET_SONAR_MODULE_1 = \
-    expand("sonar-analysis/heavy/{sample}/output/sequences/nucleotide/{sample}_goodVJ_unique.fa", sample = SAMPLES_H) + \
-    expand("sonar-analysis/light/{sample}/output/sequences/nucleotide/{sample}_goodVJ_unique.fa", sample = SAMPLES_L)
 
-TARGET_SONAR_MODULE_2_AUTO = \
-    expand("sonar-analysis/heavy/{sample}/output/tables/{sample}_lineages.txt", sample = SAMPLES_H) + \
-    expand("sonar-analysis/light/{sample}/output/tables/{sample}_lineages.txt", sample = SAMPLES_L)
+# TODO make this stuff subject-specific!! we want to be able to supply germline alleles on a per-subject basis.
 
-TARGET_SONAR_MODULE_2_ID_DIV = \
-    expand("sonar-analysis/heavy/{sample}/output/tables/{sample}_goodVJ_unique_id-div.tab", sample = SAMPLES_H) + \
-    expand("sonar-analysis/light/{sample}/output/tables/{sample}_goodVJ_unique_id-div.tab", sample = SAMPLES_L)
 
-TARGET_SONAR_MODULE_2_MANUAL = \
-    expand("sonar-analysis/heavy/{sample}/output/sequences/nucleotide/{sample}_islandSeqs.fa", sample = SAMPLES_H) + \
-    expand("sonar-analysis/light/{sample}/output/sequences/nucleotide/{sample}_islandSeqs.fa", sample = SAMPLES_L)
 
-TARGET_SONAR_MODULE_3 = \
-    expand("sonar-analysis/{chain}/longitudinal/output/longitudinal_igphyml.tree", chain = ["heavy", "light"])
+IGG_CHAINS = [entry["Chain"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
+IGG_CHAINTYPES = [entry["Type"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
+IGG_SUBJECTS = [entry["SpecimenAttrs"]["Subject"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
+IGG_SPECIMENS = [entry["Specimen"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
+
+TARGET_SONAR_PREP = expand(
+    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",
+    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
+TARGET_SONAR_MODULE_1 = expand(
+    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
+TARGET_SONAR_MODULE_2_AUTO = expand(
+    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_lineages.txt",
+    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
+TARGET_SONAR_MODULE_2_ID_DIV = expand(
+    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
+    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
+TARGET_SONAR_MODULE_2_MANUAL = expand(
+    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa",
+    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
+TARGET_SONAR_MODULE_3 = expand(
+    "sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal/{subject}/output/longitudinal_igphyml.tree",
+    zip, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, subject=IGG_SUBJECTS) 
 
 rule all_sonar_prep_input:
     input: TARGET_SONAR_PREP
@@ -41,36 +48,41 @@ rule all_sonar_module_2_manual:
 rule all_sonar_module_3:
     input: TARGET_SONAR_MODULE_3
 
-ruleorder: sonar_prep_input_from_presto > sonar_prep_input
-
-# Concatenate all reads found across runs for a single sample into one
-# fastq, inside a subdirectory for that sample's SONAR analysis.
-rule sonar_prep_input:
-    output: "sonar-analysis/{chain}/{sample}/{sample}.fastq"
-    input: expand("5-primertrim/{run}/{{sample}}.fastq.gz", run = RUNS.keys())
-    shell: "zcat {input} > {output}"
-
-# New version!  use pRESTO instead of our custom prep steps
 rule sonar_prep_input_from_presto:
-    output: "sonar-analysis/{chain}/{sample}/{sample}.fastq"
-    input: "presto/qual/{sample}-FWD_primers-pass.fastq"
+    output: "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq"
+    input: "presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
     shell: "ln {input} {output}"
 
 # Prepare germline references for SONAR.  Note that it expects a particular
 # sequence naming scheme for genes and module 2 will fail if we don't follow
 # it.
 rule sonar_gather_germline:
-    output: "sonar-analysis/{chain}/germline.{segment}.fasta"
+    output: "sonar-analysis/{subject}/germline.{chain}.{segment}.fasta"
     input:
         imgt=lambda w: str(RINST/"reference/imgt/IG%s%s.fasta") % ({"heavy": "H", "light": "L"}[w.chain], w.segment),
         extra_v=str(RINST/"reference/10.1016_j.cell.2019.06.030/tables3c.{chain}.fasta")
     run:
         igseq.sonar.gather_germline(input.imgt, input.extra_v, output[0], wildcards.segment)
 
-rule sonar_gather_mature:
-    output: "sonar-analysis/{chain}/mab.fasta"
-    input: str(RINST/"reference/{chain}.mature.fasta")
-    shell: "cp {input} {output}"
+def module_1_inputs(wildcards):
+    if wildcards.chain == "heavy":
+        segments = ["V", "D", "J"]
+    elif wildcards.chain == "light":
+        segments = ["V", "J"]
+    else:
+        raise ValueError('Chain should be either "heavy" or "light"')
+    targets = dict(zip(segments, expand(
+        "sonar-analysis/{subject}/germline.{chain}.{segment}.fasta",
+        subject=wildcards.subject,
+        chain=wildcards.chain,
+        segment=segments)))
+    targets["fastq"] = expand(
+        "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",
+        subject=wildcards.subject,
+        chain=wildcards.chain,
+        chain_type=wildcards.chain_type,
+        specimen=wildcards.specimen)[0]
+    return targets
 
 # use --jmotif arguent to sonar finalize?
 # ("Conserved nucleotide sequence indicating the start of FWR4 on the J gene.
@@ -81,53 +93,56 @@ rule sonar_gather_mature:
 # and TTCGG in all of the IGLJ.fasta sequences, so maybe that's OK as the
 # default? Also, our amplicons seem to end with just a tiny fragment of this
 # conserved region anyway.
+
 rule sonar_module_1:
-    output: "sonar-analysis/{chain}/{sample}/output/sequences/nucleotide/{sample}_goodVJ_unique.fa"
-    input:
-        fq="sonar-analysis/{chain}/{sample}/{sample}.fastq",
-        ref_hv="sonar-analysis/heavy/germline.V.fasta",
-        ref_hd="sonar-analysis/heavy/germline.D.fasta",
-        ref_hj="sonar-analysis/heavy/germline.J.fasta",
-        ref_lv="sonar-analysis/light/germline.V.fasta",
-        ref_lj="sonar-analysis/light/germline.J.fasta"
+    output: "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa"
+    input: unpack(module_1_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
         cluster_id_fract=.97,
-        cluster_min2=2
+        cluster_min2=2,
+        # What we give for the V(D)J command-line argments depends on which
+        # chain we're doing.  We could handle this during the rule itself with
+        # a run: directive but then it won't let us use singularity.
+        libv_arg=lambda w, input: "--lib ../../" + str(Path(input.V).name),
+        libd_arg=lambda w, input: "D" in input and "--dlib ../../" + str(Path(input.D).name) or "--noD",
+        libj_arg=lambda w, input: "--jlib ../../" + str(Path(input.J).name)
     shell:
         """
-            cd $(dirname {input.fq})
-            if [[ {wildcards.chain} == "heavy" ]]; then
-                true
-                libv_arg="--lib ../$(basename {input.ref_hv})"
-                libd_arg="--dlib ../$(basename {input.ref_hd})"
-                libj_arg="--jlib ../$(basename {input.ref_hj})"
-            else
-                libv_arg="--lib ../$(basename {input.ref_lv})"
-                libd_arg="--noD"
-                libj_arg="--jlib ../$(basename {input.ref_lj})"
-            fi
-            sonar blast_V --fasta ../../../{input.fq} $libv_arg  --derep --threads {threads}
-            sonar blast_J $libd_arg $libj_arg --noC --threads {threads}
+            cd $(dirname {input.fastq})
+            sonar blast_V --fasta ../../../../{input.fastq} {params.libv_arg} --derep --threads {threads}
+            sonar blast_J {params.libd_arg} {params.libj_arg} --noC --threads {threads}
             sonar finalize --noclean --threads {threads}
             sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2}
         """
 
+
+
+
+
+
+
+
 ### Non-interactive aspect of module 2
+
+# TODO use entries in metadata
+rule sonar_gather_mature:
+    output: "sonar-analysis/{subject}/{antibody_type}.{chain}.mab.fasta"
+    input: "/t/b/d"
+    shell: "cp {input} {output}"
 
 # Automated intradonor analysis and grouping
 rule sonar_module_2:
     output: "sonar-analysis/{chain}/{sample}/output/tables/{sample}_lineages.txt"
     input:
         module1="sonar-analysis/{chain}/{sample}/output/sequences/nucleotide/{sample}_goodVJ_unique.fa",
-        mab="sonar-analysis/{chain}/mab.fasta",
+        mab="sonar-analysis/{subject}/{antibody_type}.{chain}/mab.fasta",
         ref_hv="sonar-analysis/heavy/germline.V.fasta",
         ref_hd="sonar-analysis/heavy/germline.D.fasta",
         ref_hj="sonar-analysis/heavy/germline.J.fasta",
         ref_lv="sonar-analysis/light/germline.V.fasta",
         ref_lj="sonar-analysis/light/germline.J.fasta",
-        ref_mab="sonar-analysis/{chain}/mab.fasta",
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
