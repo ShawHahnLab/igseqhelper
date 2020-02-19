@@ -30,7 +30,6 @@ def __find_r_pkg():
     return igseq_inst, igseq
 
 LOGGER = logging.getLogger(__name__)
-#logging.basicConfig(level=0)
 
 R_PKG_INST, R_PKG_PATH = __find_r_pkg()
 
