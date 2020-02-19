@@ -195,3 +195,31 @@ def get_samples_per_run(samples):
             samples_per_run[runid] = []
         samples_per_run[runid].append(sample_name)
     return samples_per_run
+
+def amplicon_files(pattern, samples, cell_type_keep="IgG+"):
+    """Make list of filenames for all specimen/chain/type combos of a given cell type.
+
+    Give a pattern with templated fields for specimen, chain, and chain_type.
+    Escape any others.  We're using the sample metadata for this, but it's not
+    really sample-specific as we may have more than one sample for the same
+    specimen/chain/chain type.  We'll deduplicate at the end in case.
+    """
+    LOGGER.info("amplicon_files: pattern: %s", pattern)
+    LOGGER.info("amplicon_files: samples: %d entries", len(samples.keys()))
+    LOGGER.info("amplicon_files: cell_type_keep: %s", cell_type_keep)
+    target = []
+    for samp_name, samp_items in samples.items():
+        spec_name = samp_items["Specimen"]
+        cell_type = samp_items["SpecimenAttrs"]["CellType"]
+        chain = samp_items["Chain"]
+        chain_type = samp_items["Type"]
+        LOGGER.debug(
+            "amplicon_files: process sample: %s " \
+            "(specimen %s, cell type %s, chain %s, chain type %s)",
+            samp_name, spec_name, cell_type, chain, chain_type)
+        if cell_type_keep in cell_type:
+            text = pattern.format(chain=chain, chain_type=chain_type, specimen=spec_name)
+            if text not in target:
+                LOGGER.debug("amplicon_files: add target: %s", text)
+                target.append(text)
+    return target

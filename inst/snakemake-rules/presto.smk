@@ -13,12 +13,13 @@ See also:
  * https://presto.readthedocs.io/en/stable/workflows/Greiff2014_Workflow.html
 """
 
-from igseq.presto import (PRESTO_OPTS, prep_primers_fwd, specimens_per_sample)
+from igseq.data import amplicon_files
+from igseq.presto import (PRESTO_OPTS, prep_primers_fwd)
 
-TARGET_PRESTO_DATA = expand(specimens_per_sample("presto/data/{chain}.{chain_type}/{specimen}.{{rp}}.fastq", SAMPLES), rp=["R1", "R2"])
-TARGET_PRESTO_ASSEMBLY = expand(specimens_per_sample("presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES))
-TARGET_PRESTO_QC = expand(specimens_per_sample("presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq", SAMPLES))
-TARGET_PRESTO_ALL = expand(specimens_per_sample("presto/collapse/{chain}.{chain_type}/{specimen}_atleast-2.fastq", SAMPLES))
+TARGET_PRESTO_DATA = expand(amplicon_files("presto/data/{chain}.{chain_type}/{specimen}.{{rp}}.fastq", SAMPLES), rp=["R1", "R2"])
+TARGET_PRESTO_ASSEMBLY = expand(amplicon_files("presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES))
+TARGET_PRESTO_QC = expand(amplicon_files("presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq", SAMPLES))
+TARGET_PRESTO_ALL = expand(amplicon_files("presto/collapse/{chain}.{chain_type}/{specimen}_atleast-2.fastq", SAMPLES))
 
 rule all_presto_data:
     input: TARGET_PRESTO_DATA

@@ -2,7 +2,8 @@
 Summarizing and reporting helper functions.
 """
 import csv
-from igseq.data import load_csv, get_samples_per_run
+import re
+from igseq.data import load_csv, get_samples_per_run, MetadataError
 
 def counts_sample_summary(
         file_counts_in, counts_sample_summary_out, samples):
@@ -69,6 +70,71 @@ def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
         writer = csv.writer(f_out)
         writer.writerow(["Run", "UnassignedSeqs", "SampleSeqs", "TotalSeqs", "Ratio"])
         writer.writerows(rows)
+
+def amplicon_summary(input_fps, specimens, regex):
+    """Take a list of per-specimen read count files and make a list of summary dictionaries."""
+    counts = []
+    for fp_in in input_fps:
+        match = re.match(regex, fp_in)
+        if match:
+            chain = match.group(1)
+            chain_type = match.group(2)
+            specimen = match.group(3)
+        else:
+            raise ValueError("Couldn't parse specimen details from %s" % fp_in)
+        if not specimen in specimens:
+            raise MetadataError("Unknown specimen %s" % specimen)
+        with open(fp_in) as f_in:
+            cts = int(next(f_in))
+        counts.append({
+            "Subject": specimens[specimen]["Subject"],
+            "Timepoint": int(specimens[specimen]["Timepoint"]),
+            "Chain": chain,
+            "ChainType": chain_type,
+            "Specimen": specimen,
+            "Seqs": cts})
+    fieldnames = [
+        "Subject", "Timepoint", "Chain", "ChainType", "Specimen", "Seqs"]
+    counts = sorted(counts, key=lambda x: [x[key] for key in fieldnames])
+    return counts, fieldnames
+
+def counts_specimen_summary(input_fps, output_fp, specimens):
+    """Take a list of per-specimen-R1 read count files and make a summary table."""
+    counts, fieldnames = amplicon_summary(
+        input_fps,
+        specimens,
+        r"counts/presto/data/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+).R1.fastq.counts")
+    # Add some additional columns of interest for this specific case
+    for cts in counts:
+        cts["CellCount"] = specimens[cts["Specimen"]]["CellCount"]
+        cts["Ratio"] = divide(cts["Seqs"], specimens[cts["Specimen"]]["CellCount"])
+    fieldnames = fieldnames.extend(["CellCount", "Ratio"])
+    with open(output_fp, "wt") as f_out:
+        writer = csv.DictWriter(f_out, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(counts)
+
+def counts_assembly_summary(input_fps, output_fp, specimens):
+    """Take a list of per-specimen assembled sequence count files and make a summary table."""
+    counts, fieldnames = amplicon_summary(
+        input_fps,
+        specimens,
+        r"counts/presto/assemble/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+)_assemble-pass.fastq.counts")
+    with open(output_fp, "wt") as f_out:
+        writer = csv.DictWriter(f_out, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(counts)
+
+def counts_presto_qual_summary(input_fps, output_fp, specimens):
+    """Take a list of per-specimen presto quality sequence count files and make a summary table."""
+    counts, fieldnames = amplicon_summary(
+        input_fps,
+        specimens,
+        r"counts/presto/qual/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+)_quality-pass.fastq.counts")
+    with open(output_fp, "wt") as f_out:
+        writer = csv.DictWriter(f_out, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(counts)
 
 def divide(val1, val2, fmt="{:.6f}"):
     """Divide val1 by val2 as floats and return formatted string."""
