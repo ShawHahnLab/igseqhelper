@@ -28,7 +28,7 @@ def adapter_fwd(sample, sequences):
     except KeyError:
         raise MetadataError("Unknown antibody type %s" % antibody_type)
     try:
-        adapter = sequences[pcr_seq_name]
+        adapter = sequences[pcr_seq_name]["Seq"]
     except KeyError:
         raise MetadataError("Missing entry in sequence metadata: %s" % pcr_seq_name)
     return revcmp(adapter)
@@ -48,7 +48,7 @@ def adapter_rev(sample, sequences):
     # Note that the "N" characters in the barcode sequences should be handled
     # just fine by cutadapt.
     try:
-        p5seq = sequences["P5_Seq"]
+        p5seq = sequences["P5_Seq"]["Seq"]
     except KeyError:
         raise MetadataError("Missing entry in sequence metadata: P5_Seq")
     barcode = sample["BarcodeFwdAttrs"]["Seq"]
