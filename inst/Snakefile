@@ -37,3 +37,9 @@ include: "snakemake-rules/presto.smk"
 include: "snakemake-rules/igdiscover.smk"
 include: "snakemake-rules/sonar.smk"
 include: "snakemake-rules/reporting.smk"
+
+# TODO this should be the final sonar output, once up to date, and should
+# automatically pull in igdiscover.
+TARGET_ALL = TARGET_IGDISCOVER_ALL + TARGET_SONAR_MODULE_1 + TARGET_REPORT_ALL
+rule all:
+    input: TARGET_ALL
