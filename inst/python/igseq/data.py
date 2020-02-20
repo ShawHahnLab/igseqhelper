@@ -196,7 +196,7 @@ def get_samples_per_run(samples):
         samples_per_run[runid].append(sample_name)
     return samples_per_run
 
-def amplicon_files(pattern, samples, cell_type_keep="IgG+"):
+def amplicon_files(pattern, samples, cell_type_keep=None):
     """Make list of filenames for all specimen/chain/type combos of a given cell type.
 
     Give a pattern with templated fields for specimen, chain, and chain_type.
@@ -217,7 +217,7 @@ def amplicon_files(pattern, samples, cell_type_keep="IgG+"):
             "amplicon_files: process sample: %s " \
             "(specimen %s, cell type %s, chain %s, chain type %s)",
             samp_name, spec_name, cell_type, chain, chain_type)
-        if cell_type_keep in cell_type:
+        if not cell_type_keep or cell_type_keep in cell_type:
             text = pattern.format(chain=chain, chain_type=chain_type, specimen=spec_name)
             if text not in target:
                 LOGGER.debug("amplicon_files: add target: %s", text)
