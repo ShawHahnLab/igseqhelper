@@ -1,0 +1,21 @@
+# IgG+ Specimens - Lineage analysis with SONAR
+
+## Initial Processing - IgG+ specimens
+
+In some cases we've sequenced the same physical specimen multiple times, so we 
+combine these replicates for analysis (this way deduplication and such works
+across replicates).
+
+```{r}
+drawtab(counts_by_amplicon)
+```
+
+## pRESTO processing
+
+pRESTO pairs forward and reverse reads, applies a quality filter, and checks for
+the expected primer sequence at the start of the amplicons.  We can the sequence
+counts as compared with the cell counts through each step.
+
+```{r}
+drawtab(subset(counts_presto, select = -c(Subject, Timepoint, Chain, ChainType)))
+```

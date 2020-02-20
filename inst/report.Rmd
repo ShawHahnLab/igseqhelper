@@ -15,105 +15,11 @@ if (! "ROOT" %in% ls()) {
 devtools::load_all(file.path(ROOT, "igseq"))
 ```
 
-# Run Performance and Read Depth
-
-```{r}
-counts_by_sample <- read.csv(file.path(ROOT, "reporting/counts_by_sample.csv"), header = TRUE, stringsAsFactors = FALSE)
-counts_by_sample <- subset(counts_by_sample, Sample != "unassigned")
-counts_by_run <- read.csv(file.path(ROOT, "reporting/counts_by_run.csv"), header = TRUE, stringsAsFactors = FALSE)
-counts_by_amplicon <- read.csv(file.path(ROOT, "reporting/counts_amplicon_summary.csv"), header = TRUE, stringsAsFactors = FALSE)
-counts_assembly <- read.csv(file.path(ROOT, "reporting/counts_assembly_summary.csv"), header = TRUE, stringsAsFactors = FALSE)
-counts_qual <- read.csv(file.path(ROOT, "reporting/counts_presto_qual_summary.csv"), header = TRUE, stringsAsFactors = FALSE)
+```{r child="report-initial.Rmd"}
 ```
 
-```{r}
-counts_presto <- subset(counts_by_amplicon, select = -Ratio)
-handle <- with(counts_presto, paste(Timepoint, Specimen, Chain, ChainType))
-if (! (length(handle) == length(unique(handle)))) {
-  stop("Non-unique IDs for specimen handling")
-}
-
-idx <- match(handle, with(counts_assembly, paste(Timepoint, Specimen, Chain, ChainType)))
-counts_presto$SeqsAssembled <- counts_assembly$Seqs[idx]
-idx <- match(handle, with(counts_qual, paste(Timepoint, Specimen, Chain, ChainType)))
-counts_presto$SeqsQualFilt <- counts_qual$Seqs[idx]
-
-counts_presto <- counts_presto[, c(colnames(counts_presto)["CellCount" != colnames(counts_presto)], "CellCount")]
-counts_presto$FinalRatio <- with(counts_presto, round(SeqsQualFilt/CellCount, 8))
+```{r child="report-igm.Rmd"}
 ```
 
-```{r}
-drawtab <- function(df) {
-  kableExtra::kable_styling(
-    knitr::kable(df, digits = 3, row.names = FALSE, booktabs = TRUE))
-}
-```
-
-## By Sequencing Run
-
-We aim for a 50/50 ratio of library to PhiX. Assuming the unassigned reads are
-all PhiX, we expect to see close to 1.0 for the below ratios.
-
-```{r}
-knitr::kable(counts_by_run, digits = 3, row.names = FALSE)
-```
-
-## By Sequencing Sample
-
-The libraries are prepared with a goal of roughly ten reads for every one cell,
-so we expect to see 10 or more for the below ratios.
-
-```{r}
-knitr::kable(counts_by_sample, digits = 3, row.names = FALSE)
-```
-
-## By Sequencing Sample - Adapter and Quality Trimming
-
-```{r}
-qualgrids_r1 <- list()
-qualgrids_r2 <- list()
-for (idx in 1:nrow(counts_by_sample)) {
-  prefix <- file.path(
-    ROOT,
-    "qc",
-    counts_by_sample$Run[idx],
-    paste0("qualtrim.", counts_by_sample$Sample[idx]))
-  qualgrids_r1 <- c(qualgrids_r1, list(load_qualgrid(paste0(prefix, ".R1.csv"))))
-  qualgrids_r2 <- c(qualgrids_r2, list(load_qualgrid(paste0(prefix, ".R2.csv"))))
-}
-names(qualgrids_r1) <- counts_by_sample$Sample
-names(qualgrids_r2) <- counts_by_sample$Sample
-```
-
-```{r fig.width = 3.7, fig.height = 3, dev="png", dpi=150}
-for (sample in counts_by_sample$Sample) {
-  if (sum(qualgrids_r1[[sample]]) > 100) {
-  plot_qualgrid(qualgrids_r1[[sample]], main=paste(sample, "R1"),
-                legend = FALSE, show_rownames = FALSE)
-  plot_qualgrid(qualgrids_r2[[sample]], main=paste(sample, "R2"))
-  cat("\n\n")
-  } else {
-    cat(paste("\n\nToo few reads for", sample, "\n\n"))
-  }
-}
-```
-
-# Initial Processing - IgG+ specimens
-
-In some cases we've sequenced the same phsyical specimen multiple times, so we 
-combine these replicates for analysis (this way deduplication and such works
-across replicates).
-
-```{r}
-drawtab(counts_by_amplicon)
-```
-
-## pRESTO processing
-
-pRESTO pairs forward and reverse reads, applies a quality filter, and checks for
-the expected primer sequence at the start of the amplicons.  We can the sequence
-counts as compared with the cell counts through each step.
-
-```{r}
-drawtab(subset(counts_presto, select = -c(Subject, Timepoint, Chain, ChainType)))
+```{r child="report-igg.Rmd"}
 ```
