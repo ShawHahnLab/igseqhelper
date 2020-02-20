@@ -3,7 +3,10 @@ Summarizing and reporting helper functions.
 """
 import csv
 import re
+import logging
 from igseq.data import load_csv, get_samples_per_run, MetadataError
+
+LOGGER = logging.getLogger(__name__)
 
 def counts_sample_summary(
         file_counts_in, counts_sample_summary_out, samples):
@@ -73,6 +76,9 @@ def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
 
 def amplicon_summary(input_fps, specimens, regex):
     """Take a list of per-specimen read count files and make a list of summary dictionaries."""
+    LOGGER.debug("amplicon_summary: # input_fps: %d", len(input_fps))
+    LOGGER.debug("amplicon_summary: # specimens: %d", len(specimens))
+    LOGGER.debug("amplicon_summary: regex: %s", regex)
     counts = []
     for fp_in in input_fps:
         match = re.match(regex, fp_in)
@@ -108,7 +114,7 @@ def counts_specimen_summary(input_fps, output_fp, specimens):
     for cts in counts:
         cts["CellCount"] = specimens[cts["Specimen"]]["CellCount"]
         cts["Ratio"] = divide(cts["Seqs"], specimens[cts["Specimen"]]["CellCount"])
-    fieldnames = fieldnames.extend(["CellCount", "Ratio"])
+    fieldnames.extend(["CellCount", "Ratio"])
     with open(output_fp, "wt") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=fieldnames)
         writer.writeheader()
