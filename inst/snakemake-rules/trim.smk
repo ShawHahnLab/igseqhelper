@@ -32,7 +32,7 @@ rule trim:
         adapter_R2=lambda w: adapter_rev(SAMPLES[w.sample], SEQUENCES),
         # https://cutadapt.readthedocs.io/en/stable/guide.html#quality-trimming
         # https://cutadapt.readthedocs.io/en/stable/algorithms.html#quality-trimming-algorithm
-        quality_cutoff=10
+        quality_cutoff=15
     log: "logs/trim.{run}.{sample}.log"
     shell:
         """
