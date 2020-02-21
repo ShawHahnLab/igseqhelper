@@ -31,11 +31,11 @@ wildcard_constraints:
 include: "snakemake-rules/counts.smk"
 include: "snakemake-rules/data.smk"
 include: "snakemake-rules/demux.smk"
-include: "snakemake-rules/qc.smk"
 include: "snakemake-rules/trim.smk"
 include: "snakemake-rules/presto.smk"
 include: "snakemake-rules/igdiscover.smk"
 include: "snakemake-rules/sonar.smk"
+include: "snakemake-rules/qc.smk"
 include: "snakemake-rules/reporting.smk"
 
 # TODO this should be the final sonar output, once up to date, and should
