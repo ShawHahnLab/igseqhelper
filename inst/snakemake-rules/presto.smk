@@ -17,9 +17,9 @@ from igseq.data import amplicon_files
 from igseq.presto import (PRESTO_OPTS, prep_primers_fwd)
 
 TARGET_PRESTO_DATA = expand(amplicon_files("presto/data/{chain}.{chain_type}/{specimen}.{{rp}}.fastq", SAMPLES, "IgG+"), rp=["R1", "R2"])
-TARGET_PRESTO_ASSEMBLY = expand(amplicon_files("presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES, "IgG+"))
-TARGET_PRESTO_QC = expand(amplicon_files("presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq", SAMPLES, "IgG+"))
-TARGET_PRESTO_ALL = expand(amplicon_files("presto/collapse/{chain}.{chain_type}/{specimen}_atleast-2.fastq", SAMPLES, "IgG+"))
+TARGET_PRESTO_ASSEMBLY = amplicon_files("presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES, "IgG+")
+TARGET_PRESTO_QC = amplicon_files("presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq", SAMPLES, "IgG+")
+TARGET_PRESTO_ALL = amplicon_files("presto/collapse/{chain}.{chain_type}/{specimen}_atleast-2.fastq", SAMPLES, "IgG+")
 
 rule all_presto_data:
     input: TARGET_PRESTO_DATA
