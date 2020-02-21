@@ -6,7 +6,7 @@ from igseq.data import amplicon_files
 TARGET_REPORT_ALL = expand(
     "reporting/{thing}.csv",
     thing=["counts_by_sample", "counts_by_run", "counts_amplicon_summary",
-           "counts_assembly_summary", "counts_presto_qual_summary"])
+           "counts_assembly_summary", "counts_presto_qual_summary"]) + TARGET_QUALTRIM_GRID
 
 TARGET_REPORT_COUNTS = expand(
     outputs_per_run("counts/demux/{run}/{sample}.{{rp}}.fastq.gz.counts", SAMPLES),
