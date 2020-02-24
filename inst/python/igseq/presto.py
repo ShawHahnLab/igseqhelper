@@ -37,7 +37,7 @@ PRESTO_OPTS = {
         "maxlen": 1000
     },
     "qc": {
-        "mean_qual": 20,
+        "mean_qual": 30,
         "fwd_start": 0,
         "fwd_mode": "cut",
         "fwd_pf": "VPRIMER",
