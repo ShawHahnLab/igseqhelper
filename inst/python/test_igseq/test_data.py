@@ -5,6 +5,7 @@ Test data and metadata functions.
 import unittest
 import logging
 import igseq.data
+from igseq.data import MetadataError
 from test_igseq.util import ROOT
 
 
@@ -58,21 +59,6 @@ class TestMetadata(unittest.TestCase):
         samples = igseq.data.load_samples(self.path / "samples.csv")
         self.check_metadata(samples, self.expected["samples"], "Sample")
 
-    def check_metadata(self, obs, exp, key):
-        """Check that the rows and columns are as expected.
-        obs: observed metadata dict structure
-        exp: expected metadata row and columns names
-        key: expected key for rows (should also be column name)
-        """
-        # every entry is a row and keys are the row names.
-        self.assertEqual(list(obs.keys()), exp["rows"])
-        # Every row should have an entry for every column, where keys are
-        # column names.  The row name should be present as the expected column
-        # name.
-        for name, attrs in obs.items():
-            self.assertEqual(attrs[key], name)
-            self.assertEqual(list(attrs.keys()), exp["cols"])
-
     def test_load_samples_joined(self):
         """Test loading samples CSV, joined to other metadata.
 
@@ -104,6 +90,21 @@ class TestMetadata(unittest.TestCase):
             keys = [key for key in keys if key not in nested_items.keys()]
             self.assertEqual(keys, self.expected["samples"]["cols"])
 
+    def check_metadata(self, obs, exp, key):
+        """Check that the rows and columns are as expected.
+        obs: observed metadata dict structure
+        exp: expected metadata row and columns names
+        key: expected key for rows (should also be column name)
+        """
+        # every entry is a row and keys are the row names.
+        self.assertEqual(list(obs.keys()), exp["rows"])
+        # Every row should have an entry for every column, where keys are
+        # column names.  The row name should be present as the expected column
+        # name.
+        for name, attrs in obs.items():
+            self.assertEqual(attrs[key], name)
+            self.assertEqual(list(attrs.keys()), exp["cols"])
+
 
 class TestMetadataDuplicates(TestMetadata):
     """Test metadata spreadsheets that have duplicated entries.
@@ -119,33 +120,33 @@ class TestMetadataDuplicates(TestMetadata):
 
     def test_load_sequences(self):
         with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(ValueError):
+            with self.assertRaises(MetadataError):
                 igseq.data.load_sequences(self.path / "sequences.csv")
         # But also, we shouldn't have any duplicated sequences.
         with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(ValueError):
+            with self.assertRaises(MetadataError):
                 igseq.data.load_sequences(self.path / "sequences_dup_seq.csv")
 
     def test_load_runs(self):
         with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(ValueError):
+            with self.assertRaises(MetadataError):
                 igseq.data.load_runs(self.path / "runs.csv")
 
     def test_load_specimens(self):
         with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(ValueError):
+            with self.assertRaises(MetadataError):
                 igseq.data.load_specimens(self.path / "specimens.csv")
 
     def test_load_samples_basic(self):
         with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(ValueError):
+            with self.assertRaises(MetadataError):
                 igseq.data.load_samples(self.path / "samples.csv")
         # But also, we shouldn't have any duplicated combinations of
         # BarcodeFwd, BarcodeRev, and Run.  In this case the supposed sample7
         # is indistinguishable from sample1 because  it's in the same run with
         # the same barcodes.
         with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(ValueError):
+            with self.assertRaises(MetadataError):
                 igseq.data.load_samples(self.path / "samples_dup_barcodes.csv")
 
     def test_load_samples_joined(self):

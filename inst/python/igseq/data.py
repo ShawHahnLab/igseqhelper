@@ -30,7 +30,7 @@ def load_sequences(fp_in):
     if len(seqs_unique) != len(sequences.values()):
         msg = "Duplicate entries in CSV %s in Seq column" % fp_in
         LOGGER.critical(msg)
-        raise ValueError(msg)
+        raise MetadataError(msg)
     return sequences
 
 def load_runs(fp_in):
@@ -65,7 +65,7 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     if len(unique_keys) != len(samples.values()):
         msg = "Duplicate entries in CSV %s for BarcodeFwd/BarcodeRev/Run combinations" % fp_in
         LOGGER.critical(msg)
-        raise ValueError(msg)
+        raise MetadataError(msg)
     for sample_name, sample in samples.items():
         if sequences:
             bc_fwd = sequences.get(sample["BarcodeFwd"])
@@ -111,7 +111,7 @@ def load_csv(fp_in, key=None):
                 msg = "Duplicate keys in CSV %s under column %s (value %s)" % (
                     fp_in, key, row_key)
                 LOGGER.critical(msg)
-                raise ValueError(msg)
+                raise MetadataError(msg)
             entries[row_key] = row
     return entries
 
