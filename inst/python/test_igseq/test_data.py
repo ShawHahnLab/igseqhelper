@@ -2,6 +2,7 @@
 Test data and metadata functions.
 """
 
+import re
 import unittest
 import logging
 import igseq.data
@@ -90,6 +91,21 @@ class TestMetadata(unittest.TestCase):
             keys = [key for key in keys if key not in nested_items.keys()]
             self.assertEqual(keys, self.expected["samples"]["cols"])
 
+    def test_load_csv(self):
+        """Test generic CSV loading."""
+        # This should behave similarly to the load_sequences wrapper, except
+        # for the extra sequence content processing.
+        sequences = igseq.data.load_csv(self.path / "sequences.csv")
+        for _, seq_data in sequences.items():
+            seq_data["Seq"] = re.sub(" ", "", seq_data["Seq"])
+        self.check_metadata(sequences, self.expected["sequences"], "Name")
+        # Or, we can use a different key, so long as it's unique.
+        sequences = igseq.data.load_csv(self.path / "sequences.csv", "Seq")
+        # Non-unique should give an error.
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(MetadataError):
+                igseq.data.load_csv(self.path / "sequences.csv", "Use")
+
     def check_metadata(self, obs, exp, key):
         """Check that the rows and columns are as expected.
         obs: observed metadata dict structure
@@ -151,3 +167,8 @@ class TestMetadataDuplicates(TestMetadata):
 
     def test_load_samples_joined(self):
         self.skipTest("not yet implemented")
+
+    def test_load_csv(self):
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(MetadataError):
+                igseq.data.load_csv(self.path / "sequences.csv")
