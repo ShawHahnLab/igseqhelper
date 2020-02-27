@@ -25,6 +25,47 @@ TARGET_PRESTO_QUAL_COUNTS = amplicon_files(
 rule report_all:
     input: TARGET_REPORT_ALL
 
+TARGET_QUALTRIM_GRID = expand(
+    outputs_per_run("reporting/{run}/qualtrim.{sample}.{{rp}}.csv", SAMPLES),
+    rp=["R1", "R2", "I1"])
+
+rule all_qualtrim_grid:
+    input: TARGET_QUALTRIM_GRID
+
+rule qualtrim_grid:
+    """Make a CSV table summarizing cutadapt trim cutoffs vs output length."""
+    output: "reporting/{run}/qualtrim.{sample}.{rp}.csv"
+    input: "demux/{run}/{sample}.{rp}.fastq.gz"
+    run: igseq.reporting.make_qualtrim_csv(input[0], output[0])
+
+def input_sonar_clusters_by_read(w):
+    targets = {}
+    subject = SPECIMENS[w.specimen]["Subject"]
+    targets["rearr"] = "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv".format(
+        subject=subject, chain=w.chain, chain_type=w.chain_type, specimen=w.specimen)
+    for samp_name, samp_attrs in SAMPLES.items():
+        if samp_attrs["Specimen"] == w.specimen and \
+            samp_attrs["Chain"] == w.chain and \
+            samp_attrs["Type"] == w.chain_type:
+            targets[samp_name] = "demux/{run}/{sample}.I1.fastq.gz".format(
+                run=samp_attrs["Run"],
+                sample=samp_name)
+    return targets
+
+rule sonar_clusters_by_read:
+    """Make a CSV pairing raw sequence read IDs with the SONAR cluster they map to."""
+    output: "reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
+    input: unpack(input_sonar_clusters_by_read)
+    run:
+        fp_rearr = input.rearr
+        fps_fqgz = [val for key, val in input.items() if key is not "rearr"]
+        igseq.reporting.get_rearr_centroids_by_raw_reads(fp_rearr, fps_fqgz, output[0])
+
+rule rarefy_sonar_clusters:
+    output: "reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv"
+    input: "reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
+    run: igseq.reporting.rarefy_sonar_clusters(input[0], output[0])
+
 # Sample-based
 
 rule counts_table:
