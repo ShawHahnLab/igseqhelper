@@ -87,11 +87,11 @@ def demux(samples, fps, outdir=".", output_files=None, revcmp=False, send_stats=
         with gzip.open(extra, "wt") as _:
             pass
 
-def gzp(fp_in):
+def _gzp(fp_in):
     """Convenience wrapper for gzip opener."""
     return gzip.open(fp_in, "rt")
 
-def fqparse(f_in):
+def _fqparse(f_in):
     """Convenience wrapper for FASTQ parser."""
     return SeqIO.parse(f_in, "fastq")
 
@@ -105,8 +105,8 @@ def _trio_demux(fps, f_outs, samples, dorevcmp, send_stats):
         LOGGER.debug("%d barcode map: %s -> %s", PID, str(key), bc_map[key])
     counter = 0
     hits = defaultdict(int)
-    with gzp(fps["R1"]) as r1_in, gzp(fps["R2"]) as r2_in, gzp(fps["I1"]) as i1_in:
-        for trio in zip(fqparse(r1_in), fqparse(r2_in), fqparse(i1_in)):
+    with _gzp(fps["R1"]) as r1_in, _gzp(fps["R2"]) as r2_in, _gzp(fps["I1"]) as i1_in:
+        for trio in zip(_fqparse(r1_in), _fqparse(r2_in), _fqparse(i1_in)):
             if not trio[0].id == trio[1].id == trio[2].id:
                 raise DemuxError("Sequence ID mismatch between R1/R2/I1")
             trio = list(trio)

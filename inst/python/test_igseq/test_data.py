@@ -10,8 +10,11 @@ from igseq.data import MetadataError
 from test_igseq.util import ROOT
 
 
-class TestMetadata(unittest.TestCase):
-    """Basic tests for metadata loading from spreadsheets."""
+class TestMetadataBase(unittest.TestCase):
+    """Base test class for metadata loading from spreadsheets.
+
+    These tests will run for any metadata scenario.
+    """
 
     def setUp(self):
         self.path = ROOT / "metadata"
@@ -122,7 +125,29 @@ class TestMetadata(unittest.TestCase):
             self.assertEqual(list(attrs.keys()), exp["cols"])
 
 
-class TestMetadataDuplicates(TestMetadata):
+class TestMetadata(TestMetadataBase):
+    """Basic tests for metadata loading from spreadsheets.
+
+    This does some additioal checks for correctly-formatted metadata sheets.
+    """
+
+    def test_get_samples_per_run(self):
+        """Test making a dictionary of run IDs to sample names."""
+        samples = igseq.data.load_samples(self.path / "samples.csv")
+        samples_per_run = igseq.data.get_samples_per_run(samples)
+        # If we tally up pairs of run Id and sample name we should get the same
+        # list either way
+        pairs_exp = [(entry["Run"], entry["Sample"]) for entry in samples.values()]
+        pairs_exp = sorted(pairs_exp)
+        pairs_obs = []
+        for run_id, samp_list in samples_per_run.items():
+            for samp in samp_list:
+                pairs_obs.append((run_id, samp))
+        pairs_obs = sorted(pairs_obs)
+        self.assertEqual(pairs_obs, pairs_exp)
+
+
+class TestMetadataDuplicates(TestMetadataBase):
     """Test metadata spreadsheets that have duplicated entries.
 
     This shouldn't be allowed, since each type of thing should have exactly one row per thing.
@@ -172,3 +197,22 @@ class TestMetadataDuplicates(TestMetadata):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
                 igseq.data.load_csv(self.path / "sequences.csv")
+
+
+class TestData(unittest.TestCase):
+    """Basic tests for data helper functions."""
+
+    def test_get_data(self):
+        """Test getting run data from local disk or URL."""
+        self.skipTest("not yet implemented")
+
+    def test_md5(self):
+        """Test MD5 checksum on a file."""
+        # /dev/null is an empty file when reading.
+        self.assertEqual(
+            igseq.data.md5("/dev/null"),
+            "d41d8cd98f00b204e9800998ecf8427e")
+
+    def test_amplicon_files(self):
+        """Test filename helper for files per specimen per target chain type."""
+        self.skipTest("not yet implemented")
