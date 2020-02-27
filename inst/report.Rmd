@@ -2,7 +2,10 @@
 title: "IgSeq Analysis"
 author: "Jesse Connell"
 date: \today
-output: pdf_document
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
 geometry: margin=1.5cm
 ---
 
@@ -13,6 +16,22 @@ if (! "ROOT" %in% ls()) {
   ROOT <- normalizePath(file.path(getwd(), "../.."))  
 }
 devtools::load_all(file.path(ROOT, "igseq"))
+```
+
+```{r}
+load_csv <- function(fp, must_exist=FALSE) {
+  if (must_exist || file.exists(fp)) {
+    data <- read.csv(fp, header = TRUE, stringsAsFactors = FALSE)
+  } else {
+    data <- NULL
+  }
+  data
+}
+
+drawtab <- function(df) {
+  kableExtra::kable_styling(
+    knitr::kable(df, digits = 3, row.names = FALSE, booktabs = TRUE))
+}
 ```
 
 ```{r child="report-initial.Rmd"}

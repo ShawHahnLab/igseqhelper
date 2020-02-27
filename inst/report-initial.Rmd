@@ -1,36 +1,34 @@
 # Run Performance and Read Depth
 
 ```{r}
-counts_by_sample <- read.csv(file.path(ROOT, "reporting/counts_by_sample.csv"), header = TRUE, stringsAsFactors = FALSE)
-counts_by_sample <- subset(counts_by_sample, Sample != "unassigned")
-counts_by_run <- read.csv(file.path(ROOT, "reporting/counts_by_run.csv"), header = TRUE, stringsAsFactors = FALSE)
-counts_by_amplicon <- read.csv(file.path(ROOT, "reporting/counts_amplicon_summary.csv"), header = TRUE, stringsAsFactors = FALSE)
-counts_assembly <- read.csv(file.path(ROOT, "reporting/counts_assembly_summary.csv"), header = TRUE, stringsAsFactors = FALSE)
-counts_qual <- read.csv(file.path(ROOT, "reporting/counts_presto_qual_summary.csv"), header = TRUE, stringsAsFactors = FALSE)
+counts_stats <- within(list(), {
+  by_sample <- load_csv(file.path(ROOT, "reporting/counts_by_sample.csv"))
+  by_sample <- subset(by_sample, Sample != "unassigned")
+  by_run <- load_csv(file.path(ROOT, "reporting/counts_by_run.csv"))
+  by_amplicon <- load_csv(file.path(ROOT, "reporting/counts_amplicon_summary.csv"))
+  assembly <- load_csv(file.path(ROOT, "reporting/counts_assembly_summary.csv"))
+  qual <- load_csv(file.path(ROOT, "reporting/counts_presto_qual_summary.csv"))
+})
 ```
 
 ```{r}
-counts_presto <- subset(counts_by_amplicon, select = -Ratio)
-handle <- with(counts_presto, paste(Timepoint, Specimen, Chain, ChainType))
-if (! (length(handle) == length(unique(handle)))) {
-  stop("Non-unique IDs for specimen handling")
-}
+if (! is.null(counts_stats$by_amplicon)) {
+  counts_presto <- subset(counts_stats$by_amplicon, select = -Ratio)
+  handle <- with(counts_presto, paste(Timepoint, Specimen, Chain, ChainType))
+  if (! (length(handle) == length(unique(handle)))) {
+    stop("Non-unique IDs for specimen handling")
+  }
 
-idx <- match(handle, with(counts_assembly, paste(Timepoint, Specimen, Chain, ChainType)))
-counts_presto$SeqsAssembled <- counts_assembly$Seqs[idx]
-idx <- match(handle, with(counts_qual, paste(Timepoint, Specimen, Chain, ChainType)))
-counts_presto$SeqsQualFilt <- counts_qual$Seqs[idx]
+  idx <- match(handle, with(counts_stats$assembly, paste(Timepoint, Specimen, Chain, ChainType)))
+  counts_presto$SeqsAssembled <- counts_stats$assembly$Seqs[idx]
+  idx <- match(handle, with(counts_stats$qual, paste(Timepoint, Specimen, Chain, ChainType)))
+  counts_presto$SeqsQualFilt <- counts_stats$qual$Seqs[idx]
 
-counts_presto <- counts_presto[, c(colnames(counts_presto)["CellCount" != colnames(counts_presto)], "CellCount")]
-counts_presto$FinalRatio <- with(counts_presto, round(SeqsQualFilt/CellCount, 8))
-```
-
-```{r}
-drawtab <- function(df) {
-  kableExtra::kable_styling(
-    knitr::kable(df, digits = 3, row.names = FALSE, booktabs = TRUE))
+  counts_presto <- counts_presto[, c(colnames(counts_presto)["CellCount" != colnames(counts_presto)], "CellCount")]
+  counts_presto$FinalRatio <- with(counts_presto, round(SeqsQualFilt/CellCount, 8))
 }
 ```
+
 
 ## By Sequencing Run
 
@@ -38,7 +36,7 @@ We aim for a 50/50 ratio of library to PhiX. Assuming the unassigned reads are
 all PhiX, we expect to see close to 1.0 for the below ratios.
 
 ```{r}
-knitr::kable(counts_by_run, digits = 3, row.names = FALSE)
+drawtab(counts_stats$by_run)
 ```
 
 ## By Sequencing Sample
@@ -47,29 +45,50 @@ The libraries are prepared with a goal of roughly ten reads for every one cell,
 so we expect to see 10 or more for the below ratios.
 
 ```{r}
-knitr::kable(counts_by_sample, digits = 3, row.names = FALSE)
+drawtab(counts_stats$by_sample)
 ```
 
 ## By Sequencing Sample - Adapter and Quality Trimming
 
+The below heatmaps summarize read lengths after cutadapt's quality-based
+trimming with a range of possible quality thresholds.  The Y axis is a given
+cutadapt quality threshold, the X axis trimmed read length, and color signifies
+log10 count of reads trimmed to that length.  (For very low quality thresholds
+all reads are left full-length while for very high thresholds all are trimmed to
+zero.)  We can use this to choose a threshold that fits our reads well, for
+example by showing a distribution of read lengths that should be biologically
+plausible (i.e. some sequences for both chains will be shorter than the
+sequencer's configured read length).  This trimming is independent of the
+barcode+primer trimming that cutadapt also performs.
+
 ```{r}
 qualgrids_r1 <- list()
 qualgrids_r2 <- list()
-for (idx in 1:nrow(counts_by_sample)) {
+for (idx in 1:nrow(counts_stats$by_sample)) {
   prefix <- file.path(
     ROOT,
-    "qc",
-    counts_by_sample$Run[idx],
-    paste0("qualtrim.", counts_by_sample$Sample[idx]))
-  qualgrids_r1 <- c(qualgrids_r1, list(load_qualgrid(paste0(prefix, ".R1.csv"))))
-  qualgrids_r2 <- c(qualgrids_r2, list(load_qualgrid(paste0(prefix, ".R2.csv"))))
+    "reporting",
+    counts_stats$by_sample$Run[idx],
+    paste0("qualtrim.", counts_stats$by_sample$Sample[idx]))
+  fp_r1 <- paste0(prefix, ".R1.csv")
+  fp_r2 <- paste0(prefix, ".R2.csv")
+  if (file.exists(fp_r1)) {
+    qualgrids_r1 <- c(qualgrids_r1, list(load_qualgrid(fp_r1)))
+  } else {
+    qualgrids_r1 <- c(qualgrids_r1, list(NULL))
+  }
+  if (file.exists(fp_r2)) {
+    qualgrids_r2 <- c(qualgrids_r2, list(load_qualgrid(fp_r2)))
+  } else {
+    qualgrids_r2 <- c(qualgrids_r2, list(NULL))
+  }
 }
-names(qualgrids_r1) <- counts_by_sample$Sample
-names(qualgrids_r2) <- counts_by_sample$Sample
+names(qualgrids_r1) <- counts_stats$by_sample$Sample
+names(qualgrids_r2) <- counts_stats$by_sample$Sample
 ```
 
 ```{r fig.width = 3.7, fig.height = 3, dev="png", dpi=150}
-for (sample in counts_by_sample$Sample) {
+for (sample in counts_stats$by_sample$Sample) {
   if (sum(qualgrids_r1[[sample]]) > 100) {
   plot_qualgrid(qualgrids_r1[[sample]], main=paste(sample, "R1"),
                 legend = FALSE, show_rownames = FALSE)
@@ -79,4 +98,15 @@ for (sample in counts_by_sample$Sample) {
     cat(paste("\n\nToo few reads for", sample, "\n\n"))
   }
 }
+```
+
+
+## Grouping by Specimen
+
+In some cases we've sequenced the same physical specimen multiple times, so we 
+combine these replicates for analysis (this way deduplication and such works
+across replicates).
+
+```{r}
+drawtab(counts_stats$by_amplicon)
 ```
