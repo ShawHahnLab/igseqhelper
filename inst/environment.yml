@@ -20,6 +20,7 @@ dependencies:
   - bioconductor-biostrings
   # requirements for IgDiscover
   - igdiscover
+  - r-rjson # helps parse outputs
   # requirements for pRESTO
   - pip
   - numpy>=1.8
