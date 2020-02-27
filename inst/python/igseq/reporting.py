@@ -1,6 +1,7 @@
 """
 Summarizing and reporting helper functions.
 """
+
 import csv
 import re
 import logging
@@ -40,10 +41,22 @@ def counts_sample_summary(
         writer.writerows(rows)
 
 def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
-    """Take a per-sample summary of sequence counts and make a per-run version."""
+    """Take a per-sample summary of sequence counts and make a per-run version.
+
+    counts_sample_summary_in: CSV file path, as from counts_sample_summary
+    counts_run_sumary_out: CSV file path for output
+    """
     with open(counts_sample_summary_in) as f_in:
         reader = csv.DictReader(f_in)
         counts_by_sample = list(reader)
+    counts_by_run = _get_counts_by_run(counts_by_sample)
+    rows = _tally_counts_by_run(counts_by_run)
+    with open(counts_run_summary_out, "wt") as f_out:
+        writer = csv.writer(f_out)
+        writer.writerow(["Run", "UnassignedSeqs", "SampleSeqs", "TotalSeqs", "Ratio"])
+        writer.writerows(rows)
+
+def _get_counts_by_run(counts_by_sample):
     counts_by_run = {}
     for row_in in counts_by_sample:
         runid = row_in["Run"]
@@ -57,6 +70,9 @@ def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
         else:
             key = "samples"
         cts[key] += int(row_in["NumSequences"])
+    return counts_by_run
+
+def _tally_counts_by_run(counts_by_run):
     rows = []
     for run_name, run_attrs in counts_by_run.items():
         try:
@@ -69,10 +85,7 @@ def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
             run_attrs.get("samples", ""),
             run_attrs.get("unassigned", "") + run_attrs.get("samples", ""),
             ratio])
-    with open(counts_run_summary_out, "wt") as f_out:
-        writer = csv.writer(f_out)
-        writer.writerow(["Run", "UnassignedSeqs", "SampleSeqs", "TotalSeqs", "Ratio"])
-        writer.writerows(rows)
+    return rows
 
 def amplicon_summary(input_fps, specimens, regex):
     """Take a list of per-specimen read count files and make a list of summary dictionaries."""

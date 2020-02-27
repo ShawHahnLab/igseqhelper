@@ -1,5 +1,5 @@
 """
-Helpers for runnin pRESTO.
+Helpers for running pRESTO.
 
 This stores the configuration settings for the different pRESTO scripts and
 provides helper functions for preparing input files.
