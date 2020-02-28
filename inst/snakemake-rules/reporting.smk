@@ -3,6 +3,13 @@
 import igseq.reporting
 from igseq.data import amplicon_files
 
+TARGET_QUALTRIM_GRID = expand(
+    outputs_per_run("reporting/{run}/qualtrim.{sample}.{{rp}}.csv", SAMPLES),
+    rp=["R1", "R2", "I1"])
+
+rule all_qualtrim_grid:
+    input: TARGET_QUALTRIM_GRID
+
 TARGET_REPORT_ALL = expand(
     "reporting/{thing}.csv",
     thing=["counts_by_sample", "counts_by_run", "counts_amplicon_summary",
@@ -25,12 +32,6 @@ TARGET_PRESTO_QUAL_COUNTS = amplicon_files(
 rule report_all:
     input: TARGET_REPORT_ALL
 
-TARGET_QUALTRIM_GRID = expand(
-    outputs_per_run("reporting/{run}/qualtrim.{sample}.{{rp}}.csv", SAMPLES),
-    rp=["R1", "R2", "I1"])
-
-rule all_qualtrim_grid:
-    input: TARGET_QUALTRIM_GRID
 
 rule qualtrim_grid:
     """Make a CSV table summarizing cutadapt trim cutoffs vs output length."""
