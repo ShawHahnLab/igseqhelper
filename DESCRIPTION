@@ -15,7 +15,8 @@ Imports:
   dplyr (>= 0.8),
   reshape2 (>= 1.4.3),
   levenR (>= 0.2.0),
-  magrittr (>= 1.5)
+  magrittr (>= 1.5),
+  UpSetR (>= 1.4.0)
 Remotes:
   github::sherrillmix/dnar
 RoxygenNote: 6.1.1
