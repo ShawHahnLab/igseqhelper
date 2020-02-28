@@ -17,6 +17,7 @@ dependencies:
   - r-ggplot2
   - r-dplyr
   - r-reshape2
+  - r-upsetr
   - bioconductor-biostrings
   # requirements for IgDiscover
   - igdiscover
