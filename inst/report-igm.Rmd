@@ -14,6 +14,9 @@ load_igdiscover_final <- function(dirpath) {
       dnar::read.fa(
         file.path(dirpath, "final/database", paste0(segment, ".fasta")))
     })
+    stats = list(
+      filtered = rjson::fromJSON(file = file.path("final/stats/filtered.json")),
+      assigned = rjson::fromJSON(file = file.path("final/stats/assignd.json")))
   })
   data
 }
@@ -43,73 +46,85 @@ load_all_igdiscover_results <- function(dirpath) {
   })
 }
 
-igdiscover_results <- load_all_igdiscover_results(file.path(ROOT, "igdiscover-20200228"))
+# Load the initial V/D/J used for each chain type for IgDiscover.
+load_igdiscover_reference <- function(dirpath) {
+  lapply(CHAINTYPES, function(chaintype) {
+    lapply(SEGMENTS, function(segment) {
+      dnar::read.fa(file.path(dirpath, chaintype, paste0(segment, ".fasta")))
+    })
+  })
+}
+
+igdiscover_results <- load_all_igdiscover_results(file.path(ROOT, "igdiscover"))
+igdiscover_reference <- load_igdiscover_reference(file.path(ROOT, "igdiscover"))
 
 overlaps <- list(
   mu = lapply(SEGMENTS, function(segment) {
     seq_sets <- lapply(igdiscover_results$mu, function(obj) obj$database[[segment]]$seq)
+    seq_sets <- c(list(reference=igdiscover_reference$mu[[segment]]$seq), seq_sets)
     gather_seq_overlaps(seq_sets)
   }),
   kappa = lapply(SEGMENTS, function(segment) {
     seq_sets <- lapply(igdiscover_results$kappa, function(obj) obj$database[[segment]]$seq)
+    seq_sets <- c(list(reference=igdiscover_reference$kappa[[segment]]$seq), seq_sets)
     gather_seq_overlaps(seq_sets)
   }),
   lambda = lapply(SEGMENTS, function(segment) {
     seq_sets <- lapply(igdiscover_results$lambda, function(obj) obj$database[[segment]]$seq)
+    seq_sets <- c(list(reference=igdiscover_reference$lambda[[segment]]$seq), seq_sets)
     gather_seq_overlaps(seq_sets)
   })
 )
 ```
 
-## Heavy Chain - Mu
+## IgDiscover - Results Summary by Chain Type
 
 The below plots summarize the number and overlap of alleles detected in each of 
-the heavy (mu) chain samples.  Each horizontal bar shows the total number of
-sequences in that sample.  Each vertical bar is a particular combination of
-samples, with height displaying the number of sequences occuring in that
-combination.
+the heavy (mu) chain samples compared with the starting reference database. 
+Each horizontal bar shows the total number of sequences in that sample.  Each
+vertical bar is a particular combination of samples, with height displaying the
+number of sequences occuring in that combination.
 
 ### Heavy Chain - Mu - V Segment
 
-```{r}
+```{r fig.height=4}
 UpSetR::upset(overlaps$mu$V, order.by = "freq")
 ```
 
 ### Heavy Chain - Mu - D Segment
 
-```{r}
+```{r fig.height=4}
 UpSetR::upset(overlaps$mu$D, order.by = "freq")
 ```
 
 ### Heavy Chain - Mu - J Segment
-```{r}
+
+```{r fig.height=4}
 UpSetR::upset(overlaps$mu$J, order.by = "freq")
 ```
 
-## Light Chain - Kappa
-
 ### Light Chain - Kappa - V Segment
 
-```{r}
+```{r fig.height=4}
 UpSetR::upset(overlaps$kappa$V, order.by = "freq")
 ```
 
 ### Light Chain - Kappa - J Segment
 
-```{r}
+```{r fig.height=4}
 UpSetR::upset(overlaps$kappa$J, order.by = "freq")
 ```
 
-## Light Chain - Lambda
-
 ### Light Chain - Lambda - V Segment
 
-```{r}
+```{r fig.height=4}
 UpSetR::upset(overlaps$lambda$V, order.by = "freq")
 ```
 
 ### Light Chain - Lambda - J Segment
 
-```{r}
+```{r fig.height=4}
 UpSetR::upset(overlaps$lambda$J, order.by = "freq")
 ```
+
+## IgDiscover - Results by Specimen
