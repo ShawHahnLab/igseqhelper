@@ -56,7 +56,10 @@ rule igdiscover_init:
         db_j="igdiscover/{chain}.{chain_type}/J.fasta",
         r1="presto/data/{chain}.{chain_type}/{specimen}.R1.fastq",
         r2="presto/data/{chain}.{chain_type}/{specimen}.R2.fastq"
-    params: iterations=5
+    params:
+        stranded="true",
+        iterations=5,
+        primer_fwd=SEQUENCES["5PIIA"]["Seq"]
     shell:
         """
             rmdir $(dirname {output})
@@ -64,7 +67,11 @@ rule igdiscover_init:
                 --db $(dirname {input.db_v}) \
                 --reads {input.r1} \
                 $(dirname {output})
+            # This is a sloppy way of handling the YAML!  Re-work this probably
+            # by parsing in Python and writing back out.
             sed -i 's/^iterations: 1$/iterations: {params.iterations}/' {output}
+            sed -i 's/^stranded: false$/stranded: {params.stranded}/' {output}
+            sed -i 's/^forward_primers:$/forward_primers:\\n - {params.primer_fwd}/' {output}
         """
 
 rule igdiscover_run:
