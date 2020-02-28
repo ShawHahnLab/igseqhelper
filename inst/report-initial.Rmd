@@ -1,13 +1,21 @@
 # Run Performance and Read Depth
 
 ```{r}
+metadata <- within(list(), {
+  runs <- load_runs(file.path(ROOT, "metadata/runs.csv"))
+  sequences <- load_sequences(file.path(ROOT, "metadata/sequences.csv"))
+  specimens <- load_specimens(file.path(ROOT, "metadata/specimens.csv"))
+  samples <- load_samples(
+    file.path(ROOT, "metadata/samples.csv"), specimens, runs, sequences)
+})
+
 counts_stats <- within(list(), {
-  by_sample <- load_csv(file.path(ROOT, "reporting/counts_by_sample.csv"))
+  by_sample <- load_csv_maybe(file.path(ROOT, "reporting/counts_by_sample.csv"), NA)
   by_sample <- subset(by_sample, Sample != "unassigned")
-  by_run <- load_csv(file.path(ROOT, "reporting/counts_by_run.csv"))
-  by_amplicon <- load_csv(file.path(ROOT, "reporting/counts_amplicon_summary.csv"))
-  assembly <- load_csv(file.path(ROOT, "reporting/counts_assembly_summary.csv"))
-  qual <- load_csv(file.path(ROOT, "reporting/counts_presto_qual_summary.csv"))
+  by_run <- load_csv_maybe(file.path(ROOT, "reporting/counts_by_run.csv"))
+  by_amplicon <- load_csv_maybe(file.path(ROOT, "reporting/counts_amplicon_summary.csv"), NA)
+  assembly <- load_csv_maybe(file.path(ROOT, "reporting/counts_assembly_summary.csv"), NA)
+  qual <- load_csv_maybe(file.path(ROOT, "reporting/counts_presto_qual_summary.csv"), NA)
 })
 ```
 

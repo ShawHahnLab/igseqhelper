@@ -19,9 +19,9 @@ devtools::load_all(file.path(ROOT, "igseq"))
 ```
 
 ```{r}
-load_csv <- function(fp, must_exist=FALSE) {
-  if (must_exist || file.exists(fp)) {
-    data <- read.csv(fp, header = TRUE, stringsAsFactors = FALSE)
+load_csv_maybe <- function(fp, ...) {
+  if (file.exists(fp)) {
+    data <- load_csv(fp, ...)
   } else {
     data <- NULL
   }
