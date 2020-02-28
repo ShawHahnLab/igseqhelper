@@ -30,6 +30,9 @@ rule trim:
     params:
         adapter_R1=lambda w: adapter_fwd(SAMPLES[w.sample], SEQUENCES),
         adapter_R2=lambda w: adapter_rev(SAMPLES[w.sample], SEQUENCES),
+        # https://cutadapt.readthedocs.io/en/stable/guide.html#filtering-reads
+        # PEAR may have trouble with zero-length reads, I think
+        min_len=50,
         # https://cutadapt.readthedocs.io/en/stable/guide.html#quality-trimming
         # https://cutadapt.readthedocs.io/en/stable/algorithms.html#quality-trimming-algorithm
         quality_cutoff=15
@@ -37,6 +40,7 @@ rule trim:
     shell:
         """
             cutadapt --cores {threads} --quality-cutoff {params.quality_cutoff} \
+                -m {params.min_len} \
                 -a {params.adapter_R1} -A {params.adapter_R2} \
                 -o {output.r1} -p {output.r2} \
                 {input.r1} {input.r2} > {log}
