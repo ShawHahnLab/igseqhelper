@@ -123,10 +123,12 @@ load_csv <- function(fp, key=NULL) {
   if (is.null(key)) {
     key <- colnames(data)[1]
   }
-  if (nrow(data) != length(unique(data[[key]]))) {
-    stop(paste("Non-unique keys in input CSV from column:", key))
+  if (! is.na(key)) {
+    if (nrow(data) != length(unique(data[[key]]))) {
+      stop(paste("Non-unique keys in input CSV from column:", key))
+    }
+    rownames(data) <- data[[key]]
   }
-  rownames(data) <- data[[key]]
   data
 }
 
