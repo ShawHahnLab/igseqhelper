@@ -128,3 +128,31 @@ UpSetR::upset(overlaps$lambda$J, order.by = "freq")
 ```
 
 ## IgDiscover - Results by Specimen
+
+Below are read counts through each stage of IgDiscover filtering for each 
+sample.  The input is as specified in the Grouping by Specimen section above. 
+According to the paper around 400,000 input reads should be sufficient.
+
+```{r}
+# TODO replace this mess and embed within igdiscover_results above
+with(NULL, {
+  filepaths <- grep(
+    "final",
+    list.files(file.path(ROOT, "igdiscover"), full.names = TRUE, recursive = TRUE, pattern = "filtered\\.json"),
+    value = TRUE)
+  # ugh
+  x <- sub('.*igdiscover/', "", filepaths)
+  md <- lapply(strsplit(x, "/"), function(vec) c(Chain=sub("\\..*", "", vec[1]), Type=sub(".*\\.", "", vec[1]), Specimen=vec[2]))
+  cts <- do.call(rbind, lapply(seq_along(filepaths), function(i) {
+    as.data.frame(c(md[[i]], rjson::fromJSON(file = filepaths[i])))
+  }))
+  abbrs <- c(
+    Chain = "Chain", Type = "Type", Specimen = "Specimen",
+    total = "total", has_vj_assignment = "has_vj", has_no_stop = "no_stop",
+    good_v_evalue = "good_v_ev", good_v_coverage = "good_v_cov",
+    good_j_coverage = "good_j_cov", has_cdr3 = "has_cdr3")
+  colnames(cts) <- abbrs[colnames(cts)]
+  kableExtra::kable_styling(drawtab(cts), font_size = 6)
+})
+
+```
