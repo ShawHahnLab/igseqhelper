@@ -56,6 +56,7 @@ rule igdiscover_init:
         db_j="igdiscover/{chain}.{chain_type}/J.fasta",
         r1="presto/data/{chain}.{chain_type}/{specimen}.R1.fastq",
         r2="presto/data/{chain}.{chain_type}/{specimen}.R2.fastq"
+    params: iterations=5
     shell:
         """
             rmdir $(dirname {output})
@@ -63,6 +64,7 @@ rule igdiscover_init:
                 --db $(dirname {input.db_v}) \
                 --reads {input.r1} \
                 $(dirname {output})
+            sed -i 's/^iterations: 1$/iterations: {params.iterations}/' {output}
         """
 
 rule igdiscover_run:
