@@ -1,1 +1,115 @@
 # IgM+ Specimens - Germline allele discovery with IgDiscover
+
+```{r}
+SEGMENTS <- c("V", "D", "J")
+names(SEGMENTS) <- SEGMENTS
+
+# Specific to how we're running IgDiscover
+CHAINTYPES <- c(mu = "heavy.mu", lambda = "light.lambda", kappa = "light.kappa")
+
+# Load nested lists of final results from an IgDiscover output directory.
+load_igdiscover_final <- function(dirpath) {
+  data <- within(list(), {
+    database <- lapply(SEGMENTS, function(segment) {
+      dnar::read.fa(
+        file.path(dirpath, "final/database", paste0(segment, ".fasta")))
+    })
+  })
+  data
+}
+
+# Given a named list of FASTA name/seq entries, make a grid of which sequences
+# are represented in which FASTAs, with 0 for absent and 1 for present.
+gather_seq_overlaps <- function(seq_sets) {
+  seqs_all <- sort(unique(unlist(seq_sets)))
+  mat <- do.call(cbind, lapply(names(seq_sets), function(samp) {
+    seqs_all %in% seq_sets[[samp]]
+  }))
+  rownames(mat) <- seqs_all
+  colnames(mat) <- names(seq_sets)
+  as.data.frame(mat + 0)
+}
+
+# Load  a complete set of IgDiscover results with our output directory structure
+# (chain_type/sample/...)
+load_all_igdiscover_results <- function(dirpath) {
+  igdiscover_results <- list()
+  lapply(CHAINTYPES, function(chaintype) {
+    dirs <- list.dirs(file.path(dirpath, chaintype), recursive=FALSE)
+    names(dirs) <- basename(dirs)
+    lapply(dirs, function(dirpath) {
+      load_igdiscover_final(dirpath)
+    })
+  })
+}
+
+igdiscover_results <- load_all_igdiscover_results(file.path(ROOT, "igdiscover-20200228"))
+
+overlaps <- list(
+  mu = lapply(SEGMENTS, function(segment) {
+    seq_sets <- lapply(igdiscover_results$mu, function(obj) obj$database[[segment]]$seq)
+    gather_seq_overlaps(seq_sets)
+  }),
+  kappa = lapply(SEGMENTS, function(segment) {
+    seq_sets <- lapply(igdiscover_results$kappa, function(obj) obj$database[[segment]]$seq)
+    gather_seq_overlaps(seq_sets)
+  }),
+  lambda = lapply(SEGMENTS, function(segment) {
+    seq_sets <- lapply(igdiscover_results$lambda, function(obj) obj$database[[segment]]$seq)
+    gather_seq_overlaps(seq_sets)
+  })
+)
+```
+
+## Heavy Chain - Mu
+
+The below plots summarize the number and overlap of alleles detected in each of 
+the heavy (mu) chain samples.  Each horizontal bar shows the total number of
+sequences in that sample.  Each vertical bar is a particular combination of
+samples, with height displaying the number of sequences occuring in that
+combination.
+
+### Heavy Chain - Mu - V Segment
+
+```{r}
+UpSetR::upset(overlaps$mu$V, order.by = "freq")
+```
+
+### Heavy Chain - Mu - D Segment
+
+```{r}
+UpSetR::upset(overlaps$mu$D, order.by = "freq")
+```
+
+### Heavy Chain - Mu - J Segment
+```{r}
+UpSetR::upset(overlaps$mu$J, order.by = "freq")
+```
+
+## Light Chain - Kappa
+
+### Light Chain - Kappa - V Segment
+
+```{r}
+UpSetR::upset(overlaps$kappa$V, order.by = "freq")
+```
+
+### Light Chain - Kappa - J Segment
+
+```{r}
+UpSetR::upset(overlaps$kappa$J, order.by = "freq")
+```
+
+## Light Chain - Lambda
+
+### Light Chain - Lambda - V Segment
+
+```{r}
+UpSetR::upset(overlaps$lambda$V, order.by = "freq")
+```
+
+### Light Chain - Lambda - J Segment
+
+```{r}
+UpSetR::upset(overlaps$lambda$J, order.by = "freq")
+```
