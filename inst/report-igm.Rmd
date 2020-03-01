@@ -10,13 +10,19 @@ CHAINTYPES <- c(mu = "heavy.mu", lambda = "light.lambda", kappa = "light.kappa")
 # Load nested lists of final results from an IgDiscover output directory.
 load_igdiscover_final <- function(dirpath) {
   data <- within(list(), {
+    path <- dirpath
     database <- lapply(SEGMENTS, function(segment) {
       dnar::read.fa(
         file.path(dirpath, "final/database", paste0(segment, ".fasta")))
     })
-    stats = list(
-      filtered = rjson::fromJSON(file = file.path("final/stats/filtered.json")),
-      assigned = rjson::fromJSON(file = file.path("final/stats/assignd.json")))
+    stats <- list(
+      filtered = rjson::fromJSON(file = file.path(dirpath, "final/stats/filtered.json")),
+      assigned = rjson::fromJSON(file = file.path(dirpath, "final/stats/assigned.json")))
+    clusterplots <- list.files(
+      path = file.path(dirpath, "final/clusterplots"),
+      full.names = TRUE,
+      pattern = ".*png")
+    names(clusterplots) <- sub("\\.png$", "", basename(clusterplots))
   })
   data
 }
@@ -40,8 +46,8 @@ load_all_igdiscover_results <- function(dirpath) {
   lapply(CHAINTYPES, function(chaintype) {
     dirs <- list.dirs(file.path(dirpath, chaintype), recursive=FALSE)
     names(dirs) <- basename(dirs)
-    lapply(dirs, function(dirpath) {
-      load_igdiscover_final(dirpath)
+    lapply(dirs, function(dirpath_inner) {
+      load_igdiscover_final(dirpath_inner)
     })
   })
 }
@@ -134,25 +140,50 @@ sample.  The input is as specified in the Grouping by Specimen section above.
 According to the paper around 400,000 input reads should be sufficient.
 
 ```{r}
-# TODO replace this mess and embed within igdiscover_results above
-with(NULL, {
-  filepaths <- grep(
-    "final",
-    list.files(file.path(ROOT, "igdiscover"), full.names = TRUE, recursive = TRUE, pattern = "filtered\\.json"),
-    value = TRUE)
-  # ugh
-  x <- sub('.*igdiscover/', "", filepaths)
-  md <- lapply(strsplit(x, "/"), function(vec) c(Chain=sub("\\..*", "", vec[1]), Type=sub(".*\\.", "", vec[1]), Specimen=vec[2]))
-  cts <- do.call(rbind, lapply(seq_along(filepaths), function(i) {
-    as.data.frame(c(md[[i]], rjson::fromJSON(file = filepaths[i])))
-  }))
-  abbrs <- c(
+abbrs <- c(
     Chain = "Chain", Type = "Type", Specimen = "Specimen",
     total = "total", has_vj_assignment = "has_vj", has_no_stop = "no_stop",
     good_v_evalue = "good_v_ev", good_v_coverage = "good_v_cov",
     good_j_coverage = "good_j_cov", has_cdr3 = "has_cdr3")
+
+with(NULL, {
+  cts <- do.call(
+    rbind.data.frame,
+    do.call(c, lapply(names(igdiscover_results), function(chain_type) {
+    lapply(names(igdiscover_results[[chain_type]]), function(spec) {
+      c(
+        list(Type=chain_type, Specimen=spec),
+        igdiscover_results[[chain_type]][[spec]]$stats$filtered)
+    })
+  })))
   colnames(cts) <- abbrs[colnames(cts)]
   kableExtra::kable_styling(drawtab(cts), font_size = 6)
+})
+
+
+```
+
+### IgDiscover - Results by Specimen - Cluster Plots
+
+These plots visualize the similarity of sequences assigned to a particular
+output allele, grouped here by specimen by locus.  The file-size images are
+available in the IgDiscover output files.
+
+```{r, results="asis"}
+with(NULL, {
+  specimens <- list()
+  for (chain_type in names(igdiscover_results)) {
+    for (spec in names(igdiscover_results[[chain_type]])) {
+      specimens[[spec]][[chain_type]] <- igdiscover_results[[chain_type]][[spec]]$clusterplots
+    }
+  }
+  for (spec in names(specimens)) {
+    for (chain_type in names(specimens[[spec]])) {
+     cat(paste0("\n\n#### ", spec, " - ", chain_type, "\n\n"))
+      img <- file.path(sub("/igdiscover/", "/reporting/igdisover/", igdiscover_results[[chain_type]][[spec]]$path), "clusterplots.png")
+      cat(paste0("![](", img, ")\n"))
+    }
+  }
 })
 
 ```

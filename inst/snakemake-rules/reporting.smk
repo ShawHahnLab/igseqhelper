@@ -3,17 +3,33 @@
 import igseq.reporting
 from igseq.data import amplicon_files
 
+IGM_CHAINS = [entry["Chain"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
+IGM_CHAINTYPES = [entry["Type"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
+IGM_SUBJECTS = [entry["SpecimenAttrs"]["Subject"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
+IGM_SPECIMENS = [entry["Specimen"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
+
 TARGET_QUALTRIM_GRID = expand(
     outputs_per_run("reporting/{run}/qualtrim.{sample}.{{rp}}.csv", SAMPLES),
     rp=["R1", "R2", "I1"])
 
+TARGET_IGDISCOVER_CLUSTERPLOTS = expand(
+    "reporting/igdiscover/{chain}.{chain_type}/{specimen}/clusterplots.png",
+    zip, chain=IGM_CHAINS, chain_type=IGM_CHAINTYPES, specimen=IGM_SPECIMENS)
+
 rule all_qualtrim_grid:
     input: TARGET_QUALTRIM_GRID
 
-TARGET_REPORT_ALL = expand(
+rule all_igdiscover_clusterplots:
+    input: TARGET_IGDISCOVER_CLUSTERPLOTS
+
+TARGET_REPORT_INPUTS = expand(
     "reporting/{thing}.csv",
     thing=["counts_by_sample", "counts_by_run", "counts_amplicon_summary",
-           "counts_assembly_summary", "counts_presto_qual_summary"]) + TARGET_QUALTRIM_GRID
+           "counts_assembly_summary", "counts_presto_qual_summary"]) + \
+           TARGET_QUALTRIM_GRID + \
+           TARGET_IGDISCOVER_CLUSTERPLOTS
+
+TARGET_REPORT_ALL = ["report.pdf"]
 
 TARGET_REPORT_COUNTS = expand(
     outputs_per_run("counts/demux/{run}/{sample}.{{rp}}.fastq.gz.counts", SAMPLES),
@@ -29,9 +45,10 @@ TARGET_ASSEMBLY_COUNTS = amplicon_files(
 TARGET_PRESTO_QUAL_COUNTS = amplicon_files(
     "counts/presto/qual/{chain}.{chain_type}/{specimen}_quality-pass.fastq.counts", SAMPLES)
 
-rule report_all:
-    input: TARGET_REPORT_ALL
-
+rule render_report:
+    output: TARGET_REPORT_ALL
+    input: TARGET_REPORT_INPUTS
+    script: "igseq/inst/report.Rmd"
 
 rule qualtrim_grid:
     """Make a CSV table summarizing cutadapt trim cutoffs vs output length."""
@@ -114,3 +131,24 @@ rule counts_presto_qual_summary:
 # TODO next: also tally after pRESTO's QC and primer checking.  Maybe do a
 # summary table in the report of counts following assembly, qc, and primer
 # checking showing attrition across steps.
+
+rule igdiscover_clusterplot_grid:
+    """A summary grid PNG of all the various clusterplot PNGs for a single IgDiscover dir.
+
+    This will make an 8xN grid of tiled thumbnails for quick viewing.
+    """
+    output: "reporting/igdiscover/{chain}.{chain_type}/{specimen}/clusterplots.png"
+    input: "igdiscover/{chain}.{chain_type}/{specimen}/stats/stats.json"
+    params:
+        width=200,
+        height=200,
+        cols=8
+    shell:
+        """
+            plotdir=$(dirname {input})/../final/clusterplots
+            num=$(ls $plotdir/*.png | wc -l)
+            num=$((num / {params.cols} + 1))
+            # My install always complains about fonts and returns with exit
+            # code 1.  Not ideal but I'm just ignoring it for now.
+            montage $plotdir/*.png -geometry {params.width}x{params.height}+0+0 -tile {params.cols}x$num {output} || exitval=$?
+        """
