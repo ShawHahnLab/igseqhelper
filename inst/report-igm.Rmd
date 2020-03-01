@@ -180,7 +180,7 @@ with(NULL, {
   for (spec in names(specimens)) {
     for (chain_type in names(specimens[[spec]])) {
      cat(paste0("\n\n#### ", spec, " - ", chain_type, "\n\n"))
-      img <- file.path(sub("/igdiscover/", "/reporting/igdisover/", igdiscover_results[[chain_type]][[spec]]$path), "clusterplots.png")
+      img <- file.path(sub("/igdiscover/", "/reporting/igdiscover/", igdiscover_results[[chain_type]][[spec]]$path), "clusterplots.png")
       cat(paste0("![](", img, ")\n"))
     }
   }
