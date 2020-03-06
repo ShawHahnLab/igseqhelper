@@ -140,8 +140,8 @@ rule igdiscover_clusterplot_grid:
     output: "reporting/igdiscover/{chain}.{chain_type}/{specimen}/clusterplots.png"
     input: "igdiscover/{chain}.{chain_type}/{specimen}/stats/stats.json"
     params:
-        width=200,
-        height=200,
+        width=100,
+        height=100,
         cols=8
     shell:
         """
