@@ -49,20 +49,52 @@ rule all_sonar_module_3:
     input: TARGET_SONAR_MODULE_3
 
 rule sonar_prep_input_from_presto:
+    """Gather input sequences from pRESTO's initial processing."""
     output: "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq"
     input: "presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
     shell: "ln {input} {output}"
 
-# Prepare germline references for SONAR.  Note that it expects a particular
-# sequence naming scheme for genes and module 2 will fail if we don't follow
-# it.
+def sonar_gather_germline_inputs(wildcards):
+    """Get IgDiscover per-specimen paths for a given per-subject output."""
+    # IgG+ will have gamma for heavy, but the germline will have come from mu.
+    if wildcards.chain_type == "gamma":
+        chain_type_naive="mu"
+    elif wildcards.chain_type == "lambda":
+        chain_type_naive="lambda"
+    elif wildcards.chain_type == "kappa":
+        chain_type_naive="kappa"
+    else:
+        raise ValueError(
+            "chain type should be gamma or lambda or kappa, not \"%s\"" % wildcards.chain_type)
+    # Again, here we want to refer to the naive specimens, not the IgG+ SONAR ones.
+    specimen_match = lambda x: \
+        x["Chain"] == wildcards.chain and \
+        x["Type"] == chain_type_naive and \
+        x["SpecimenAttrs"]["Subject"] == wildcards.subject
+    specimens = [x["Specimen"] for x in SAMPLES.values() if specimen_match(x)]
+    return expand("igdiscover/{chain}.{chain_type}/{specimen}/final/database/{segment}.fasta",
+        chain=wildcards.chain,
+        chain_type=chain_type_naive,
+        specimen=specimens,
+        segment=wildcards.segment)
+
 rule sonar_gather_germline:
-    output: "sonar-analysis/{subject}/germline.{chain}.{segment}.fasta"
-    input:
-        imgt=lambda w: str(RINST/"reference/imgt/IG%s%s.fasta") % ({"heavy": "H", "light": "L"}[w.chain], w.segment),
-        extra_v=str(RINST/"reference/10.1016_j.cell.2019.06.030/tables3c.{chain}.fasta")
+    """Gather germline alleles from IgDiscover's analysis of IgM+ specimens.
+
+    Prepare germline references for SONAR.  Note that it expects a particular
+    sequence naming scheme for genes and module 2 will fail if we don't follow
+    it.  This is written to handle the possibility of multiple specimens in the
+    IgDiscover input and pool them, though as of this writing we just use one.
+
+    We'll need to take germline references from corresponding specimens for the
+    same subject, using mu for heavy chain and lambda/kappa for light, though
+    the corresponding chain types for the samples here for SONAR will be gamma
+    for heavy and lambda/kappa for light.
+    """
+    output: "sonar-analysis/{subject}/{chain}.{chain_type}/germline.{segment}.fasta"
+    input: sonar_gather_germline_inputs
     run:
-        igseq.sonar.gather_germline(input.imgt, input.extra_v, output[0], wildcards.segment)
+        igseq.sonar.gather_germline(input, output[0])
 
 def module_1_inputs(wildcards):
     if wildcards.chain == "heavy":
@@ -72,9 +104,10 @@ def module_1_inputs(wildcards):
     else:
         raise ValueError('Chain should be either "heavy" or "light"')
     targets = dict(zip(segments, expand(
-        "sonar-analysis/{subject}/germline.{chain}.{segment}.fasta",
+        "sonar-analysis/{subject}/{chain}.{chain_type}/germline.{segment}.fasta",
         subject=wildcards.subject,
         chain=wildcards.chain,
+        chain_type=wildcards.chain_type,
         segment=segments)))
     targets["fastq"] = expand(
         "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",

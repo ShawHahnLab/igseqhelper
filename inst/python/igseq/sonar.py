@@ -8,7 +8,7 @@ from Bio import SeqIO
 
 LOGGER = logging.getLogger(__name__)
 
-def gather_germline(input_imgt_fp, input_extra_v_fp, output_fp, segment):
+def gather_germline(input_fps, output_fp):
     """
     Prepare germline references for SONAR.
 
@@ -17,13 +17,8 @@ def gather_germline(input_imgt_fp, input_extra_v_fp, output_fp, segment):
     """
     with open(output_fp, "w") as f_out:
         seqids_seen = set()
-        for record in SeqIO.parse(input_imgt_fp, "fasta"):
-            new_id = munge_seqid_for_sonar(record.id, seqids_seen)
-            record.id = new_id
-            record.description = ""
-            SeqIO.write(record, f_out, "fasta")
-        if segment == "V":
-            for record in SeqIO.parse(input_extra_v_fp, "fasta"):
+        for input_fp in input_fps:
+            for record in SeqIO.parse(input_fp, "fasta"):
                 new_id = munge_seqid_for_sonar(record.id, seqids_seen)
                 record.id = new_id
                 record.description = ""
