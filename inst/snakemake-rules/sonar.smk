@@ -138,9 +138,9 @@ rule sonar_module_1:
         # What we give for the V(D)J command-line argments depends on which
         # chain we're doing.  We could handle this during the rule itself with
         # a run: directive but then it won't let us use singularity.
-        libv_arg=lambda w, input: "--lib ../../" + str(Path(input.V).name),
-        libd_arg=lambda w, input: "D" in input and "--dlib ../../" + str(Path(input.D).name) or "--noD",
-        libj_arg=lambda w, input: "--jlib ../../" + str(Path(input.J).name)
+        libv_arg=lambda w, input: "--lib ../" + str(Path(input.V).name),
+        libd_arg=lambda w, input: "D" in input and "--dlib ../" + str(Path(input.D).name) or "--noD",
+        libj_arg=lambda w, input: "--jlib ../" + str(Path(input.J).name)
     shell:
         """
             cd $(dirname {input.fastq})
