@@ -52,6 +52,9 @@ def trimmed_specimen_samples(wildcards):
                 run=samp_attrs["Run"],
                 sample=samp_name,
                 rp=wildcards.rp))
+    if not filepaths:
+        raise ValueError("No matching samples found for %s & %s & %s" %
+            (wildcards.specimen, wildcards.chain, wildcards.chain_type))
     return filepaths
 
 rule presto_data:
