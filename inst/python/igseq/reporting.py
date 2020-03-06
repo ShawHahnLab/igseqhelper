@@ -66,18 +66,25 @@ def make_qualtrim_csv(fqgz_in, fp_csv, qual_breaks=None, len_breaks=None):
 def load_rearr_centroids_by_seq(fp_tsv):
     """Load rearrangements.tsv from SONAR, extract centroid ID and original sequence ID.
 
-    This creates a dictionary of sequence ID -> centroid ID mappings.
+    This creates a dictionary of sequence ID -> centroid ID mappings.  Only
+    centroids that have an integer cluster_count listed will be included, so
+    that we leave out one-offs that have no duplicates or clustered relatives.
     """
+    with open(fp_tsv) as f_in:
+        reader = csv.DictReader(f_in, delimiter="\t")
+        centroids_keep = {row["centroid"] for row in reader if row["cluster_count"]}
     # From a quick check it looks like these two columns put us in the range of
     # 10s of MB of text input, so I think we should be safe to just load it all in.
     # I think.
+    # (This regular expression will strip off the extra stuff in the seq ID from pRESTO.)
+    fmt = lambda row: (re.sub(r"\|.*$", "", row["source_id"]), row["centroid"])
     with open(fp_tsv) as f_in:
         reader = csv.DictReader(f_in, delimiter="\t")
-        pairs = [(re.sub(r"\|.*$", "", row["source_id"]), row["centroid"]) for row in reader]
+        pairs = [fmt(row) for row in reader if row["centroid"] in centroids_keep]
     return dict(pairs)
 
 def get_rearr_centroids_by_raw_reads(fp_tsv, fps_fqgz, fp_out):
-    """Match raw read IDs for a specimen with SONAR's centroid IDs.
+    """Match raw read IDs for a specimen with SONAR's centroid IDs, for centroids with clusters.
 
     fp_tsv: SONAR rearrangements.tsv file
     fps_fqgz: list of raw fastq.gz files containing IDs for the original reads
@@ -85,7 +92,9 @@ def get_rearr_centroids_by_raw_reads(fp_tsv, fps_fqgz, fp_out):
 
     This adds entries for read IDs not present in SONAR's set.  We can use this
     to investigate the depth of sampling within and between cells.  This is
-    very space-inefficient, but simple to work with.
+    very space-inefficient, but simple to work with.  Only centroids that have
+    an integer cluster_count listed will be included, so that we leave out
+    one-offs that have no duplicates or clustered relatives.
     """
     # this gets most of the way there, but only for sequences SONAR knows about.
     centroids_by_seq = load_rearr_centroids_by_seq(fp_tsv)
