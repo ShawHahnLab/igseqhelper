@@ -3,39 +3,42 @@ Handlers for data/metadata
 """
 
 from pathlib import Path
-from igseq.data import (load_samples, load_specimens, load_runs, load_sequences, get_data, get_samples_per_run)
+import igseq.data
 
-def _setup_metadata(fp_samples, fp_specimens, fp_runs, fp_sequences):
-    global SEQUENCES, SPECIMENS, SAMPLES, RUNS
+def _setup_metadata(fp_samples, fp_specimens, fp_runs, fp_sequences, fp_antibody_lineages, fp_antibody_isolates):
+    global SEQUENCES, SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES
     # key is sequence name, entries are dicts
-    SEQUENCES = load_sequences(fp_sequences)
+    SEQUENCES = igseq.data.load_sequences(fp_sequences)
     # key is specimen name, entries are dicts
-    SPECIMENS = load_specimens(fp_specimens)
+    SPECIMENS = igseq.data.load_specimens(fp_specimens)
     # key is run, entries are dicts
-    RUNS = load_runs(fp_runs)
+    RUNS = igseq.data.load_runs(fp_runs)
     # key is sample, entries are nested dictionaries of sample attributes and
     # other info above
-    SAMPLES = load_samples(
+    SAMPLES = igseq.data.load_samples(
         fp_samples,
         specimens=SPECIMENS,
         runs=RUNS,
         sequences=SEQUENCES)
+    ANTIBODY_LINEAGES = load_antibody_lineages(fp_antibody_lineages)
+    ANTIBODY_ISOLATES = load_antibody_isolates(fp_antibody_isolates, ANTIBODY_LINEAGES)
 
 try:
     _setup_metadata(
         "metadata/samples.csv",
         "metadata/specimens.csv",
         "metadata/runs.csv",
-        "metadata/sequences.csv")
+        "metadata/sequences.csv",
+        "metadata/antibody_lineages.csv",
+        "metadata/antibody_isolates.csv")
 except FileNotFoundError:
     print("Skipping metadata loading; be sure to run get_metadata rule.")
     SEQUENCES = {}
-    SAMPLES = {}
+    SPECIMENS = {}
     RUNS = {}
-
-SAMPLES_H = []
-SAMPLES_L = []
-ALLELES = {"heavy": {"V": "", "D": "", "J": ""}, "light": {"V": "", "J": ""}}
+    SAMPLES = {}
+    ANTIBODY_LINEAGES = {}
+    ANTIBODY_ISOLATES = {}
 
 RAW = "Undetermined_S0_L001_{rp}_001.fastq.gz"
 
@@ -46,7 +49,7 @@ def outputs_per_run(pattern, samples):
     information and the right run/sample combinations will be filled in.  Be
     sure to escape any other template variables like {{rp}}.
     """
-    samples_per_run = get_samples_per_run(samples)
+    samples_per_run = igseq.data.get_samples_per_run(samples)
     target = []
     for runid in samples_per_run.keys():
         target.extend(expand(
@@ -81,7 +84,7 @@ rule get_data:
     """
     output: expand("data/{run}/" + RAW, run = "{run}", rp = ["R1", "R2", "I1"])
     input: lambda w: checkpoints.get_metadata.get().output
-    run: get_data(wildcards.run, Path(output[0]).parent, RUNS)
+    run: igseq.data.get_data(wildcards.run, Path(output[0]).parent, RUNS)
 
 checkpoint get_metadata:
     """Create CSV files from Google sheets based on metadata YAML."""
