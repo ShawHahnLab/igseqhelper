@@ -70,6 +70,7 @@ def sonar_gather_germline_inputs(wildcards):
     specimen_match = lambda x: \
         x["Chain"] == wildcards.chain and \
         x["Type"] == chain_type_naive and \
+        "IgM+" in x["SpecimenAttrs"]["CellType"] and \
         x["SpecimenAttrs"]["Subject"] == wildcards.subject
     specimens = [x["Specimen"] for x in SAMPLES.values() if specimen_match(x)]
     return expand("igdiscover/{chain}.{chain_type}/{specimen}/final/database/{segment}.fasta",
