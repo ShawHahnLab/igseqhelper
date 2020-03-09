@@ -52,12 +52,12 @@ def load_specimens(fp_in):
 def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     """Load sample metadata CSV and optionally link to barcode data.
 
-    Output is a dict where key is run, entries are lists of sample dicts.
     Output is a dictionary of sample names to sample attributes.  If
     dictionaries for specimens, runs, or sequences are given, those are joined
     to the sample attributes as nested dictionaries for each sample.
     """
     LOGGER.info("load_samples: fp_in %s", fp_in)
+    LOGGER.info("load_samples: specimens %s...", str(specimens)[0:60])
     LOGGER.info("load_samples: runs %s...", str(runs)[0:60])
     LOGGER.info("load_samples: sequences %s...", str(sequences)[0:60])
     samples = load_csv(fp_in, "Sample")
@@ -66,31 +66,41 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
         msg = "Duplicate entries in CSV %s for BarcodeFwd/BarcodeRev/Run combinations" % fp_in
         LOGGER.critical(msg)
         raise MetadataError(msg)
-    for sample_name, sample in samples.items():
+    for sample in samples.values():
         if sequences:
-            bc_fwd = sequences.get(sample["BarcodeFwd"])
-            if bc_fwd:
-                sample["BarcodeFwdAttrs"] = bc_fwd.copy()
-            else:
-                LOGGER.error("Missing BarcodeFwd for sample %s", sample_name)
-            bc_rev = sequences.get(sample["BarcodeRev"])
-            if bc_rev:
-                sample["BarcodeRevAttrs"] = bc_rev.copy()
-            else:
-                LOGGER.error("Missing BarcodeRev for sample %s", sample_name)
+            _load_samples_nested_items(sample, sequences, "BarcodeFwd")
+            _load_samples_nested_items(sample, sequences, "BarcodeRev")
         if runs:
-            run = runs.get(sample["Run"])
-            if run:
-                sample["RunAttrs"] = run.copy()
-            else:
-                LOGGER.error("Missing Run for sample %s", sample_name)
+            _load_samples_nested_items(sample, runs, "Run")
         if specimens:
-            specimen = specimens.get(sample["Specimen"])
-            if specimen:
-                sample["SpecimenAttrs"] = specimen.copy()
-            else:
-                LOGGER.error("Missing Specimen for sample %s", sample_name)
+            _load_samples_nested_items(sample, specimens, "Specimen")
     return samples
+
+def _load_samples_nested_items(sample, others, key):
+    """Add additional nested metdata to a sample from another dictionary."""
+    other = others.get(sample[key])
+    if other:
+        sample[key + "Attrs"] = other.copy()
+    else:
+        LOGGER.error("Missing %s for sample %s", key, sample["Sample"])
+
+def load_antibody_lineages(fp_in):
+    """Load antibody lineage CSV."""
+    LOGGER.info("load_antibody_lineages: fp_in %s", fp_in)
+    lineages = load_csv(fp_in, "AntibodyLineage")
+    return lineages
+
+def load_antibody_isolates(fp_in, antibody_lineages):
+    """Load antibody isolate CSV and optionally link to antibody lineage data.
+
+    Output is a dictionary of isolate names to isolate attributes.  If a
+    dictionary for lineages is given, entries will be joined as nested
+    dictionaries.
+    """
+    LOGGER.info("load_antibody_isolates: fp_in %s", fp_in)
+    LOGGER.info("load_antibody_isolates: antibody_lineages %s...", str(antibody_lineages)[0:60])
+    isolates = load_csv(fp_in, "AntibodyIsolate")
+    return isolates
 
 def load_csv(fp_in, key=None):
     """Generic CSV to dictionary.
