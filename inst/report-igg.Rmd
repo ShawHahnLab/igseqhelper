@@ -9,3 +9,41 @@ counts as compared with the cell counts through each step.
 ```{r}
 drawtab(subset(counts_presto, select = -c(Subject, Timepoint, Chain)))
 ```
+
+## SONAR Analysis - Module 1
+
+SONAR's first step is to cluster duplicate and similar sequences together,
+categorize sequences (full-length, productive, non-productive, etc.), and
+identify regions such as V(D)J segments and CDR3.
+
+To try to demonstrate that we have sufficient sequencing depth per cell and cell
+counts per specimen, we can subsample the raw reads and tabulate number of
+non-singleton clusters identified by SONAR.  If the number of clusters observed 
+approaches the asymptote well before all reads are included, and if the
+asymptote falls well below the number of cells (i.e., there are far fewer
+sequences than cells) we have some confidence that we've sampled deeply.
+
+```{r results="asis"}
+with(NULL, {
+  samps <- subset(metadata$samples, grepl("IgG+", SpecimenCellType))
+  fps <- file.path(
+    ROOT,
+    "reporting",
+    paste(samps$Specimen, samps$Chain, samps$Type, sep = "."),
+    "sonar_clusters_rarefaction.csv")
+  for (idx in 1:nrow(samps)) {
+      cat(paste0("\n\n### ", "Rarefaction Curve - ", samps$Specimen[idx], ".", samps$Chain[idx], ".", samps$Type[idx]), "\n\n")
+      fp <- fps[idx]
+      if (file.exists(fp)) {
+        data <- read.csv(fp)
+        # TODO make y-axis scaled by cell count, x axis by total reads
+        plot(
+          data$ReadsUsed, data$UniqueCentroids,
+          pch=19, cex=0.7,
+          xlab="Reads Included", ylab="Clusters Observed")
+      } else {
+      cat("No rarefaction curve available.\n")
+    }
+  }
+})
+```
