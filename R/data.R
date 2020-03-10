@@ -45,6 +45,20 @@ load_samples <- function(fp, specimens=NULL, runs=NULL, sequences=NULL) {
   samples
 }
 
+load_antibody_lineages <- function(fp) {
+  antibody_lineages <- load_csv(fp, "AntibodyLineage")
+  antibody_lineages
+}
+
+load_antibody_isolates <- function(fp, antibody_lineages=NULL) {
+  antibody_isolates <- load_csv(fp, "AntibodyIsolate")
+  if (! is.null(antibody_lineages)) {
+    antibody_isolates <- merge_df(
+      antibody_isolates, antibody_lineages, "AntibodyLineage")
+  }
+  antibody_isolates
+}
+
 merge_df <- function(df1, df2, key, name=key) {
   idx <- match(df1[[key]], df2[[name]])
   df2 <- df2[idx, ]
