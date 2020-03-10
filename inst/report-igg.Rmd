@@ -24,6 +24,15 @@ asymptote falls well below the number of cells (i.e., there are far fewer
 sequences than cells) we have some confidence that we've sampled deeply.
 
 ```{r results="asis"}
+
+plot_rarefaction_curve <- function(data, metadata, samp) {
+  plot(
+    x = data$ReadsUsed,
+    y = data$UniqueCentroids / subset(metadata$samples, Sample == samp)$SpecimenCellCount,
+    pch=19, cex=0.7,
+    xlab="Reads Included", ylab="Clusters to Input Cells")
+}
+
 with(NULL, {
   samps <- subset(metadata$samples, grepl("IgG+", SpecimenCellType))
   fps <- file.path(
@@ -37,10 +46,7 @@ with(NULL, {
       if (file.exists(fp)) {
         data <- read.csv(fp)
         # TODO make y-axis scaled by cell count, x axis by total reads
-        plot(
-          data$ReadsUsed, data$UniqueCentroids,
-          pch=19, cex=0.7,
-          xlab="Reads Included", ylab="Clusters Observed")
+        plot_rarefaction_curve(data, metadata, samps$Sample[idx])
       } else {
       cat("No rarefaction curve available.\n")
     }
