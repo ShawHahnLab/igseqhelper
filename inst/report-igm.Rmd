@@ -169,7 +169,7 @@ These plots visualize the similarity of sequences assigned to a particular
 output allele, grouped here by specimen by locus.  The full-size images are
 available in the IgDiscover output files.
 
-```{r, results="asis" fig.cap=""}
+```{r results="asis"}
 with(NULL, {
   specimens <- list()
   for (chain_type in names(igdiscover_results)) {
@@ -189,5 +189,36 @@ with(NULL, {
     }
   }
 })
+```
 
+### IgDiscover - Results by Antibody Lineage
+
+```{r}
+# data frame of alleles per specimen/chain_type/segment
+tabulate_specimen_alleles <- function(igdiscover_results, metadata) {
+  do.call(rbind, lapply(names(igdiscover_results), function(chain_type) {
+    do.call(rbind, lapply(names(igdiscover_results[[chain_type]]), function(spec) {
+      do.call(rbind, lapply(names(igdiscover_results[[chain_type]][[spec]]$database), function(segment) {
+        data.frame(
+          Subject = metadata$specimens$Subject[match(spec, metadata$specimens$Specimen)],
+          Specimen = spec,
+          ChainType = chain_type,
+          Segment = segment,
+          Allele = igdiscover_results[[chain_type]][[spec]]$database[[segment]]$name,
+          Seq = igdiscover_results[[chain_type]][[spec]]$database[[segment]]$seq,
+          stringsAsFactors = FALSE)
+      }))
+    }))
+  }))
+}
+
+specimen_alleles <- tabulate_specimen_alleles(igdiscover_results, metadata)
+```
+
+```{r}
+# TODO show summary alignment of similar alleles for V(D)J for each lineage
+subject <- "08N021"
+heavy_lineage <- subset(metadata$antibody_lineages, Subject == subject)
+heavy_isolates <- subset(metadata$antibody_isolates, AntibodyLineage == heavy_lineage$AntibodyLineage)
+alleles <- subset(specimen_alleles, Subject == subject)
 ```
