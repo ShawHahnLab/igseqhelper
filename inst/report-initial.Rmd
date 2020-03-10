@@ -5,8 +5,12 @@ metadata <- within(list(), {
   runs <- load_runs(file.path(ROOT, "metadata/runs.csv"))
   sequences <- load_sequences(file.path(ROOT, "metadata/sequences.csv"))
   specimens <- load_specimens(file.path(ROOT, "metadata/specimens.csv"))
+  antibody_lineages <- load_antibody_lineages(
+    file.path(ROOT, "metadata/antibody_lineages.csv"))
   samples <- load_samples(
     file.path(ROOT, "metadata/samples.csv"), specimens, runs, sequences)
+  antibody_isolates <- load_antibody_isolates(
+    file.path(ROOT, "metadata/antibody_isolates.csv"), antibody_lineages)
 })
 
 counts_stats <- within(list(), {
@@ -97,7 +101,7 @@ names(qualgrids_r2) <- counts_stats$by_sample$Sample
 
 ```{r fig.width = 3.7, fig.height = 3, dev="png", dpi=150}
 for (sample in counts_stats$by_sample$Sample) {
-  if (sum(qualgrids_r1[[sample]]) > 100) {
+  if (! is.null(qualgrids_r1[[sample]]) && ! is.null(qualgrids_r2[[sample]]) && sum(qualgrids_r1[[sample]]) > 100) {
   plot_qualgrid(qualgrids_r1[[sample]], main=paste(sample, "R1"),
                 legend = FALSE, show_rownames = FALSE)
   plot_qualgrid(qualgrids_r2[[sample]], main=paste(sample, "R2"))
@@ -116,5 +120,12 @@ combine these replicates for analysis (this way deduplication and such works
 across replicates).
 
 ```{r}
-drawtab(counts_stats$by_amplicon)
+with(NULL, {
+  tbl <- counts_stats$by_amplicon
+  idx <- match(counts_stats$by_amplicon$Specimen, metadata$specimens$Specimen)
+  tbl$CellType <- metadata$specimens$CellType[idx]
+  tbl <- tbl[, c("Timepoint", "Chain", "ChainType", "CellType", "Specimen", "Seqs", "CellCount", "Ratio")]
+  drawtab(tbl)
+})
+
 ```
