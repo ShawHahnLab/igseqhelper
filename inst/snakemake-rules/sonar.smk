@@ -177,7 +177,7 @@ rule sonar_module_2_id_div:
         iddiv="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"
     input:
         fasta="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        mab="sonar-analysis/{subject}/{chain}.{chain_type}/mab.fasta"
+        mab="sonar-analysis/{subject}/{chain}.{chain_type}/mab.fasta",
         germline_v="sonar-analysis/{subject}/{chain}.{chain_type}/germline.V.fasta"
     singularity: "docker://scharch/sonar"
     threads: 4
