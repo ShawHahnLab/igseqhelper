@@ -20,8 +20,8 @@ def _setup_metadata(fp_samples, fp_specimens, fp_runs, fp_sequences, fp_antibody
         specimens=SPECIMENS,
         runs=RUNS,
         sequences=SEQUENCES)
-    ANTIBODY_LINEAGES = load_antibody_lineages(fp_antibody_lineages)
-    ANTIBODY_ISOLATES = load_antibody_isolates(fp_antibody_isolates, ANTIBODY_LINEAGES)
+    ANTIBODY_LINEAGES = igseq.data.load_antibody_lineages(fp_antibody_lineages)
+    ANTIBODY_ISOLATES = igseq.data.load_antibody_isolates(fp_antibody_isolates, ANTIBODY_LINEAGES)
 
 try:
     _setup_metadata(
