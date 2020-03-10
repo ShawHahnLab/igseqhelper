@@ -6,6 +6,8 @@ output:
   pdf_document:
     toc: true
     toc_depth: 2
+    includes:
+      in_header: report-preamble.tex
 geometry: margin=1.5cm
 ---
 

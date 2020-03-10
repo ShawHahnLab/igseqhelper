@@ -1,0 +1,12 @@
+\iffalse
+https://stackoverflow.com/a/56949568/4499968
+\fi
+\usepackage{float}
+
+\let\origfigure\figure
+\let\endorigfigure\endfigure
+\renewenvironment{figure}[1][2] {
+    \expandafter\origfigure\expandafter[H]
+} {
+    \endorigfigure
+}
