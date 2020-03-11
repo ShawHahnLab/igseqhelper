@@ -12,12 +12,17 @@ dependencies:
   - vsearch
   - cutadapt
   - rpy2
+  - imagemagick
   # For R package
   - r-devtools
   - r-ggplot2
   - r-dplyr
   - r-reshape2
   - r-upsetr
+  - r-rmarkdown
+  - r-kableextra
+  - r-magick
+  - r-pheatmap
   - bioconductor-biostrings
   # requirements for IgDiscover
   - igdiscover
