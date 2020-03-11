@@ -15,7 +15,11 @@ geometry: margin=1.5cm
 knitr::opts_chunk$set(echo = FALSE)
 # folder containing the analysis results and the igseq package directory
 if (! "ROOT" %in% ls()) {
-  ROOT <- normalizePath(file.path(getwd(), "../.."))  
+  if (basename(getwd()) == "inst") {
+    ROOT <- normalizePath(file.path(getwd(), "../.."))
+  } else {
+    ROOT <- normalizePath(file.path(getwd()))
+  }
 }
 devtools::load_all(file.path(ROOT, "igseq"))
 ```
