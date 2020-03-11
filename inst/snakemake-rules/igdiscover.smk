@@ -59,7 +59,7 @@ rule igdiscover_init:
     params:
         stranded="true",
         iterations=5,
-        primer_fwd=SEQUENCES["5PIIA"]["Seq"]
+        primer_fwd=SEQUENCES.get("5PIIA", {}).get("Seq")
     shell:
         """
             rmdir $(dirname {output})

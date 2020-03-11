@@ -5,16 +5,11 @@ Handlers for data/metadata
 from pathlib import Path
 import igseq.data
 
-def _setup_metadata(fp_samples, fp_specimens, fp_runs, fp_sequences, fp_antibody_lineages, fp_antibody_isolates):
+def _setup_metadata(fp_sequences, fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates):
     global SEQUENCES, SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES
-    # key is sequence name, entries are dicts
     SEQUENCES = igseq.data.load_sequences(fp_sequences)
-    # key is specimen name, entries are dicts
     SPECIMENS = igseq.data.load_specimens(fp_specimens)
-    # key is run, entries are dicts
     RUNS = igseq.data.load_runs(fp_runs)
-    # key is sample, entries are nested dictionaries of sample attributes and
-    # other info above
     SAMPLES = igseq.data.load_samples(
         fp_samples,
         specimens=SPECIMENS,
@@ -25,10 +20,10 @@ def _setup_metadata(fp_samples, fp_specimens, fp_runs, fp_sequences, fp_antibody
 
 try:
     _setup_metadata(
-        "metadata/samples.csv",
+        "metadata/sequences.csv",
         "metadata/specimens.csv",
         "metadata/runs.csv",
-        "metadata/sequences.csv",
+        "metadata/samples.csv",
         "metadata/antibody_lineages.csv",
         "metadata/antibody_isolates.csv")
 except FileNotFoundError:
@@ -70,10 +65,12 @@ rule all_get_data:
 
 rule all_get_metadata:
     input:
-       samples="metadata/samples.csv",
-       specimens="metadata/specimens.csv",
        sequences="metadata/sequences.csv",
-       runs="metadata/runs.csv"
+       specimens="metadata/specimens.csv",
+       runs="metadata/runs.csv",
+       samples="metadata/samples.csv",
+       antibody_lineages="metadata/antibody_lineages.csv",
+       antibody_isolates="metadata/antibody_isolates.csv"
 
 rule get_data:
     """Get data files for a run.
@@ -89,14 +86,22 @@ rule get_data:
 checkpoint get_metadata:
     """Create CSV files from Google sheets based on metadata YAML."""
     output:
-       samples="metadata/samples.csv",
+       sequences="metadata/sequences.csv",
        specimens="metadata/specimens.csv",
        runs="metadata/runs.csv",
-       sequences="metadata/sequences.csv"
+       samples="metadata/samples.csv",
+       antibody_lineages="metadata/antibody_lineages.csv",
+       antibody_isolates="metadata/antibody_isolates.csv"
     input: "metadata.yml"
     run:
         R("""
           devtools::load_all("igseq")
           update_metadata_via_yaml("{input}", ".")
           """)
-        _setup_metadata(output.samples, output.specimens, output.runs, output.sequences)
+        _setup_metadata(
+            output.sequences,
+            output.specimens,
+            output.runs,
+            output.samples,
+            output.antibody_lineages,
+            output.antibody_isolates)
