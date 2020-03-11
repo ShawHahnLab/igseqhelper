@@ -22,14 +22,14 @@ rule all_qualtrim_grid:
 rule all_igdiscover_clusterplots:
     input: TARGET_IGDISCOVER_CLUSTERPLOTS
 
+TARGET_REPORT_ALL = [Path("report.pdf").resolve()]
+
 TARGET_REPORT_INPUTS = expand(
     "reporting/{thing}.csv",
     thing=["counts_by_sample", "counts_by_run", "counts_amplicon_summary",
            "counts_assembly_summary", "counts_presto_qual_summary"]) + \
            TARGET_QUALTRIM_GRID + \
            TARGET_IGDISCOVER_CLUSTERPLOTS
-
-TARGET_REPORT_ALL = ["report.pdf"]
 
 TARGET_REPORT_COUNTS = expand(
     outputs_per_run("counts/demux/{run}/{sample}.{{rp}}.fastq.gz.counts", SAMPLES),
@@ -48,7 +48,11 @@ TARGET_PRESTO_QUAL_COUNTS = amplicon_files(
 rule render_report:
     output: TARGET_REPORT_ALL
     input: TARGET_REPORT_INPUTS
-    script: "igseq/inst/report.Rmd"
+    params: report=RINST/"report.Rmd"
+    shell:
+        """
+            Rscript --vanilla -e 'rmarkdown::render("{params.report}", output_file="{output}", quiet=TRUE)'
+        """
 
 rule qualtrim_grid:
     """Make a CSV table summarizing cutadapt trim cutoffs vs output length."""
