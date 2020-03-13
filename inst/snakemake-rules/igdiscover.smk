@@ -75,10 +75,14 @@ rule igdiscover_init:
         """
 
 rule igdiscover_run:
-    output: "igdiscover/{chain}.{chain_type}/{specimen}/stats/stats.json"
+    output:
+        stats="igdiscover/{chain}.{chain_type}/{specimen}/stats/stats.json",
+        db_v="igdiscover/{chain}.{chain_type}/{specimen}/final/database/V.fasta",
+        db_d="igdiscover/{chain}.{chain_type}/{specimen}/final/database/D.fasta",
+        db_j="igdiscover/{chain}.{chain_type}/{specimen}/final/database/J.fasta"
     input: "igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml"
     threads: 20
     shell:
         """
-            cd $(dirname {output})/.. && igdiscover run --cores {threads}
+            cd $(dirname {output.stats})/.. && igdiscover run --cores {threads}
         """
