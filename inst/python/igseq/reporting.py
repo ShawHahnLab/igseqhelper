@@ -7,7 +7,11 @@ import re
 import logging
 import gzip
 from random import random
+from tempfile import NamedTemporaryFile
+from snakemake.shell import shell
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 from cutadapt import qualtrim
 from igseq.data import load_csv, get_samples_per_run, MetadataError
 
@@ -303,3 +307,96 @@ def divide(val1, val2, fmt="{:.6f}"):
     num = float(val1)/float(val2)
     num = fmt.format(num)
     return num
+
+def gather_antibodies(
+        subject, chain, antibody_isolates, output_fasta):
+    """Gather antibody sequences from metadata for use in alignments."""
+    #lineages = {k: val for k, val in antibody_lineages.items() if val["Subject"] == subject}
+    #in_lineages = lambda v: v["AntibodyLineage"] in lineages.keys()
+    #isolates = {k: val for k, val in antibody_isolates.items() if in_lineages(val)}
+    is_subject = lambda val: val["AntibodyLineageAttrs"]["Subject"] == subject
+    isolates = {k: val for k, val in antibody_isolates.items() if is_subject(val)}
+    lineages = {val["AntibodyLineage"]: val["AntibodyLineageAttrs"] for val in isolates.values()}
+    if chain == "heavy":
+        seq_col = "HeavySeq"
+        cons_col = "HeavyConsensus"
+    else:
+        seq_col = "LightSeq"
+        cons_col = "LightConsensus"
+    with open(output_fasta, "wt") as f_out:
+        for lineage_name, lineage_attrs in lineages.items():
+            record = SeqRecord(Seq(lineage_attrs[cons_col]), id=lineage_name, description="")
+            SeqIO.write(record, f_out, "fasta")
+        for isolate_name, isolate_attrs in isolates.items():
+            record = SeqRecord(Seq(isolate_attrs[seq_col]), id=isolate_name, description="")
+            SeqIO.write(record, f_out, "fasta")
+
+def align_next_segment(antibodies_fasta, aligned_fasta, alleles_fasta, output_fasta):
+    """Align discovered alleles from a segment to the regions not yet aligned to.
+
+    antibodies_fasta: path to FASTA for known antibody sequences
+    aligned_fasta: path to FASTA for previous segment's alignment
+    alleles_fasta: path to FASTA for discovered alleleles for next segment
+    output_fasta: path to FASTA to save new alignment to
+    """
+    antibodies = list(SeqIO.parse(antibodies_fasta, "fasta"))
+    alignment = list(SeqIO.parse(aligned_fasta, "fasta"))
+    antibody_ids = {record.id for record in antibodies}
+
+    # Find the farthest-left right edge of the previously-aligned set of alleles.
+    right_ends = []
+    for record in alignment:
+        if record.id in antibody_ids:
+            continue
+        # left gaps, alignment, right gaps.
+        match = re.match("(^-*)([^-].*[^-])(--*)$", str(record.seq))
+        right_ends.append(match.start(3))
+    maskpos = min(right_ends)
+
+    # Cut the alignment down to just the antibodies and mask to just the
+    # rightward region.
+    antibodies_masked = NamedTemporaryFile("wt", buffering=1)
+    for record in alignment:
+        if record.id in antibody_ids:
+            record_masked = SeqRecord(
+                Seq("-" * maskpos + str(record.seq)[maskpos:]),
+                id=record.id,
+                description="")
+            SeqIO.write(record_masked, antibodies_masked, "fasta")
+
+    # Align the new alleles to this modified version.
+    aligned_masked = NamedTemporaryFile("rt", buffering=1)
+    shell(
+        "clustalw -align -profile1={profile1} "
+        "-profile2={profile2} -sequences -output=fasta "
+        "-outfile={outfile}".format(
+            profile1=antibodies_masked.name,
+            profile2=alleles_fasta,
+            outfile=aligned_masked.name))
+
+    # Swap the original antibodies back into place.
+    with open(output_fasta, "wt") as f_out:
+        for record in alignment:
+            if record.id in antibody_ids:
+                SeqIO.write(record, f_out, "fasta")
+        for record in SeqIO.parse(aligned_masked, "fasta"):
+            if record.id in antibody_ids:
+                continue
+            SeqIO.write(record, f_out, "fasta")
+
+def combine_aligned_segments(antibodies_fasta, with_v, with_d, with_j, output_fasta):
+    """Combine the antibody sequences and separately aligned V(D)J alleles into one alignment."""
+    antibodies = list(SeqIO.parse(antibodies_fasta, "fasta"))
+    aligned_v = list(SeqIO.parse(with_v, "fasta"))
+    aligned_d = list(SeqIO.parse(with_d, "fasta"))
+    aligned_j = list(SeqIO.parse(with_j, "fasta"))
+    antibody_ids = {record.id for record in antibodies}
+    with open(output_fasta, "wt") as f_out:
+        for record in aligned_v:
+            SeqIO.write(record, f_out, "fasta")
+        for record in aligned_d:
+            if record.id not in antibody_ids:
+                SeqIO.write(record, f_out, "fasta")
+        for record in aligned_j:
+            if record.id not in antibody_ids:
+                SeqIO.write(record, f_out, "fasta")
