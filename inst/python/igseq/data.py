@@ -68,21 +68,13 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
         raise MetadataError(msg)
     for sample in samples.values():
         if sequences:
-            _load_samples_nested_items(sample, sequences, "BarcodeFwd")
-            _load_samples_nested_items(sample, sequences, "BarcodeRev")
+            _load_nested_items(sample, "Sample", sequences, "BarcodeFwd")
+            _load_nested_items(sample, "Sample", sequences, "BarcodeRev")
         if runs:
-            _load_samples_nested_items(sample, runs, "Run")
+            _load_nested_items(sample, "Sample", runs, "Run")
         if specimens:
-            _load_samples_nested_items(sample, specimens, "Specimen")
+            _load_nested_items(sample, "Sample", specimens, "Specimen")
     return samples
-
-def _load_samples_nested_items(sample, others, key):
-    """Add additional nested metdata to a sample from another dictionary."""
-    other = others.get(sample[key])
-    if other:
-        sample[key + "Attrs"] = other.copy()
-    else:
-        LOGGER.error("Missing %s for sample %s", key, sample["Sample"])
 
 def load_antibody_lineages(fp_in):
     """Load antibody lineage CSV."""
@@ -90,7 +82,7 @@ def load_antibody_lineages(fp_in):
     lineages = load_csv(fp_in, "AntibodyLineage")
     return lineages
 
-def load_antibody_isolates(fp_in, antibody_lineages):
+def load_antibody_isolates(fp_in, antibody_lineages=None):
     """Load antibody isolate CSV and optionally link to antibody lineage data.
 
     Output is a dictionary of isolate names to isolate attributes.  If a
@@ -100,7 +92,19 @@ def load_antibody_isolates(fp_in, antibody_lineages):
     LOGGER.info("load_antibody_isolates: fp_in %s", fp_in)
     LOGGER.info("load_antibody_isolates: antibody_lineages %s...", str(antibody_lineages)[0:60])
     isolates = load_csv(fp_in, "AntibodyIsolate")
+    if antibody_lineages:
+        for isolate in isolates.values():
+            _load_nested_items(
+                isolate, "AntibodyIsolate", antibody_lineages, "AntibodyLineage")
     return isolates
+
+def _load_nested_items(entry, entrykey, others, key):
+    """Add additional nested metdata to an entity from another dictionary."""
+    other = others.get(entry[key])
+    if other:
+        entry[key + "Attrs"] = other.copy()
+    else:
+        LOGGER.error("Missing %s for %s %s", key, entrykey, entry[entrykey])
 
 def load_csv(fp_in, key=None):
     """Generic CSV to dictionary.
