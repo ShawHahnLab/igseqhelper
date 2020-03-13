@@ -46,7 +46,7 @@ rule all_sonar_module_3:
 def sonar_gather_germline_inputs(wildcards):
     """Get IgDiscover per-specimen paths for a given per-subject output."""
     # IgG+ will have gamma for heavy, but the germline will have come from mu.
-    return igdiscover_final_db(
+    return igseq.sonar.igdiscover_final_db(
         SAMPLES, wildcards.subject, wildcards.chain, wildcards.chain_type, wildcards.segment)
 
 rule sonar_prep_input_from_presto:
@@ -84,7 +84,9 @@ rule sonar_gather_germline:
 # conserved region anyway.
 
 rule sonar_module_1:
-    output: "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa"
+    output:
+        fasta="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        rearr="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv",
     input: unpack(igseq.sonar.sonar_module_1_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
