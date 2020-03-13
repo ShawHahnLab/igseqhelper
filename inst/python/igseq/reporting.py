@@ -311,12 +311,15 @@ def divide(val1, val2, fmt="{:.6f}"):
 def gather_antibodies(
         subject, chain, antibody_isolates, output_fasta):
     """Gather antibody sequences from metadata for use in alignments."""
-    #lineages = {k: val for k, val in antibody_lineages.items() if val["Subject"] == subject}
-    #in_lineages = lambda v: v["AntibodyLineage"] in lineages.keys()
-    #isolates = {k: val for k, val in antibody_isolates.items() if in_lineages(val)}
+    LOGGER.info("gather_antibodies: subject: %s", subject)
+    LOGGER.info("gather_antibodies: chain: %s", chain)
+    LOGGER.info("gather_antibodies: antibody_isolates: %d", len(antibody_isolates))
+    LOGGER.info("gather_antibodies: output_fasta: %s", output_fasta)
     is_subject = lambda val: val["AntibodyLineageAttrs"]["Subject"] == subject
     isolates = {k: val for k, val in antibody_isolates.items() if is_subject(val)}
+    LOGGER.info("gather_antibodies: kept %d isolates matching subject", len(isolates))
     lineages = {val["AntibodyLineage"]: val["AntibodyLineageAttrs"] for val in isolates.values()}
+    LOGGER.info("gather_antibodies: kept %d lineages matching subject", len(lineages))
     if chain == "heavy":
         seq_col = "HeavySeq"
         cons_col = "HeavyConsensus"
@@ -342,6 +345,11 @@ def align_next_segment(antibodies_fasta, aligned_fasta, alleles_fasta, output_fa
     antibodies = list(SeqIO.parse(antibodies_fasta, "fasta"))
     alignment = list(SeqIO.parse(aligned_fasta, "fasta"))
     antibody_ids = {record.id for record in antibodies}
+
+    # Handle the case that we have no antibodies on record for this subject
+    if not antibody_ids:
+        shell("touch {output_fasta}")
+        return
 
     # Find the farthest-left right edge of the previously-aligned set of alleles.
     right_ends = []

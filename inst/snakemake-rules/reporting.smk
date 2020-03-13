@@ -209,7 +209,12 @@ rule igdiscover_allele_alignments_align_d:
         antibodies="reporting/{specimen}.{chain}.{chain_type}/antibodies.fasta",
         with_v="reporting/{specimen}.{chain}.{chain_type}/germline.V.aligned.fasta",
         d="igdiscover/{chain}.{chain_type}/{specimen}/final/database/D.fasta"
-    run: igseq.reporting.align_next_segment(input.antibodies, input.with_v, input.d, output.fasta)
+    run:
+        if wildcards.chain == "heavy":
+            igseq.reporting.align_next_segment(
+                input.antibodies, input.with_v, input.d, output.fasta)
+        else:
+            shell("cp {input.with_v} {output.fasta}")
 
 rule igdiscover_allele_alignments_align_v:
     """Align discovered V alleles to antibody lineages."""
@@ -219,5 +224,9 @@ rule igdiscover_allele_alignments_align_v:
         v="igdiscover/{chain}.{chain_type}/{specimen}/final/database/V.fasta",
     shell:
         """
-            clustalw -align -profile1={input.antibodies} -profile2={input.v} -sequences -output=fasta -outfile={output}
+            if [[ -s {input.antibodies} ]]; then
+                clustalw -align -profile1={input.antibodies} -profile2={input.v} -sequences -output=fasta -outfile={output}
+            else
+                touch {output}
+            fi
         """
