@@ -12,13 +12,15 @@ Imports:
   Biostrings (>= 2.38.4),
   ggplot2 (>= 3.1.1),
   dnar (>= 0.1),
+  dnaplotr (0.1.1),
   dplyr (>= 0.8),
   reshape2 (>= 1.4.3),
   levenR (>= 0.2.0),
   magrittr (>= 1.5),
   UpSetR (>= 1.4.0)
 Remotes:
-  github::sherrillmix/dnar
+  github::sherrillmix/dnar,
+  github::sherrillmix/dnaplotr
 RoxygenNote: 6.1.1
 Suggests: 
     testthat
