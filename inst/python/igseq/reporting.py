@@ -14,6 +14,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 from cutadapt import qualtrim
 from igseq.data import load_csv, get_samples_per_run, MetadataError
+from igseq.util import strdist_iupac_squeezed
 
 LOGGER = logging.getLogger(__name__)
 
@@ -382,29 +383,92 @@ def align_next_segment(antibodies_fasta, aligned_fasta, alleles_fasta, output_fa
             profile2=alleles_fasta,
             outfile=aligned_masked.name))
 
-    # Swap the original antibodies back into place.
-    with open(output_fasta, "wt") as f_out:
-        for record in alignment:
-            if record.id in antibody_ids:
-                SeqIO.write(record, f_out, "fasta")
-        for record in SeqIO.parse(aligned_masked, "fasta"):
-            if record.id in antibody_ids:
-                continue
-            SeqIO.write(record, f_out, "fasta")
+    shell("cp {outfile_temp} {outfile_real}".format(
+        outfile_temp=aligned_masked.name, outfile_real=output_fasta))
+    ## Swap the original antibodies back into place.
+    #with open(output_fasta, "wt") as f_out:
+    #    for record in alignment:
+    #        if record.id in antibody_ids:
+    #            SeqIO.write(record, f_out, "fasta")
+    #    for record in SeqIO.parse(aligned_masked, "fasta"):
+    #        if record.id in antibody_ids:
+    #            continue
+    #        SeqIO.write(record, f_out, "fasta")
 
 def combine_aligned_segments(antibodies_fasta, with_v, with_d, with_j, output_fasta):
     """Combine the antibody sequences and separately aligned V(D)J alleles into one alignment."""
     antibodies = list(SeqIO.parse(antibodies_fasta, "fasta"))
-    aligned_v = list(SeqIO.parse(with_v, "fasta"))
-    aligned_d = list(SeqIO.parse(with_d, "fasta"))
-    aligned_j = list(SeqIO.parse(with_j, "fasta"))
-    antibody_ids = {record.id for record in antibodies}
+    aligned = {
+        "v": list(SeqIO.parse(with_v, "fasta")),
+        "j": list(SeqIO.parse(with_j, "fasta"))
+        }
+    if with_d:
+        aligned["d"] = list(SeqIO.parse(with_d, "fasta"))
+    ab_ids = {record.id for record in antibodies}
+    antibodies = {key: [entry for entry in aligned[key] if entry.id in ab_ids] for key in aligned}
+    lengths = {key: max([len(rec) for rec in antibodies[key]]) for key in antibodies}
+    if len(set(lengths)) > 1:
+        LOGGER.warning("Aligned antibodies differ in length; will pad to max length.")
     with open(output_fasta, "wt") as f_out:
-        for record in aligned_v:
+        for record in aligned["v"]:
+            record.seq = Seq(str(record.seq).ljust(max(lengths.values()), "-"))
             SeqIO.write(record, f_out, "fasta")
-        for record in aligned_d:
-            if record.id not in antibody_ids:
+        if "d" in aligned:
+            for record in aligned["d"]:
+                record.seq = Seq(str(record.seq).ljust(max(lengths.values()), "-"))
+                if record.id not in ab_ids:
+                    SeqIO.write(record, f_out, "fasta")
+        for record in aligned["j"]:
+            record.seq = Seq(str(record.seq).ljust(max(lengths.values()), "-"))
+            if record.id not in ab_ids:
                 SeqIO.write(record, f_out, "fasta")
-        for record in aligned_j:
-            if record.id not in antibody_ids:
-                SeqIO.write(record, f_out, "fasta")
+
+def convert_combined_alignment(fasta_in, csv_out, specimens, antibody_isolates, wildcards):
+    """Convert VDJ+antibody alignment from FASTA into CSV form."""
+    fields = ["Specimen", "Subject", "Chain", "Type", "Category", "LineageDist", "SeqName", "Seq"]
+    segments = ["IGHV", "IGHD", "IGHJ", "IGLV", "IGLJ", "IGKV", "IGKJ"]
+    categories = ["AntibodyLineage", "AntibodyIsolate"] + segments
+    subject_lut = {specimen["Specimen"]: specimen["Subject"] for specimen in specimens.values()}
+    rows = []
+    def categorize(seqid):
+        if seqid in antibody_isolates.keys():
+            return "AntibodyIsolate"
+        if seqid in {entry["AntibodyLineage"] for entry in antibody_isolates.values()}:
+            return "AntibodyLineage"
+        for segment in segments:
+            match = re.match("^(" + segment + ").*$", seqid)
+            if match:
+                return match.group(1)
+        return "???"
+    def sortable_row(row):
+        entries = []
+        for field in fields:
+            entry = row[field]
+            if field == "Category":
+                entry = categories.index(entry)
+            entries.append(entry)
+        return entries
+    for record in SeqIO.parse(fasta_in, "fasta"):
+        row = {}
+        row["Specimen"] = wildcards.specimen
+        row["Subject"] = subject_lut[wildcards.specimen]
+        row["Chain"] = wildcards.chain
+        row["Type"] = wildcards.chain_type
+        row["Category"] = categorize(record.id)
+        row["SeqName"] = record.id
+        row["Seq"] = str(record.seq)
+        rows.append(row)
+    lineage = ""
+    for row in rows:
+        if row["Category"] == "AntibodyLineage":
+            if lineage:
+                LOGGER.error("antibody lineage sequence already defined; check metadata.")
+            lineage = row["Seq"]
+    for row in rows:
+        row["LineageDist"] = strdist_iupac_squeezed(row["Seq"], lineage)
+    # Sort by the given ordered fields above
+    rows = sorted(rows, key=sortable_row)
+    with open(csv_out, "wt") as f_out:
+        writer = csv.DictWriter(f_out, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)

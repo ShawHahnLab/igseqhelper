@@ -17,7 +17,7 @@ TARGET_IGDISCOVER_CLUSTERPLOTS = expand(
     zip, chain=IGM_CHAINS, chain_type=IGM_CHAINTYPES, specimen=IGM_SPECIMENS)
 
 TARGET_IGDISCOVER_ALLELE_ALIGNMENTS = expand(
-    "reporting/{specimen}.{chain}.{chain_type}/germline.VDJ.aligned.fasta",
+    "reporting/{specimen}.{chain}.{chain_type}/germline.VDJ.aligned.csv",
     zip, chain=IGM_CHAINS, chain_type=IGM_CHAINTYPES, specimen=IGM_SPECIMENS)
 
 TARGET_SONAR_RAREFACTION = expand(
@@ -174,15 +174,18 @@ rule igdiscover_clusterplot_grid:
             montage $plotdir/*.png -geometry {params.width}x{params.height}+0+0 -tile {params.cols}x$num {output} || exitval=$?
         """
 
-rule gather_antibody_sequences:
-    """Gather mature antibody sequences to start off the alignment against."""
-    output: "reporting/{specimen}.{chain}.{chain_type}/antibodies.fasta"
+### IgDiscover allele handling
+
+rule igdiscover_allele_alignments_table:
+    """Convert combined alignment into CSV of relevant attributes per sequence."""
+    output: csv="reporting/{specimen}.{chain}.{chain_type}/germline.VDJ.aligned.csv"
+    input: fasta="reporting/{specimen}.{chain}.{chain_type}/germline.VDJ.aligned.fasta"
     run:
-        igseq.reporting.gather_antibodies(
-            SPECIMENS[wildcards.specimen]["Subject"],
-            wildcards.chain, ANTIBODY_ISOLATES, output[0])
+        igseq.reporting.convert_combined_alignment(
+            input.fasta, output.csv, SPECIMENS, ANTIBODY_ISOLATES, wildcards)
 
 rule igdiscover_allele_alignments_align_vdj:
+    """Combine V(D)J alignments into one combined alignment."""
     output: fasta="reporting/{specimen}.{chain}.{chain_type}/germline.VDJ.aligned.fasta"
     input:
         antibodies="reporting/{specimen}.{chain}.{chain_type}/antibodies.fasta",
@@ -190,11 +193,15 @@ rule igdiscover_allele_alignments_align_vdj:
         with_d="reporting/{specimen}.{chain}.{chain_type}/germline.D.aligned.fasta",
         with_j="reporting/{specimen}.{chain}.{chain_type}/germline.J.aligned.fasta"
     run:
-        igseq.reporting.combine_aligned_segments(
-            input.antibodies, input.with_v, input.with_d, input.with_j, output.fasta)
+        if wildcards.chain == "heavy":
+            with_d = input.with_d
+        else:
+            with_d = None
+        igseq.reporting.combine_aligned_segments(\
+            input.antibodies, input.with_v, with_d, input.with_j, output.fasta)
 
 rule igdiscover_allele_alignments_align_j:
-    """Align discovered J alleles to antibody lineages based on V alignment."""
+    """Align discovered J alleles to antibody lineages based on V/J alignment."""
     output: fasta="reporting/{specimen}.{chain}.{chain_type}/germline.J.aligned.fasta"
     input:
         antibodies="reporting/{specimen}.{chain}.{chain_type}/antibodies.fasta",
@@ -230,3 +237,11 @@ rule igdiscover_allele_alignments_align_v:
                 touch {output}
             fi
         """
+
+rule gather_antibody_sequences:
+    """Gather mature antibody sequences to start off the alignment against."""
+    output: "reporting/{specimen}.{chain}.{chain_type}/antibodies.fasta"
+    run:
+        igseq.reporting.gather_antibodies(
+            SPECIMENS[wildcards.specimen]["Subject"],
+            wildcards.chain, ANTIBODY_ISOLATES, output[0])

@@ -6,6 +6,26 @@ from Bio import Phylo
 from Bio.Seq import Seq
 from Bio import SeqIO
 
+# https://www.bioinformatics.org/sms/iupac.html
+# With added stubs to more easily handle regular bases and gaps
+IUPAC = {
+    "A": ("A", ),
+    "C": ("C", ),
+    "T": ("T", ),
+    "G": ("G", ),
+    "-": ("-", ),
+    "R": ("A", "G"),
+    "Y": ("C", "T"),
+    "S": ("G", "C"),
+    "W": ("A", "T"),
+    "K": ("G", "T"),
+    "M": ("A", "C"),
+    "B": ("C", "G", "T"),
+    "D": ("A", "G", "T"),
+    "H": ("A", "C", "T"),
+    "V": ("A", "C", "G"),
+    "N": ("A", "C", "T", "G")}
+
 def revcmp(record):
     """Reverse complement a SeqRcord, keeping ALL metadata.
 
@@ -17,6 +37,52 @@ def revcmp(record):
             annotations=True, letter_annotations=True, dbxrefs=True)
     except AttributeError:
         return Seq(record).reverse_complement()
+
+def strdist(str1, str2, compare=lambda chr1, chr2: chr1 != chr2):
+    """Naive string distance comparison.
+
+    This just compares each pair of characters using the given function
+    (not-equals by default).  The optional comare argument should be a function
+    that returns 0 if a pair of characters match, 1 otherwise.
+    """
+    return sum([compare(x, y) for x, y in zip(str1, str2)])
+
+def strdist_iupac(str1, str2):
+    """String distance considering ambiguous bases as matches.
+
+    For example, A <-> A gives 0, A <-> R gives 0, A <-> Y gives 1.
+    Unrecognized characters count as a mismatch.
+    """
+    def compare(chr1, chr2):
+        # It's a mismatch if all of these things are true:
+        # 1) the characters are not the same
+        # 2) the set of characters represented by the 1st doesn't have the 2nd
+        # 3) the set of characters represented by the 2nd doesn't have the 1st
+        return chr1 != chr2 and \
+            chr2 not in IUPAC.get(chr1, []) and \
+            chr1 not in IUPAC.get(chr2, [])
+    return strdist(str1, str2, compare)
+
+def strdist_iupac_squeezed(str1, str2):
+    """String distance considering ambiguous bases as matches, with trimming.
+
+    As in strdist_iupac, but excluding gap/nongap comparison at edges.
+    For example this will give 2:
+    str1:       CGCAC-TG------
+    str2:       ---ACGTCGCACGC
+    mismatches:      X X
+    """
+    def compare(chr1, chr2):
+        return chr1 != chr2 and \
+            chr2 not in IUPAC.get(chr1, []) and \
+            chr1 not in IUPAC.get(chr2, [])
+    match1 = re.match("(^-*)([^-].*[^-])(-*)$", str1)
+    match2 = re.match("(^-*)([^-].*[^-])(-*)$", str2)
+    start = max(match1.end(1), match2.end(1))
+    stop = min(match1.start(3), match2.start(3))
+    str1_squeezed = str1[start:stop]
+    str2_squeezed = str2[start:stop]
+    return strdist(str1_squeezed, str2_squeezed, compare)
 
 def trim_alignment_to(fasta_fp_in, fasta_fp_out, seq_id):
     """Trim all sequences in a FASTA to match a given sequence ID.

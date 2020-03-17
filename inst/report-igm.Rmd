@@ -195,74 +195,50 @@ with(NULL, {
 ### IgDiscover - Results by Antibody Lineage
 
 ```{r}
-# TODO show summary alignment of similar alleles for V(D)J for each lineage
-
-tbl <- subset(metadata$samples,
-       grepl("IgM+", SpecimenCellType), select = c("SpecimenSubject", "Specimen", "Chain", "Type"))
-keys <- paste(tbl$Specimen, tbl$Chain, tbl$Type, sep = ".")
-germlines <- lapply(keys, function(key) {
-  fp <- file.path(ROOT, "reporting", key, "germline.VDJ.aligned.fasta")
-  if (file.exists(fp)) {
-    dnar::read.fa(fp)  
-  } else {
-    list(name=c(), seq=c())
-  }
-})
-
-categorize_seqs <- function(txt, isolate_names, lineage_names) {
-  fields <- c("IGHV", "IGHD", "IGHJ", "IGLV", "IGLJ", "IGKV", "IGKJ")
-  bool_mat <- do.call(cbind, lapply(fields, function(field) {
-    grepl(paste0("^", field), txt)
+load_germline_alleles <- function(samples, dp=ROOT) {
+  tbl <- subset(samples,
+         grepl("IgM+", SpecimenCellType),
+         select = c("SpecimenSubject", "Specimen", "Chain", "Type"))
+  keys <- paste(tbl$Specimen, tbl$Chain, tbl$Type, sep = ".")
+  data <- do.call(rbind, lapply(keys, function(key) {
+    fp <- file.path(dp, "reporting", key, "germline.VDJ.aligned.csv")
+    if (file.exists(fp)) {
+      load_csv(fp, "SeqName")
+    } else {
+      NULL
+    }
   }))
-  idx <- apply(bool_mat, 1, function(row) match(TRUE, row))
-  labels <- fields[idx]
-  labels[txt %in% isolate_names] <- "AntibodyIsolate"
-  labels[txt %in% lineage_names] <- "AntibodyLineage"
-  labels
+  data$Category <- factor(data$Category, levels = unique(data$Category))
+  data
 }
 
-germlines <- do.call(rbind, lapply(1:length(germlines), function(idx) {
-  if (length(germlines[[idx]]$name) > 0)
-  data.frame(
-    Specimen = tbl$Specimen[idx],
-    Subject = tbl$SpecimenSubject[idx],
-    Chain = tbl$Chain[idx],
-    Type = tbl$Type[idx],
-    SeqName = germlines[[idx]]$name,
-    Seq = germlines[[idx]]$seq,
-    Category = categorize_seqs(
-      germlines[[idx]]$name,
-      metadata$antibody_isolates$AntibodyIsolate,
-      metadata$antibody_lineages$AntibodyLineage),
-    stringsAsFactors = FALSE)
-}))
+germlines <- load_germline_alleles(metadata$samples)
+```
 
-germlines$Category <- factor(
-  germlines$Category,
-  levels = c(
-    "AntibodyLineage", "AntibodyIsolate",
-    "IGHV", "IGHD", "IGHJ", "IGHK", "IGLV", "IGLJ", "IGKV", "IGKJ"))
-
-# Calc distance to each lineage sequence
-germlines <- do.call(rbind, lapply(
-  split(germlines, paste(germlines$Subject, germlines$Chain, germlines$Type)),
-  function(chunk) {
-  ref <- subset(chunk, Category == "AntibodyLineage")$Seq
-  chunk$LineageDistance <- adist(chunk$Seq, ref)
-  chunk
-}))
-
-# order entries
-germlines <- germlines[order(
-  germlines$Subject, germlines$Specimen, germlines$Chain, germlines$Category, germlines$LineageDistance, germlines$SeqName), ]
-
-x <- (subset(germlines, Subject == "08N021" & Chain == "heavy"))
-par(mar = c(2,2,2,8))
-dnaplotr::plotDNA(x$Seq, groups = x$Category)
-
-x <- (subset(germlines, Subject == "08N021" & Chain == "heavy"))
-x <- do.call(rbind, lapply(split(x, x$Category), function(chunk) head(chunk, n = 6)))
-par(mar = c(2,2,2,8))
-dnaplotr::plotDNA(x$Seq, groups = x$Category)
-
+```{r fig.width=8, fig.height=10, results="asis"}
+for (lineage in unique(subset(germlines, Category == "AntibodyLineage")$SeqName)) {
+  subject <- subset(germlines, SeqName == lineage)$Subject[1]
+  specimen <- subset(germlines, SeqName == lineage)$Specimen[1]
+  for (chain in c("heavy", "light")) {
+    chunk <- subset(germlines, Chain == chain & Specimen == specimen)
+    chain_types <- unique(chunk$Type)
+    for (chain_type in chain_types) {
+      cat(paste0("\n\n#### ", lineage, " - ", chain, "\n\n"))
+      cat("\n\n", chain_type, "\n\n", sep = "")
+      chunk_by_type <- subset(chunk, Type == chain_type)
+      chunk_by_type <- chunk_by_type[seq(nrow(chunk_by_type), 1, -1), ]
+      chunk_by_type$Category <- factor(chunk_by_type$Category, levels = rev(levels(chunk_by_type$Category)))
+      chunk_filt <- do.call(rbind, lapply(split(chunk_by_type, chunk_by_type$Category), function(data) {
+        if (data$Category[1] %in% c("AntibodyLineage", "AntibodyIsolate")) {
+          data
+        } else {
+          tail(data, n = 5)
+        }
+      }))
+      drawtab(chunk_filt)
+      par(mar = c(2,2,2,8))
+      dnaplotr::plotDNA(chunk_by_type$Seq, groups = chunk_by_type$Category)
+    }
+  }
+}
 ```
