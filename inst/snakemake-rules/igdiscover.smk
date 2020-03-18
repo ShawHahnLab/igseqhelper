@@ -12,9 +12,9 @@ from igseq.igdiscover import CHAINS, CHAIN_TYPES, SEGMENTS
 # We'll run IgDiscover on all IgM+ specimens, so, some combination of heavy.mu,
 # light.lambda, light.kappa.
 TARGET_IGDISCOVER_INIT = amplicon_files(
-    "igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml", SAMPLES, "IgM+")
+    "analysis/igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml", SAMPLES, "IgM+")
 TARGET_IGDISCOVER_ALL = amplicon_files(
-    "igdiscover/{chain}.{chain_type}/{specimen}/stats/stats.json", SAMPLES, "IgM+")
+    "analysis/igdiscover/{chain}.{chain_type}/{specimen}/stats/stats.json", SAMPLES, "IgM+")
 
 rule all_igdiscover_init:
     input: TARGET_IGDISCOVER_INIT
@@ -39,7 +39,7 @@ def input_igdiscover_db(w):
     return expand("SONAR/germDB/Ig{x}{z}_BU_DD.fasta", x=chain_type, z=w.segment)
 
 rule igdiscover_db:
-    output: "igdiscover/{chain}.{chain_type}/{segment}.fasta"
+    output: "analysis/igdiscover/{chain}.{chain_type}/{segment}.fasta"
     input: input_igdiscover_db
     shell:
         """
@@ -48,14 +48,14 @@ rule igdiscover_db:
 
 # SNAKEMAKES ON SNAKEMAKES
 rule igdiscover_init:
-    output: "igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml"
+    output: "analysis/igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml"
     input:
         # IgDiscover always wants a "D" even for light
-        db_v="igdiscover/{chain}.{chain_type}/V.fasta",
-        db_d="igdiscover/{chain}.{chain_type}/D.fasta",
-        db_j="igdiscover/{chain}.{chain_type}/J.fasta",
-        r1="presto/data/{chain}.{chain_type}/{specimen}.R1.fastq",
-        r2="presto/data/{chain}.{chain_type}/{specimen}.R2.fastq"
+        db_v="analysis/igdiscover/{chain}.{chain_type}/V.fasta",
+        db_d="analysis/igdiscover/{chain}.{chain_type}/D.fasta",
+        db_j="analysis/igdiscover/{chain}.{chain_type}/J.fasta",
+        r1="analysis/presto/data/{chain}.{chain_type}/{specimen}.R1.fastq",
+        r2="analysis/presto/data/{chain}.{chain_type}/{specimen}.R2.fastq"
     params:
         stranded="true",
         iterations=5,
@@ -76,11 +76,11 @@ rule igdiscover_init:
 
 rule igdiscover_run:
     output:
-        stats="igdiscover/{chain}.{chain_type}/{specimen}/stats/stats.json",
-        db_v="igdiscover/{chain}.{chain_type}/{specimen}/final/database/V.fasta",
-        db_d="igdiscover/{chain}.{chain_type}/{specimen}/final/database/D.fasta",
-        db_j="igdiscover/{chain}.{chain_type}/{specimen}/final/database/J.fasta"
-    input: "igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml"
+        stats="analysis/igdiscover/{chain}.{chain_type}/{specimen}/stats/stats.json",
+        db_v="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/V.fasta",
+        db_d="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/D.fasta",
+        db_j="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/J.fasta"
+    input: "analysis/igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml"
     threads: 20
     shell:
         """

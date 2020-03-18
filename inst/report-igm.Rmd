@@ -61,8 +61,8 @@ load_igdiscover_reference <- function(dirpath) {
   })
 }
 
-igdiscover_results <- load_all_igdiscover_results(file.path(ROOT, "igdiscover"))
-igdiscover_reference <- load_igdiscover_reference(file.path(ROOT, "igdiscover"))
+igdiscover_results <- load_all_igdiscover_results(file.path(ROOT, "analysis/igdiscover"))
+igdiscover_reference <- load_igdiscover_reference(file.path(ROOT, "analysis/igdiscover"))
 
 overlaps <- list(
   mu = lapply(SEGMENTS, function(segment) {
@@ -201,7 +201,7 @@ load_germline_alleles <- function(samples, dp=ROOT) {
          select = c("SpecimenSubject", "Specimen", "Chain", "Type"))
   keys <- paste(tbl$Specimen, tbl$Chain, tbl$Type, sep = ".")
   data <- do.call(rbind, lapply(keys, function(key) {
-    fp <- file.path(dp, "reporting", key, "germline.VDJ.aligned.csv")
+    fp <- file.path(dp, "analysis/reporting", key, "germline.VDJ.aligned.csv")
     if (file.exists(fp)) {
       load_csv(fp, "SeqName")
     } else {

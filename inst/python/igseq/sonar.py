@@ -121,13 +121,13 @@ def sonar_module_1_inputs(wildcards):
     else:
         raise ValueError('Chain should be either "heavy" or "light"')
     targets = dict(zip(segments, expand(
-        "sonar-analysis/{subject}/{chain}.{chain_type}/germline.{segment}.fasta",
+        "analysis/sonar/{subject}/{chain}.{chain_type}/germline.{segment}.fasta",
         subject=wildcards.subject,
         chain=wildcards.chain,
         chain_type=wildcards.chain_type,
         segment=segments)))
     targets["fastq"] = expand(
-        "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",
+        "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",
         subject=wildcards.subject,
         chain=wildcards.chain,
         chain_type=wildcards.chain_type,
@@ -143,20 +143,20 @@ def sonar_module_2_inputs(wildcards):
     else:
         raise ValueError('Chain should be either "heavy" or "light"')
     targets = dict(zip(segments, expand(
-        "sonar-analysis/{subject}/{chain}.{chain_type}/germline.{segment}.fasta",
+        "analysis/sonar/{subject}/{chain}.{chain_type}/germline.{segment}.fasta",
         subject=wildcards.subject,
         chain=wildcards.chain,
         chain_type=wildcards.chain_type,
         segment=segments)))
     targets["module1"] = expand(
-        "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/"
+        "analysissonar/{subject}/{chain}.{chain_type}/{specimen}/"
         "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
         subject=wildcards.subject,
         chain=wildcards.chain,
         chain_type=wildcards.chain_type,
         specimen=wildcards.specimen)[0]
     targets["mab"] = expand(
-        "sonar-analysis/{subject}/{chain}.{chain_type}/mab.fasta",
+        "analysis/sonar/{subject}/{chain}.{chain_type}/mab.fasta",
         subject=wildcards.subject,
         chain=wildcards.chain,
         chain_type=wildcards.chain_type,
@@ -170,7 +170,7 @@ def sonar_islands_for_subject(samples, subject, chain, chain_type):
     targets = {}
     for spec in specimens:
         targets[spec] = (
-            "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/"
+            "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/"
             "output/sequences/nucleotide/{specimen}_islandSeqs.fa").format(
                 subject=subject,
                 chain=chain,

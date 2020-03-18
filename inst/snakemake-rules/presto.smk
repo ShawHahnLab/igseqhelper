@@ -16,10 +16,10 @@ See also:
 from igseq.data import amplicon_files
 from igseq.presto import (PRESTO_OPTS, prep_primers_fwd)
 
-TARGET_PRESTO_DATA = expand(amplicon_files("presto/data/{chain}.{chain_type}/{specimen}.{{rp}}.fastq", SAMPLES, "IgG+"), rp=["R1", "R2"])
-TARGET_PRESTO_ASSEMBLY = amplicon_files("presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES, "IgG+")
-TARGET_PRESTO_QC = amplicon_files("presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq", SAMPLES, "IgG+")
-TARGET_PRESTO_ALL = amplicon_files("presto/collapse/{chain}.{chain_type}/{specimen}_atleast-2.fastq", SAMPLES, "IgG+")
+TARGET_PRESTO_DATA = expand(amplicon_files("analysis/presto/data/{chain}.{chain_type}/{specimen}.{{rp}}.fastq", SAMPLES, "IgG+"), rp=["R1", "R2"])
+TARGET_PRESTO_ASSEMBLY = amplicon_files("analysis/presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES, "IgG+")
+TARGET_PRESTO_QC = amplicon_files("analysis/presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq", SAMPLES, "IgG+")
+TARGET_PRESTO_ALL = amplicon_files("analysis/presto/collapse/{chain}.{chain_type}/{specimen}_atleast-2.fastq", SAMPLES, "IgG+")
 
 rule all_presto_data:
     input: TARGET_PRESTO_DATA
@@ -41,7 +41,7 @@ def trimmed_specimen_samples(wildcards):
     We may have prepped and sequenced the same specimen multiple times so this
     will give a list of one or more files.
     """
-    pattern = "trim/{run}/{sample}.{rp}.fastq.gz"
+    pattern = "analysis/trim/{run}/{sample}.{rp}.fastq.gz"
     filepaths = []
     for samp_name, samp_attrs in SAMPLES.items():
         if \
@@ -62,23 +62,23 @@ rule presto_data:
 
     pRESTO uses plaintext FASTQ so we'll leave them uncompressed, too.
     """
-    output: "presto/data/{chain}.{chain_type}/{specimen}.{rp}.fastq"
+    output: "analysis/presto/data/{chain}.{chain_type}/{specimen}.{rp}.fastq"
     input: trimmed_specimen_samples
     shell: "zcat {input} > {output}"
 
 rule presto_primers:
-    output: fwd="presto/vprimers.fasta"
+    output: fwd="analysis/presto/vprimers.fasta"
     input: sequences="metadata/sequences.csv"
     run: prep_primers_fwd(input.sequences, output.fwd)
 
 ### Paired-end Assembly
 
 rule presto_assembly:
-    output: "presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq"
+    output: "analysis/presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq"
     input:
-        r1="presto/data/{chain}.{chain_type}/{specimen}.R1.fastq",
-        r2="presto/data/{chain}.{chain_type}/{specimen}.R2.fastq"
-    log: "logs/presto/assemble.{chain}.{chain_type}.{specimen}.log"
+        r1="analysis/presto/data/{chain}.{chain_type}/{specimen}.R1.fastq",
+        r2="analysis/presto/data/{chain}.{chain_type}/{specimen}.R2.fastq"
+    log: "analysis/logs/presto/assemble.{chain}.{chain_type}.{specimen}.log"
     params:
         coord=PRESTO_OPTS["assembly"]["coord"],
         rc=PRESTO_OPTS["assembly"]["rc"],
@@ -97,9 +97,9 @@ rule presto_assembly:
 ### Quality Control
 
 rule presto_qual:
-    output: "presto/qual/{chain}.{chain_type}/{specimen}_quality-pass.fastq"
-    input: "presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq"
-    log: "logs/presto/qual.{chain}.{chain_type}.{specimen}.log"
+    output: "analysis/presto/qual/{chain}.{chain_type}/{specimen}_quality-pass.fastq"
+    input: "analysis/presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq"
+    log: "analysis/logs/presto/qual.{chain}.{chain_type}.{specimen}.log"
     params:
         mean_qual=PRESTO_OPTS["qc"]["mean_qual"]
     threads: 8
@@ -112,11 +112,11 @@ rule presto_qual:
         """
 
 rule presto_qual_fwd:
-    output: "presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
+    output: "analysis/presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
     input:
-        data="presto/qual/{chain}.{chain_type}/{specimen}_quality-pass.fastq",
-        primers="presto/vprimers.fasta"
-    log: "logs/presto/qual_fwd.{chain}.{chain_type}.{specimen}.log"
+        data="analysis/presto/qual/{chain}.{chain_type}/{specimen}_quality-pass.fastq",
+        primers="analysis/presto/vprimers.fasta"
+    log: "analysis/logs/presto/qual_fwd.{chain}.{chain_type}.{specimen}.log"
     params:
         start=PRESTO_OPTS["qc"]["fwd_start"],
         mode=PRESTO_OPTS["qc"]["fwd_mode"],
@@ -135,11 +135,11 @@ rule presto_qual_fwd:
 # I don't think we have any trace of the reverse primer visible in the sequence
 # itself, only in the I1 read.
 rule presto_qual_rev:
-    output: "presto/qual/{chain}.{chain_type}/{specimen}-REV_primers-pass.fastq"
+    output: "analysis/presto/qual/{chain}.{chain_type}/{specimen}-REV_primers-pass.fastq"
     input:
-        data="presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq",
+        data="analysis/presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq",
         primers=""
-    log: "logs/presto/qual_rev.{chain}.{chain_type}.{specimen}.log"
+    log: "analysis/logs/presto/qual_rev.{chain}.{chain_type}.{specimen}.log"
     params:
         start=PRESTO_OPTS["qc"]["rev_start"],
         mode=PRESTO_OPTS["qc"]["rev_mode"],
@@ -156,9 +156,9 @@ rule presto_qual_rev:
 ### Deduplication and Filtering
 
 rule presto_collapse:
-    output: "presto/collapse/{chain}.{chain_type}/{specimen}_collapse-unique.fastq"
-    input: "presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
-    log: "logs/presto/collapse.{chain}.{chain_type}.{specimen}.log"
+    output: "analysis/presto/collapse/{chain}.{chain_type}/{specimen}_collapse-unique.fastq"
+    input: "analysis/presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
+    log: "analysis/logs/presto/collapse.{chain}.{chain_type}.{specimen}.log"
     params:
         uf=PRESTO_OPTS["collapse"]["uf"],
         cf=PRESTO_OPTS["collapse"]["cf"]
@@ -171,8 +171,8 @@ rule presto_collapse:
         """
 
 rule presto_collapse_atleast:
-    output: "presto/collapse/{chain}.{chain_type}/{specimen}_atleast-2.fastq"
-    input: "presto/collapse/{chain}.{chain_type}/{specimen}_collapse-unique.fastq"
+    output: "analysis/presto/collapse/{chain}.{chain_type}/{specimen}_atleast-2.fastq"
+    input: "analysis/presto/collapse/{chain}.{chain_type}/{specimen}_collapse-unique.fastq"
     params:
         f=PRESTO_OPTS["collapse"]["f"],
         num=PRESTO_OPTS["collapse"]["num"]

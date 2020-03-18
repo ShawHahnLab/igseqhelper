@@ -7,22 +7,22 @@ IGG_SUBJECTS = [entry["SpecimenAttrs"]["Subject"] for entry in SAMPLES.values() 
 IGG_SPECIMENS = [entry["Specimen"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
 
 TARGET_SONAR_PREP = expand(
-    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",
+    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",
     zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
 TARGET_SONAR_MODULE_1 = expand(
-    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
     zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
 TARGET_SONAR_MODULE_2_AUTO = expand(
-    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_lineages.txt",
+    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_lineages.txt",
     zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
 TARGET_SONAR_MODULE_2_ID_DIV = expand(
-    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
+    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
     zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
 TARGET_SONAR_MODULE_2_MANUAL = expand(
-    "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa",
+    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa",
     zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
 TARGET_SONAR_MODULE_3 = expand(
-    "sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal/{subject}/output/longitudinal_igphyml.tree",
+    "analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/{subject}/output/longitudinal_igphyml.tree",
     zip, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, subject=IGG_SUBJECTS) 
 
 rule all_sonar_prep_input:
@@ -51,8 +51,8 @@ def sonar_gather_germline_inputs(wildcards):
 
 rule sonar_prep_input_from_presto:
     """Gather input sequences from pRESTO's initial processing."""
-    output: "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq"
-    input: "presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
+    output: "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq"
+    input: "analysis/presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
     shell: "ln {input} {output}"
 
 rule sonar_gather_germline:
@@ -68,7 +68,7 @@ rule sonar_gather_germline:
     the corresponding chain types for the samples here for SONAR will be gamma
     for heavy and lambda/kappa for light.
     """
-    output: "sonar-analysis/{subject}/{chain}.{chain_type}/germline.{segment}.fasta"
+    output: "analysis/sonar/{subject}/{chain}.{chain_type}/germline.{segment}.fasta"
     input: sonar_gather_germline_inputs
     run:
         igseq.sonar.gather_germline(input, output[0])
@@ -85,8 +85,8 @@ rule sonar_gather_germline:
 
 rule sonar_module_1:
     output:
-        fasta="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        rearr="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv",
+        fasta="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        rearr="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv",
     input: unpack(igseq.sonar.sonar_module_1_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
@@ -110,7 +110,7 @@ rule sonar_module_1:
 
 rule sonar_gather_mature:
     """Get heavy or light chain mature antibody sequences for a subject."""
-    output: "sonar-analysis/{subject}/{chain}.{chain_type}/mab.fasta"
+    output: "analysis/sonar/{subject}/{chain}.{chain_type}/mab.fasta"
     run:
         igseq.sonar.gather_mature(
             ANTIBODY_ISOLATES,
@@ -136,7 +136,7 @@ def sonar_allele_j(wildcards):
 
 # Automated intradonor analysis and grouping
 rule sonar_module_2:
-    output: "sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_lineages.txt"
+    output: "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_lineages.txt"
     input: unpack(igseq.sonar.sonar_module_2_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
@@ -176,11 +176,11 @@ rule sonar_module_2:
 # Part 1 of 3: Calculate % identity to each of the mature antibodies.
 rule sonar_module_2_id_div:
     output:
-        iddiv="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"
+        iddiv="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"
     input:
-        fasta="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        mab="sonar-analysis/{subject}/{chain}.{chain_type}/mab.fasta",
-        germline_v="sonar-analysis/{subject}/{chain}.{chain_type}/germline.V.fasta"
+        fasta="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        mab="analysis/sonar/{subject}/{chain}.{chain_type}/mab.fasta",
+        germline_v="analysis/sonar/{subject}/{chain}.{chain_type}/germline.V.fasta"
     singularity: "docker://scharch/sonar"
     threads: 4
     shell:
@@ -197,9 +197,9 @@ rule sonar_module_2_id_div:
 # singularity/docker stuff
 rule sonar_module_2_id_div_island:
     output:
-        seqids="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/islandSeqs.txt"
+        seqids="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/islandSeqs.txt"
     input:
-        iddiv="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"
+        iddiv="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"
     params:
         mab="=a", # =a means use all antibodies in mab input file
     shell:
@@ -214,10 +214,10 @@ rule sonar_module_2_id_div_island:
 # Part 3 of 3: Extract those goodVJ cluster sequences given in the id/div lists
 rule sonar_module_2_id_div_getfasta:
     output:
-        fasta="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa"
+        fasta="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa"
     input:
-        fasta="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        seqids="sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/islandSeqs.txt"
+        fasta="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        seqids="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/islandSeqs.txt"
     singularity: "docker://scharch/sonar"
     shell:
         """
@@ -243,12 +243,12 @@ def sonar_module_3_collect_seqs(wildcards, inputs):
 rule sonar_module_3_collect:
     """Gather the selected island sequences from each specimen for a given subject and chain."""
     output:
-        collected="sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal-collected.fa"
+        collected="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal-collected.fa"
     input: unpack(sonar_module_3_collect_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
-        wd="sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal",
+        wd="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal",
         seqs=sonar_module_3_collect_seqs
     shell:
         """
@@ -259,14 +259,14 @@ rule sonar_module_3_collect:
 rule sonar_module_3_igphyml:
     """Run phylogenetic anaysis and generate tree across specimens for a given subject and chain."""
     output:
-        tree="sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal/output/longitudinal_igphyml.tree",
-        inferred_nucl="sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal_inferredAncestors.fa",
-        inferred_prot="sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/amino_acid/longitudinal_inferredAncestors.fa",
-        stats="sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal/output/logs/longitudinal_igphyml_stats.txt"
+        tree="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/longitudinal_igphyml.tree",
+        inferred_nucl="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal_inferredAncestors.fa",
+        inferred_prot="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/amino_acid/longitudinal_inferredAncestors.fa",
+        stats="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/logs/longitudinal_igphyml_stats.txt"
     input:
-        collected="sonar-analysis/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal-collected.fa",
-        ref_hv="sonar-analysis/{subject}/{chain}.{chain_type}/germline.V.fasta",
-        natives="sonar-analysis/{subject}/{chain}.{chain_type}/mab.fasta"
+        collected="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal-collected.fa",
+        ref_hv="analysis/sonar/{subject}/{chain}.{chain_type}/germline.V.fasta",
+        natives="analysis/sonar/{subject}/{chain}.{chain_type}/mab.fasta"
     singularity: "docker://scharch/sonar"
     threads: 4
     params:

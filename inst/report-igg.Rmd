@@ -37,7 +37,7 @@ with(NULL, {
   samps <- subset(metadata$samples, grepl("IgG+", SpecimenCellType))
   fps <- file.path(
     ROOT,
-    "reporting",
+    "analysis/reporting",
     paste(samps$Specimen, samps$Chain, samps$Type, sep = "."),
     "sonar_clusters_rarefaction.csv")
   for (idx in 1:nrow(samps)) {

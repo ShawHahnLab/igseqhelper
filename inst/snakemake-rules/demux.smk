@@ -26,7 +26,7 @@ for runid in RUNS.keys():
     # like it has any option to do this mixed R1/I1 barcoding thing.
     rule:
         message: "demultiplexing for {run}".format(run=runid)
-        output: expand("demux/{run}/{sample}.{rp}.fastq.gz", run=runid, sample=samples.keys(), rp=["R1", "R2", "I1"])
+        output: expand("analysis/demux/{run}/{sample}.{rp}.fastq.gz", run=runid, sample=samples.keys(), rp=["R1", "R2", "I1"])
         input:
             r1="data/{run}/Undetermined_S0_L001_R1_001.fastq.gz".format(run=runid),
             r2="data/{run}/Undetermined_S0_L001_R2_001.fastq.gz".format(run=runid),
@@ -34,8 +34,8 @@ for runid in RUNS.keys():
         params:
             samples=samples,
             revcmp=revcmp,
-            outdir="demux/{run}".format(run=runid)
-        log: "logs/demux.{run}.tsv".format(run=runid)
+            outdir="analysis/demux/{run}".format(run=runid)
+        log: "analysis/logs/demux.{run}.tsv".format(run=runid)
         run:
             with open(log[0], "w") as f_log:
                 demux(
@@ -45,7 +45,7 @@ for runid in RUNS.keys():
                     revcmp=params.revcmp, send_stats=f_log)
 
 TARGET_DEMUX = expand(
-    outputs_per_run("demux/{run}/{sample}.{{rp}}.csv", SAMPLES),
+    outputs_per_run("analysis/demux/{run}/{sample}.{{rp}}.csv", SAMPLES),
     rp=["R1", "R2", "I1"])
 
 rule all_demux:
