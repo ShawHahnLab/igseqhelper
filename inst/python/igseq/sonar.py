@@ -103,7 +103,7 @@ def igdiscover_final_db(samples, subject, chain, chain_type, segment):
         x["SpecimenAttrs"]["Subject"] == subject
     specimens = [x["Specimen"] for x in samples.values() if specimen_match(x)]
     return expand(
-        "igdiscover/{chain}.{chain_type}/{specimen}/final/database/{segment}.fasta",
+        "analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/{segment}.fasta",
         chain=chain,
         chain_type=chain_type_naive,
         specimen=specimens,
