@@ -80,7 +80,7 @@ rule qualtrim_grid:
 def input_sonar_clusters_by_read(w):
     targets = {}
     subject = SPECIMENS[w.specimen]["Subject"]
-    targets["rearr"] = "analysis/sonar-analysis/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv".format(
+    targets["rearr"] = "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv".format(
         subject=subject, chain=w.chain, chain_type=w.chain_type, specimen=w.specimen)
     for samp_name, samp_attrs in SAMPLES.items():
         if samp_attrs["Specimen"] == w.specimen and \

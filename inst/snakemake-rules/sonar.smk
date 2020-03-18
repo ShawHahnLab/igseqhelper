@@ -102,7 +102,7 @@ rule sonar_module_1:
     shell:
         """
             cd $(dirname {input.fastq})
-            sonar blast_V --fasta ../../../../{input.fastq} {params.libv_arg} --derep --threads {threads}
+            sonar blast_V --fasta ../../../../../{input.fastq} {params.libv_arg} --derep --threads {threads}
             sonar blast_J {params.libd_arg} {params.libj_arg} --noC --threads {threads}
             sonar finalize --noclean --threads {threads}
             sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2}
@@ -146,7 +146,7 @@ rule sonar_module_2:
     shell:
         """
             # Start from the top-level directory for this specimen's analysis
-            cd $(dirname {input.module1})/../../..
+            cd $(dirname {input.module1})/../../../..
             libv=../germline.V.fasta
             mab=../mab.fasta
             # 2) Automated intradonor analysis
@@ -185,7 +185,7 @@ rule sonar_module_2_id_div:
     threads: 4
     shell:
         """
-            cd $(dirname {input.fasta})/../../..
+            cd $(dirname {input.fasta})/../../../..
             libv=../germline.V.fasta
             mab=../mab.fasta
             sonar id-div -g "$libv" -a "$mab" -t {threads}
@@ -207,8 +207,8 @@ rule sonar_module_2_id_div_island:
             set +e
             set +u
             source ~/miniconda3/bin/activate sonar
-            cd $(dirname {input.iddiv})/../..
-            sonar get_island ../../../../{input.iddiv} --mab "{params.mab}"
+            cd $(dirname {input.iddiv})/../../..
+            sonar get_island ../../../../../{input.iddiv} --mab "{params.mab}"
         """
 
 # Part 3 of 3: Extract those goodVJ cluster sequences given in the id/div lists
@@ -221,14 +221,14 @@ rule sonar_module_2_id_div_getfasta:
     singularity: "docker://scharch/sonar"
     shell:
         """
-            cd $(dirname {input.fasta})/../../..
+            cd $(dirname {input.fasta})/../../../..
             # Pull out sequences using our selected island from the above
             # id-div step.  I think this is essentially "seqmagick convert
             # --include-from-file ..."
             sonar getfasta \
-                -l ../../../../{input.seqids} \
-                -f ../../../../{input.fasta} \
-                -o ../../../../{output.fasta}
+                -l ../../../../../{input.seqids} \
+                -f ../../../../../{input.fasta} \
+                -o ../../../../../{output.fasta}
         """
 
 def sonar_module_3_collect_inputs(wildcards):
@@ -237,7 +237,7 @@ def sonar_module_3_collect_inputs(wildcards):
         SAMPLES, wildcards.subject, wildcards.chain, wildcards.chain_type)
 
 def sonar_module_3_collect_seqs(wildcards, inputs):
-    args = ["--seqs ../../../{key} --labels {val}".format() for key, val in inputs.items()]
+    args = ["--seqs ../../../../{key} --labels {val}".format() for key, val in inputs.items()]
     return " ".join(args)
 
 rule sonar_module_3_collect:
@@ -277,7 +277,7 @@ rule sonar_module_3_igphyml:
             #set +e
             #set +u
             #source ~/miniconda3/bin/activate sonar
-            cd $(dirname {input.collected})/../../..
+            cd $(dirname {input.collected})/../../../..
             sonar igphyml \
                 -v '{params.v_id}' \
                 --lib ../germline.V.fasta \
