@@ -335,43 +335,44 @@ def gather_antibodies(
             record = SeqRecord(Seq(isolate_attrs[seq_col]), id=isolate_name, description="")
             SeqIO.write(record, f_out, "fasta")
 
-def align_next_segment(antibodies_fasta, aligned_fasta, alleles_fasta, output_fasta):
+def align_next_segment(target_fasta, aligned_fasta, alleles_fasta, output_fasta):
     """Align discovered alleles from a segment to the regions not yet aligned to.
 
-    antibodies_fasta: path to FASTA for known antibody sequences
+    target_fasta: path to FASTA for alignment target, i.e., known antibody
+                  sequences
     aligned_fasta: path to FASTA for previous segment's alignment
     alleles_fasta: path to FASTA for discovered alleleles for next segment
     output_fasta: path to FASTA to save new alignment to
     """
-    antibodies = list(SeqIO.parse(antibodies_fasta, "fasta"))
+    targets = list(SeqIO.parse(target_fasta, "fasta"))
     alignment = list(SeqIO.parse(aligned_fasta, "fasta"))
-    antibody_ids = {record.id for record in antibodies}
+    target_ids = {record.id for record in targets}
 
-    # Handle the case that we have no antibodies on record for this subject
-    if not antibody_ids:
+    # Handle the case that we have no targets on record for this subject
+    if not target_ids:
         shell("touch {output_fasta}")
         return
 
     # Find the farthest-left right edge of the previously-aligned set of alleles.
     right_ends = []
     for record in alignment:
-        if record.id in antibody_ids:
+        if record.id in target_ids:
             continue
         # left gaps, alignment, right gaps.
         match = re.match("(^-*)([^-].*[^-])(--*)$", str(record.seq))
         right_ends.append(match.start(3))
     maskpos = min(right_ends)
 
-    # Cut the alignment down to just the antibodies and mask to just the
+    # Cut the alignment down to just the targets and mask to just the
     # rightward region.
-    antibodies_masked = NamedTemporaryFile("wt", buffering=1)
+    targets_masked = NamedTemporaryFile("wt", buffering=1)
     for record in alignment:
-        if record.id in antibody_ids:
+        if record.id in target_ids:
             record_masked = SeqRecord(
                 Seq("-" * maskpos + str(record.seq)[maskpos:]),
                 id=record.id,
                 description="")
-            SeqIO.write(record_masked, antibodies_masked, "fasta")
+            SeqIO.write(record_masked, targets_masked, "fasta")
 
     # Align the new alleles to this modified version.
     aligned_masked = NamedTemporaryFile("rt", buffering=1)
@@ -379,36 +380,30 @@ def align_next_segment(antibodies_fasta, aligned_fasta, alleles_fasta, output_fa
         "clustalw -align -profile1={profile1} "
         "-profile2={profile2} -sequences -output=fasta "
         "-outfile={outfile}".format(
-            profile1=antibodies_masked.name,
+            profile1=targets_masked.name,
             profile2=alleles_fasta,
             outfile=aligned_masked.name))
 
     shell("cp {outfile_temp} {outfile_real}".format(
         outfile_temp=aligned_masked.name, outfile_real=output_fasta))
-    ## Swap the original antibodies back into place.
-    #with open(output_fasta, "wt") as f_out:
-    #    for record in alignment:
-    #        if record.id in antibody_ids:
-    #            SeqIO.write(record, f_out, "fasta")
-    #    for record in SeqIO.parse(aligned_masked, "fasta"):
-    #        if record.id in antibody_ids:
-    #            continue
-    #        SeqIO.write(record, f_out, "fasta")
 
-def combine_aligned_segments(antibodies_fasta, with_v, with_d, with_j, output_fasta):
-    """Combine the antibody sequences and separately aligned V(D)J alleles into one alignment."""
-    antibodies = list(SeqIO.parse(antibodies_fasta, "fasta"))
+def combine_aligned_segments(target_fasta, with_v, with_d, with_j, output_fasta):
+    """Combine the target sequences and separately aligned V(D)J alleles into one alignment."""
+    targets = list(SeqIO.parse(target_fasta, "fasta"))
+    if not targets:
+        shell("touch {output_fasta}")
+        return
     aligned = {
         "v": list(SeqIO.parse(with_v, "fasta")),
         "j": list(SeqIO.parse(with_j, "fasta"))
         }
     if with_d:
         aligned["d"] = list(SeqIO.parse(with_d, "fasta"))
-    ab_ids = {record.id for record in antibodies}
-    antibodies = {key: [entry for entry in aligned[key] if entry.id in ab_ids] for key in aligned}
-    lengths = {key: max([len(rec) for rec in antibodies[key]]) for key in antibodies}
+    ab_ids = {record.id for record in targets}
+    targets = {key: [entry for entry in aligned[key] if entry.id in ab_ids] for key in aligned}
+    lengths = {key: max([len(rec) for rec in targets[key]]) for key in targets}
     if len(set(lengths)) > 1:
-        LOGGER.warning("Aligned antibodies differ in length; will pad to max length.")
+        LOGGER.warning("Aligned tarets differ in length; will pad to max length.")
     with open(output_fasta, "wt") as f_out:
         for record in aligned["v"]:
             record.seq = Seq(str(record.seq).ljust(max(lengths.values()), "-"))
