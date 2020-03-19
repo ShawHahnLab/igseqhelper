@@ -201,7 +201,7 @@ load_germline_alleles <- function(samples, dp=ROOT) {
          select = c("SpecimenSubject", "Specimen", "Chain", "Type"))
   keys <- paste(tbl$Specimen, tbl$Chain, tbl$Type, sep = ".")
   data <- do.call(rbind, lapply(keys, function(key) {
-    fp <- file.path(dp, "analysis/reporting", key, "germline.VDJ.aligned.csv")
+    fp <- file.path(dp, "analysis/reporting", key, "antibodies/VDJ.aligned.csv")
     if (file.exists(fp)) {
       load_csv(fp, "SeqName")
     } else {
