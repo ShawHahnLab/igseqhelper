@@ -427,7 +427,7 @@ def convert_combined_alignment(fasta_in, csv_out, specimens, antibody_isolates, 
     """Convert VDJ+antibody alignment from FASTA into CSV form."""
     fields = ["Specimen", "Subject", "Chain", "Type", "Category", "LineageDist", "SeqName", "Seq"]
     segments = ["IGHV", "IGHD", "IGHJ", "IGLV", "IGLJ", "IGKV", "IGKJ"]
-    categories = ["AntibodyLineage", "AntibodyIsolate"] + segments
+    categories = ["???", "AntibodyLineage", "AntibodyIsolate"] + segments
     subject_lut = {specimen["Specimen"]: specimen["Subject"] for specimen in specimens.values()}
     rows = []
     def categorize(seqid):
@@ -464,6 +464,11 @@ def convert_combined_alignment(fasta_in, csv_out, specimens, antibody_isolates, 
             if lineage:
                 LOGGER.error("antibody lineage sequence already defined; check metadata.")
             lineage = row["Seq"]
+    if not lineage:
+        LOGGER.warning("No lineage sequence present; defaulting to first non-segment sequence.")
+        for row in rows:
+            if row["Category"] not in segments:
+                lineage = row["Seq"]
     for row in rows:
         row["LineageDist"] = strdist_iupac_squeezed(row["Seq"], lineage)
     # Sort by the given ordered fields above
