@@ -5,26 +5,27 @@ import re
 from Bio import Phylo
 from Bio.Seq import Seq
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 
 # https://www.bioinformatics.org/sms/iupac.html
 # With added stubs to more easily handle regular bases and gaps
 IUPAC = {
-    "A": ("A", ),
-    "C": ("C", ),
-    "T": ("T", ),
-    "G": ("G", ),
-    "-": ("-", ),
-    "R": ("A", "G"),
-    "Y": ("C", "T"),
-    "S": ("G", "C"),
-    "W": ("A", "T"),
-    "K": ("G", "T"),
-    "M": ("A", "C"),
-    "B": ("C", "G", "T"),
-    "D": ("A", "G", "T"),
-    "H": ("A", "C", "T"),
-    "V": ("A", "C", "G"),
-    "N": ("A", "C", "T", "G")}
+    "A": {"A"},
+    "C": {"C"},
+    "T": {"T"},
+    "G": {"G"},
+    "-": {"-"},
+    "R": {"A", "G"},
+    "Y": {"C", "T"},
+    "S": {"G", "C"},
+    "W": {"A", "T"},
+    "K": {"G", "T"},
+    "M": {"A", "C"},
+    "B": {"C", "G", "T"},
+    "D": {"A", "G", "T"},
+    "H": {"A", "C", "T"},
+    "V": {"A", "C", "G"},
+    "N": {"A", "C", "T", "G"}}
 
 def revcmp(record):
     """Reverse complement a SeqRcord, keeping ALL metadata.
@@ -83,6 +84,36 @@ def strdist_iupac_squeezed(str1, str2):
     str1_squeezed = str1[start:stop]
     str2_squeezed = str2[start:stop]
     return strdist(str1_squeezed, str2_squeezed, compare)
+
+def ambiguify_alignment(fasta_fp_in, fasta_fp_out, seqid="CombinedAlignment"):
+    """Condense all variation in each position to IUPAC codes.
+
+    This will take a FASTA alignment over a number of sequences, and output a
+    single sequence that encompasses all variation at each position in the
+    appropriate IUAPC ambiguity code.
+    """
+    seqs_in = []
+    for record in SeqIO.parse(fasta_fp_in, "fasta"):
+        seqs_in.append(str(record.seq))
+    if not seqs_in:
+        with open(fasta_fp_out, "w") as _:
+            pass
+        return
+    lengths = {len(s) for s in seqs_in}
+    if len(lengths) > 1:
+        raise ValueError("Input sequences vary in length (not an alignment?)")
+    # Set up a dictionary mapping sets of explicit bases to their IUPAC
+    # ambiguity codes.
+    # (I know because of how I set up IUPAC above that it's 1:1 with keys and
+    # values, but be careful...)
+    iupac_rev = {"".join(sorted(list(val))): key for key, val in IUPAC.items()}
+    def getbase(pos):
+        chars = "".join(sorted(list({seq[pos] for seq in seqs_in})))
+        return iupac_rev.get(chars, "?")
+    bases = [getbase(pos) for pos in range(len(seqs_in[0]))]
+    seq_out = "".join(bases)
+    record = SeqRecord(Seq(seq_out), id=seqid, description="")
+    SeqIO.write(record, fasta_fp_out, "fasta")
 
 def trim_alignment_to(fasta_fp_in, fasta_fp_out, seq_id):
     """Trim all sequences in a FASTA to match a given sequence ID.
