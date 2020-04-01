@@ -59,11 +59,13 @@ def gather_mature(antibody_isolates, subject, chain, output_fp):
     col_key = {"heavy": "HeavySeq", "light": "LightSeq"}.get(chain)
     if not col_key:
         raise data.MetadataError("chain should be \"heavy\" or \"light\", not \"%s\"" % chain)
-    for isolate_name, isolate_attrs in antibody_isolates.items():
-        if isolate_attrs["Subject"] == subject:
-            seq = isolate_attrs[col_key]
-            seqid = isolate_name + "_" + col_key
-            rec = SeqRecord(Seq(seq), id=seqid, description="")
+    with open(output_fp, "w") as f_out:
+        for isolate_name, isolate_attrs in antibody_isolates.items():
+            if isolate_attrs["AntibodyLineageAttrs"]["Subject"] == subject:
+                seq = isolate_attrs[col_key]
+                seqid = isolate_name + "_" + col_key
+                rec = SeqRecord(Seq(seq), id=seqid, description="")
+                SeqIO.write(rec, f_out, "fasta")
 
 def get_antibody_alleles(antibody_lineages, subject, chain, segment):
     """Get a list of antibody lineage germline allele IDs for a given subject/chain/segment.
