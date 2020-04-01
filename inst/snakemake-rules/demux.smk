@@ -45,7 +45,7 @@ for runid in RUNS.keys():
                     revcmp=params.revcmp, send_stats=f_log)
 
 TARGET_DEMUX = expand(
-    outputs_per_run("analysis/demux/{run}/{sample}.{{rp}}.csv", SAMPLES),
+    outputs_per_run("analysis/demux/{run}/{sample}.{{rp}}.fastq.gz", SAMPLES),
     rp=["R1", "R2", "I1"])
 
 rule all_demux:
