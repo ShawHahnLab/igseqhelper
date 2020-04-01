@@ -26,7 +26,9 @@ wildcard_constraints:
     chain="(heavy|light)",
     chain_type="(alpha|delta|gamma|mu|epsilon|kappa|lambda)",
     segment="(V|D|J)",
-    antibody_type="(IgA|IgD|IgG|IgM|IgE)"
+    antibody_type="(IgA|IgD|IgG|IgM|IgE)",
+    antibody_isolate=r"[-_A-Za-z0-9\.]+",
+    antibody_lineage=r"[-_A-Za-z0-9\.]+"
 
 include: "snakemake-rules/counts.smk"
 include: "snakemake-rules/data.smk"
