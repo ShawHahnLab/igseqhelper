@@ -185,7 +185,7 @@ rule sonar_module_2_id_div:
     threads: 4
     shell:
         """
-            cd $(dirname {input.fasta})/../../../..
+            cd $(dirname {input.fasta})/../../..
             libv=../germline.V.fasta
             mab=../mab.fasta
             sonar id-div -g "$libv" -a "$mab" -t {threads}
@@ -207,7 +207,7 @@ rule sonar_module_2_id_div_island:
             set +e
             set +u
             source ~/miniconda3/bin/activate sonar
-            cd $(dirname {input.iddiv})/../../..
+            cd $(dirname {input.iddiv})/../..
             sonar get_island ../../../../../{input.iddiv} --mab "{params.mab}"
         """
 
