@@ -144,7 +144,7 @@ def get_data(runid, outdir, runs):
         "R2": Path(outdir) / "Undetermined_S0_L001_R2_001.fastq.gz",
         "I1": Path(outdir) / "Undetermined_S0_L001_I1_001.fastq.gz"}
     # Get data from raw run data
-    if rundir.is_dir() and False:
+    if rundir.is_dir():
         LOGGER.info("get_data: running bcl2fastq")
         shell(
             """
