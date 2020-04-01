@@ -16,9 +16,27 @@ TARGET_IGDISCOVER_CLUSTERPLOTS = expand(
     "analysis/reporting/igdiscover/{chain}.{chain_type}/{specimen}/clusterplots.png",
     zip, chain=IGM_CHAINS, chain_type=IGM_CHAINTYPES, specimen=IGM_SPECIMENS)
 
-TARGET_IGDISCOVER_ALLELE_ALIGNMENTS = expand(
-    "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies/VDJ.aligned.csv",
-    zip, chain=IGM_CHAINS, chain_type=IGM_CHAINTYPES, specimen=IGM_SPECIMENS)
+def _get_allele_alignment_targets():
+    targets = []
+    for sample, sample_attrs in SAMPLES.items():
+        specimen = sample_attrs["Specimen"]
+        if not specimen in IGM_SPECIMENS:
+            continue
+        chain = sample_attrs["Chain"]
+        chain_type = sample_attrs["Type"]
+        subject = sample_attrs["SpecimenAttrs"]["Subject"]
+        for lineage, lineage_attrs in ANTIBODY_LINEAGES.items():
+            if lineage_attrs["Subject"] == subject:
+                targets.append(
+                    ("analysis/reporting/{specimen}.{chain}.{chain_type}"
+                    "/antibodies.{lineage}/VDJ.aligned.csv").format(
+                        specimen=specimen,
+                        chain=chain,
+                        chain_type=chain_type,
+                        lineage=lineage))
+    return targets
+
+TARGET_IGDISCOVER_ALLELE_ALIGNMENTS = _get_allele_alignment_targets()
 
 TARGET_SONAR_RAREFACTION = expand(
     "analysis/reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
@@ -188,7 +206,7 @@ rule igdiscover_allele_alignments_align_vdj:
     """Combine V(D)J alignments into one combined alignment."""
     output: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.fasta"
     input:
-        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.fasta",
+        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
         with_v="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta",
         with_d="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta",
         with_j="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/J.aligned.fasta"
@@ -204,7 +222,7 @@ rule igdiscover_allele_alignments_align_j:
     """Align discovered J alleles to target sequences based on V/J alignment."""
     output: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/J.aligned.fasta"
     input:
-        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.fasta",
+        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
         with_d="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta",
         j="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/J.fasta"
     run: igseq.reporting.align_next_segment(input.target, input.with_d, input.j, output.fasta)
@@ -213,7 +231,7 @@ rule igdiscover_allele_alignments_align_d:
     """Align discovered D alleles to target sequences based on V alignment."""
     output: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta"
     input:
-        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.fasta",
+        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
         with_v="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta",
         d="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/D.fasta"
     run:
@@ -224,10 +242,15 @@ rule igdiscover_allele_alignments_align_d:
             shell("cp {input.with_v} {output.fasta}")
 
 rule igdiscover_allele_alignments_align_v:
-    """Align discovered V alleles to target sequences."""
+    """Align discovered V alleles to target sequences.
+
+    This will generally be the antibody sequences provided by
+    gather_antibody_sequences, but if another FASTA is provided manually it'll
+    work with that instead.
+    """
     output: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta"
     input:
-        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.fasta",
+        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
         v="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/V.fasta",
     shell:
         """
@@ -238,10 +261,23 @@ rule igdiscover_allele_alignments_align_v:
             fi
         """
 
+rule align_targets:
+    """Align target sequences to one another before bringing discovered alleles into the mix."""
+    output: "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.aln.fa"
+    input: "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.fasta"
+    shell:
+        """
+            if [[ -s {input} ]]; then
+                clustalw -align -infile={input} -output=fasta -outfile={output}
+            else
+                touch {output}
+            fi
+        """
+
+
 rule gather_antibody_sequences:
     """Gather mature antibody sequences to start off the alignment against."""
-    output: "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies.fasta"
+    output: "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.fasta"
     run:
         igseq.reporting.gather_antibodies(
-            SPECIMENS[wildcards.specimen]["Subject"],
-            wildcards.chain, ANTIBODY_ISOLATES, output[0])
+            wildcards.antibody_lineage, wildcards.chain, ANTIBODY_ISOLATES, output[0])

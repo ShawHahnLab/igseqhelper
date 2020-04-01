@@ -309,18 +309,17 @@ def divide(val1, val2, fmt="{:.6f}"):
     num = fmt.format(num)
     return num
 
-def gather_antibodies(
-        subject, chain, antibody_isolates, output_fasta):
+def gather_antibodies(lineage, chain, antibody_isolates, output_fasta):
     """Gather antibody sequences from metadata for use in alignments."""
-    LOGGER.info("gather_antibodies: subject: %s", subject)
+    LOGGER.info("gather_antibodies: lineage: %s", lineage)
     LOGGER.info("gather_antibodies: chain: %s", chain)
     LOGGER.info("gather_antibodies: antibody_isolates: %d", len(antibody_isolates))
     LOGGER.info("gather_antibodies: output_fasta: %s", output_fasta)
-    is_subject = lambda val: val["AntibodyLineageAttrs"]["Subject"] == subject
-    isolates = {k: val for k, val in antibody_isolates.items() if is_subject(val)}
-    LOGGER.info("gather_antibodies: kept %d isolates matching subject", len(isolates))
+    is_lineage = lambda val: val["AntibodyLineageAttrs"]["AntibodyLineage"] == lineage
+    isolates = {k: val for k, val in antibody_isolates.items() if is_lineage(val)}
+    LOGGER.info("gather_antibodies: kept %d isolates matching lineage", len(isolates))
     lineages = {val["AntibodyLineage"]: val["AntibodyLineageAttrs"] for val in isolates.values()}
-    LOGGER.info("gather_antibodies: kept %d lineages matching subject", len(lineages))
+    LOGGER.info("gather_antibodies: kept %d entries matching lineage", len(lineages))
     if chain == "heavy":
         seq_col = "HeavySeq"
         cons_col = "HeavyConsensus"
