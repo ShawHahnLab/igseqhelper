@@ -91,6 +91,10 @@ def ambiguify_alignment(fasta_fp_in, fasta_fp_out, seqid="CombinedAlignment"):
     This will take a FASTA alignment over a number of sequences, and output a
     single sequence that encompasses all variation at each position in the
     appropriate IUAPC ambiguity code.
+
+    NOTE: As currently written this doesn't know how to account for a gap, so
+    it will become "?" for any positions with gaps.  Sequences that vary in
+    length will cause a ValueError.
     """
     seqs_in = []
     for record in SeqIO.parse(fasta_fp_in, "fasta"):
