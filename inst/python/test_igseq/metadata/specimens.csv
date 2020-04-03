@@ -1,4 +1,4 @@
 Specimen,Subject,Timepoint,CellCount,CellType,Comments
-specimen1,1234,12,40000,IgG+,
-specimen2,1234,16,30000,IgG+,
-specimen3,1234,24,400000,IgG+,
+specimen1,S1,12,40000,IgG+,
+specimen2,S1,16,30000,IgG+,
+specimen3,S1,24,400000,IgG+,

@@ -40,6 +40,16 @@ class TestMetadataBase(unittest.TestCase):
                 "cols": ["Sample", "Run", "Specimen",
                          "BarcodeFwd", "BarcodeRev", "Replicate", "Chain", "Type", "Comments"],
                 "rows": ["sample%d" % num for num in range(1, 7)]
+                },
+            "antibody_isolates": {
+                "cols": ["AntibodyIsolate", "AntibodyLineage", "HeavySeq", "LightSeq", "Comments"],
+                "rows": ["ISO_S1_1_A", "ISO_S1_1_B", "ISO_S3_1_A", "ISO_S4_1_A"]
+                },
+            "antibody_lineages": {
+                "cols": [
+                    "AntibodyLineage", "Subject", "HeavyConsensus", "LightConsensus",
+                    "VH", "DH", "JH", "VL", "JL", "Comments"],
+                "rows": ["ISO_S1_1", "ISO_S3_1", "ISO_S4_1"]
                 }
             }
 
@@ -57,6 +67,34 @@ class TestMetadataBase(unittest.TestCase):
         """Test loading specimens CSV."""
         specimens = igseq.data.load_specimens(self.path / "specimens.csv")
         self.check_metadata(specimens, self.expected["specimens"], "Specimen")
+
+    def test_load_antibody_lineages(self):
+        """Test loading antibody lineages CSV."""
+        lineages = igseq.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
+        self.check_metadata(lineages, self.expected["antibody_lineages"], "AntibodyLineage")
+
+    def test_load_antibody_isolates_basic(self):
+        """Test loading antibody isolates CSV, by itself."""
+        isolates = igseq.data.load_antibody_isolates(self.path / "antibody_isolates.csv")
+        self.check_metadata(isolates, self.expected["antibody_isolates"], "AntibodyIsolate")
+
+    def test_load_antibody_isolates_joined(self):
+        """Test loading antibody isolates CSV, joined to lineage metadata.
+
+        See a similar test (just more intricate) in test_load_samples_joined.
+        """
+        lineages = igseq.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
+        isolates = igseq.data.load_antibody_isolates(self.path / "antibody_isolates.csv", lineages)
+        nested_items = {"AntibodyLineageAttrs": "antibody_lineages"}
+        self.assertEqual(list(isolates.keys()), self.expected["antibody_isolates"]["rows"])
+        for name, attrs in isolates.items():
+            self.assertEqual(name, attrs["AntibodyIsolate"])
+            keys = attrs.keys()
+            for key, sheet in nested_items.items():
+                self.assertIn(key, keys)
+                self.assertEqual(list(attrs[key].keys()), self.expected[sheet]["cols"])
+            keys = [key for key in keys if key not in nested_items.keys()]
+            self.assertEqual(keys, self.expected["antibody_isolates"]["cols"])
 
     def test_load_samples_basic(self):
         """Test loading samples CSV, by itself."""
@@ -108,6 +146,10 @@ class TestMetadataBase(unittest.TestCase):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
                 igseq.data.load_csv(self.path / "sequences.csv", "Use")
+
+    def test_get_data(self):
+        """Test getting data from local disk or URLs."""
+        self.skipTest("not yet implemented.")
 
     def check_metadata(self, obs, exp, key):
         """Check that the rows and columns are as expected.
@@ -178,6 +220,19 @@ class TestMetadataDuplicates(TestMetadataBase):
             with self.assertRaises(MetadataError):
                 igseq.data.load_specimens(self.path / "specimens.csv")
 
+    def test_load_antibody_lineages(self):
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(MetadataError):
+                igseq.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
+
+    def test_load_antibody_isolates_basic(self):
+        with self.assertLogs(level=logging.CRITICAL):
+            with self.assertRaises(MetadataError):
+                igseq.data.load_antibody_isolates(self.path / "antibody_isolates.csv")
+
+    def test_load_antibody_isolates_joined(self):
+        self.skipTest("not yet implemented")
+
     def test_load_samples_basic(self):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
@@ -215,4 +270,7 @@ class TestData(unittest.TestCase):
 
     def test_amplicon_files(self):
         """Test filename helper for files per specimen per target chain type."""
+        # I think we can probably remove this outright eventually, and just use
+        # snakemake's optional function argument to expand() for the same
+        # functionality.
         self.skipTest("not yet implemented")
