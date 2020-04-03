@@ -4,10 +4,13 @@ This ambiguous alignment stuff is currently a mess.  proceed with caution.
 
 import csv
 import logging
+from warnings import warn
 from Bio.Alphabet.IUPAC import IUPACAmbiguousDNA
 from Bio import SeqIO, AlignIO
 from Bio.Align import PairwiseAligner
 from Bio.Seq import Seq
+
+warn(DeprecationWarning("Don't use this junk!"), stacklevel=2)
 
 LOGGER = logging.getLogger(__name__)
 
