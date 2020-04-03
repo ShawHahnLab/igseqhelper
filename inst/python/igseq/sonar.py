@@ -17,14 +17,18 @@ def gather_germline(input_fps, output_fp):
     Prepare germline references for SONAR.
 
     Note that it expects a particular sequence naming scheme for genes and
-    module 2 will fail if we don't follow it.
+    module 2 will fail if we don't follow it.  Module 1 also seems confused by
+    the periods IMGT uses in its sequences so we'll strip those out as well.
     """
     with open(output_fp, "w") as f_out:
         seqids_seen = set()
         for input_fp in input_fps:
             for record in SeqIO.parse(input_fp, "fasta"):
+                # update with simple sequence ID
                 new_id = munge_seqid_for_sonar(record.id, seqids_seen)
                 record.id = new_id
+                # update to remove periods in sequence content
+                record.seq = Seq(str(record.seq).replace(".", ""))
                 record.description = ""
                 SeqIO.write(record, f_out, "fasta")
 
