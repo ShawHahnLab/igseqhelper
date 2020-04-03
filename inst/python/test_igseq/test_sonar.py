@@ -31,8 +31,12 @@ class TestSonar(unittest.TestCase):
             record1 = next(parser)
             for record in parser:
                 record2 = record
+        # We should have short simple IDs with just the gene+allele
         self.assertEqual(record1.id, "IGHV1-1*01")
         self.assertEqual(record2.id, "IGHV7-1*01")
+        # We should NOT have periods (like IMGT likes to use to ensure
+        # standardized positions)
+        self.assertNotIn(".", str(record1.seq))
 
     def test_munge_seqid_for_sonar(self):
         """Test modifying sequence IDs for SONAR."""
