@@ -129,22 +129,26 @@ def load_csv(fp_in, key=None):
             entries[row_key] = row
     return entries
 
-def get_data(runid, outdir, runs):
+def get_data(runid, outdir, runs, runpath=None):
     """Get the raw data files for a single run, either from local disk or from URLs.
 
     runid: Illumina Run ID
     outdir: run directory to save fastq.gz to
     runs: dictionary of per-run metadata
+    runpath: path on local disk where run directories are found
     """
     LOGGER.info("get_data: runid %s", runid)
     LOGGER.info("get_data: outdir %s", outdir)
-    rundir = Path("/seq/runs") / runid
+    if runpath:
+        rundir = Path(runpath) / runid
+    else:
+        rundir = None
     outfiles = {
         "R1": Path(outdir) / "Undetermined_S0_L001_R1_001.fastq.gz",
         "R2": Path(outdir) / "Undetermined_S0_L001_R2_001.fastq.gz",
         "I1": Path(outdir) / "Undetermined_S0_L001_I1_001.fastq.gz"}
     # Get data from raw run data
-    if rundir.is_dir():
+    if rundir and rundir.is_dir():
         LOGGER.info("get_data: running bcl2fastq")
         shell(
             """

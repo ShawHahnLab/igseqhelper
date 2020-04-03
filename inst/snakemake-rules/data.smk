@@ -81,7 +81,8 @@ rule get_data:
     """
     output: expand("data/{run}/" + RAW, run = "{run}", rp = ["R1", "R2", "I1"])
     input: lambda w: checkpoints.get_metadata.get().output
-    run: igseq.data.get_data(wildcards.run, Path(output[0]).parent, RUNS)
+    params: runpath="/seq/runs"
+    run: igseq.data.get_data(wildcards.run, Path(output[0]).parent, RUNS, params.runpath)
 
 checkpoint get_metadata:
     """Create CSV files from Google sheets based on metadata YAML."""
