@@ -13,6 +13,7 @@ import sys
 import gzip
 import logging
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from collections import defaultdict
 from Bio import SeqIO
@@ -42,6 +43,7 @@ def demux(samples, fps, outdir=".", output_files=None, dorevcmp=False, send_stat
     dorevcmp: reverse-complement R1 and R2 during demultiplexing?
     send_stats: file object to write a table of per-read demux results to
     """
+    # pylint: disable=too-many-arguments
     LOGGER.debug("%d demux: dorevcmp: %s", PID, str(dorevcmp))
     if not output_files:
         output_files = []
@@ -65,6 +67,8 @@ def demux(samples, fps, outdir=".", output_files=None, dorevcmp=False, send_stat
     for key in fp_outs:
         for sample in fp_outs[key]:
             LOGGER.debug("%d demux: %s %s output file: %s", PID, key, sample, fp_outs[key][sample])
+    # This is annoyingly similar to open_gzips below but different dict
+    # structure.  Maybe try to combine.
     try:
         f_outs = {
             "R1": {key: gzip.open(fp_outs["R1"][key], "wt") for key in fp_outs["R1"].keys()},
@@ -87,10 +91,6 @@ def demux(samples, fps, outdir=".", output_files=None, dorevcmp=False, send_stat
         with gzip.open(extra, "wt") as _:
             pass
 
-def _gzp(fp_in):
-    """Convenience wrapper for gzip opener."""
-    return gzip.open(fp_in, "rt")
-
 def _fqparse(f_in):
     """Convenience wrapper for FASTQ parser."""
     return SeqIO.parse(f_in, "fastq")
@@ -106,8 +106,8 @@ def _trio_demux(fps, f_outs, samples, dorevcmp, send_stats):
         LOGGER.debug("%d barcode map: %s -> %s", PID, str(key), bc_map[key])
     counter = 0
     hits = defaultdict(int)
-    with _gzp(fps["R1"]) as r1_in, _gzp(fps["R2"]) as r2_in, _gzp(fps["I1"]) as i1_in:
-        for trio in zip(_fqparse(r1_in), _fqparse(r2_in), _fqparse(i1_in)):
+    with _open_gzips(fps, "rt") as hndls:
+        for trio in zip(_fqparse(hndls["R1"]), _fqparse(hndls["R2"]), _fqparse(hndls["I1"])):
             if not trio[0].id == trio[1].id == trio[2].id:
                 raise DemuxError("Sequence ID mismatch between R1/R2/I1")
             trio = list(trio)
@@ -118,14 +118,13 @@ def _trio_demux(fps, f_outs, samples, dorevcmp, send_stats):
             assigned = (
                 assign_barcode_fwd(trio[0], barcodes["F"], send_stats=send_stats),
                 assign_barcode_rev(trio[2], barcodes["R"], send_stats=send_stats))
-            samp = bc_map.get(assigned)
             hits[assigned] += 1
             # trim barcode from forward read
             if assigned[0]:
                 trio[0] = trio[0][len(assigned[0]):]
-            SeqIO.write(trio[0], f_outs["R1"][str(samp)], "fastq")
-            SeqIO.write(trio[1], f_outs["R2"][str(samp)], "fastq")
-            SeqIO.write(trio[2], f_outs["I1"][str(samp)], "fastq")
+            SeqIO.write(trio[0], f_outs["R1"][str(bc_map.get(assigned))], "fastq")
+            SeqIO.write(trio[1], f_outs["R2"][str(bc_map.get(assigned))], "fastq")
+            SeqIO.write(trio[2], f_outs["I1"][str(bc_map.get(assigned))], "fastq")
             # Log message every 10,000th read trio
             if counter % 10000 == 0:
                 keys = sorted(hits, key=hits.__getitem__)[::-1]
@@ -138,6 +137,20 @@ def _trio_demux(fps, f_outs, samples, dorevcmp, send_stats):
                         str(keys[1]), hits[keys[1]])
             counter += 1
 
+@contextmanager
+def _open_gzips(filenames, *args, **kwargs):
+    """Open and yield each gzipped filename in a dictionary, as a dictionary.
+
+    Any additional arguments will be passed to gzip.open.
+    """
+    try:
+        handles = {key: gzip.open(filenames[key], *args, **kwargs) for key in filenames}
+        # run the code
+        yield handles
+    # close them
+    finally:
+        for key in handles:
+            handles[key].close()
 
 def assign_barcode_fwd(record, barcodes,
                        max_mismatch=1, min_next_mismatch=1, send_stats=sys.stdout):
