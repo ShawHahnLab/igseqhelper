@@ -61,8 +61,12 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     LOGGER.info("load_samples: runs %s...", str(runs)[0:60])
     LOGGER.info("load_samples: sequences %s...", str(sequences)[0:60])
     samples = load_csv(fp_in, "Sample")
-    unique_keys = {(row["BarcodeFwd"], row["BarcodeRev"], row["Run"]) for row in samples.values()}
-    if len(unique_keys) != len(samples.values()):
+    noblanks = {k: v for k, v in samples.items() if \
+            v["BarcodeFwd"] and v["BarcodeRev"] and v["Run"]}
+    if len(noblanks) < len(samples):
+        LOGGER.warning("Blanks in BarcodeFwd/BarcodeRev/Run columns")
+    unique_keys = {(row["BarcodeFwd"], row["BarcodeRev"], row["Run"]) for row in noblanks.values()}
+    if len(unique_keys) != len(noblanks.values()):
         msg = "Duplicate entries in CSV %s for BarcodeFwd/BarcodeRev/Run combinations" % fp_in
         LOGGER.critical(msg)
         raise MetadataError(msg)
