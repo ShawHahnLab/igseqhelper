@@ -1,4 +1,11 @@
-### Reporting
+"""
+Report generation and helper rules.
+
+These prepare summary spreadsheets and plots from various steps in the
+analysis.  It's a bit of a mess but the idea is everything funnels toward
+analysis/report.pdf, with as much as possible handled in a modular fashion here
+before going in the Rmarkdown for the report.
+"""
 
 from igseq.reporting.trim import make_qualtrim_csv
 from igseq.reporting.sonar import (

@@ -4,7 +4,8 @@ on a per-specimen per-amplicon-type basis.  IgDiscover does its own
 read-merging using PEAR so we won't use pRESTO's merge reads here.
 
 The databases will be prepared from SONAR's local copy of the Ramesh et al.
-database (https://doi.org/10.3389/fimmu.2017.01407).
+database (https://doi.org/10.3389/fimmu.2017.01407).  This requires the SONAR
+repository in the working directory.
 """
 
 from igseq.igdiscover import CHAINS, CHAIN_TYPES, SEGMENTS

@@ -1,3 +1,17 @@
+"""
+SONAR processing across the three modules.
+
+There's one interactive step here, the island selection from the
+identity/divergence plots.  This requires X11 to show the interactive plot and
+uses a separate sonar conda environment so I could avoid having to figure out
+X11 over singularity/docker.  The others rules here require --use-singularity
+in snakemake.
+
+This whole setup is very brittle (depends on the extra conda environment,
+singularity, and specific relative paths) and would probably take some work to
+run successfully anywhere else.
+"""
+
 import igseq.sonar
 from igseq.data import MetadataError
 
