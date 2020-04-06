@@ -434,14 +434,6 @@ def convert_combined_alignment(fasta_in, csv_out, specimens, antibody_isolates, 
             if match:
                 return match.group(1)
         return "???"
-    def sortable_row(row):
-        entries = []
-        for field in fields:
-            entry = row[field]
-            if field == "Category":
-                entry = categories.index(entry)
-            entries.append(entry)
-        return entries
     for record in SeqIO.parse(fasta_in, "fasta"):
         row = {}
         row["Specimen"] = wildcards.specimen
@@ -465,6 +457,21 @@ def convert_combined_alignment(fasta_in, csv_out, specimens, antibody_isolates, 
                 lineage = row["Seq"]
     for row in rows:
         row["LineageDist"] = strdist_iupac_squeezed(row["Seq"], lineage)
+    _write_alignment_csv(csv_out, rows, fields, categories)
+
+def _write_alignment_csv(csv_out, rows, fields, categories):
+    """Write alignment dictionaries as CSV, sorting by field/category."""
+    # make a (sortable) list for each row dictionary by using the keys in their
+    # given order.  Special case: category will be sorted according to an
+    # explicitly defined order (R factor-like, kinda).
+    def sortable_row(row):
+        entries = []
+        for field in fields:
+            entry = row[field]
+            if field == "Category":
+                entry = categories.index(entry)
+            entries.append(entry)
+        return entries
     # Sort by the given ordered fields above
     rows = sorted(rows, key=sortable_row)
     with open(csv_out, "wt") as f_out:
