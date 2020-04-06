@@ -108,8 +108,12 @@ update_metadata <- function(google_sheets, prefix=NULL) {
         "/pub?gid=", gid,
         "&single=true&output=csv")
       path_file <- file.path(path_dir, paste0(sheet, ".csv"))
-      data <- read.csv(file = url)
-      write.csv(data, path_file, quote = FALSE, row.names = FALSE)
+      data <- read.csv(
+        file = url,
+        header = TRUE,
+        stringsAsFactors = FALSE,
+        check.names = FALSE)
+      write.csv(data, path_file, row.names = FALSE)
     }
   }
 }
