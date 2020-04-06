@@ -18,7 +18,7 @@ TARGET_SONAR_MODULE_2_AUTO = expand(
 TARGET_SONAR_MODULE_2_ID_DIV = expand(
     "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
     zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
-TARGET_SONAR_MODULE_2_MANUAL = expand(
+TARGET_SONAR_MODULE_2_ID_DIV_ISLAND = expand(
     "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa",
     zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
 TARGET_SONAR_MODULE_3 = expand(
@@ -37,8 +37,8 @@ rule all_sonar_module_2_auto:
 rule all_sonar_module_2_id_div:
     input: TARGET_SONAR_MODULE_2_ID_DIV
 
-rule all_sonar_module_2_manual:
-    input: TARGET_SONAR_MODULE_2_MANUAL
+rule all_sonar_module_2_id_div_island:
+    input: TARGET_SONAR_MODULE_2_ID_DIV_ISLAND
 
 rule all_sonar_module_3:
     input: TARGET_SONAR_MODULE_3
@@ -221,11 +221,11 @@ rule sonar_module_2_id_div_getfasta:
     singularity: "docker://scharch/sonar"
     shell:
         """
-            cd $(dirname {input.fasta})/../../../..
+            cd $(dirname {input.fasta})/../../..
             # Pull out sequences using our selected island from the above
             # id-div step.  I think this is essentially "seqmagick convert
             # --include-from-file ..."
-            sonar getfasta \
+            sonar getFastaFromList \
                 -l ../../../../../{input.seqids} \
                 -f ../../../../../{input.fasta} \
                 -o ../../../../../{output.fasta}
