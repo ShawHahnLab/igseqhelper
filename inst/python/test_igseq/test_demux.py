@@ -250,7 +250,7 @@ class TestDemuxRevcmp(TestDemux):
         fps = {key: path_pat % key for key in ("R1", "R2", "I1")}
         stream = StringIO()
         with TemporaryDirectory() as outdir:
-            demux(self.samples, fps, outdir, revcmp=True, send_stats=stream)
+            demux(self.samples, fps, outdir, dorevcmp=True, send_stats=stream)
             files_observed = sorted([str(x.name) for x in Path(outdir).iterdir()])
             self.assertEqual(files_observed, self.expected["files"])
             sample_data = self.load_trio(outdir)
@@ -307,4 +307,4 @@ class TestDemuxIDMismatch(TestDemux):
         stream = StringIO()
         with TemporaryDirectory() as outdir:
             with self.assertRaises(DemuxError):
-                demux(self.samples, fps, outdir, revcmp=True, send_stats=stream)
+                demux(self.samples, fps, outdir, dorevcmp=True, send_stats=stream)

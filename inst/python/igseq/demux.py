@@ -32,17 +32,17 @@ class DemuxError(Exception):
     """A special exception for demultiplexing problems."""
 
 
-def demux(samples, fps, outdir=".", output_files=None, revcmp=False, send_stats=sys.stdout):
+def demux(samples, fps, outdir=".", output_files=None, dorevcmp=False, send_stats=sys.stdout):
     """Demultiplex one run based on dictionaries of sample and barcode data.
 
     samples: dictionary of sample attributes for this run
     fps: dict of "R1", "R2", and "I1" keys pointing to file paths to fastq.gz.
     outdir: output directory to write demultiplexed fastq.gz files to
     output_files: expected output files; will touch empty ones if any aren't expected
-    revcmp: reverse-complement R1 and R2 during demultiplexing?
+    dorevcmp: reverse-complement R1 and R2 during demultiplexing?
     send_stats: file object to write a table of per-read demux results to
     """
-    LOGGER.debug("%d demux: revcmp: %s", PID, str(revcmp))
+    LOGGER.debug("%d demux: dorevcmp: %s", PID, str(dorevcmp))
     if not output_files:
         output_files = []
     else:
@@ -71,7 +71,7 @@ def demux(samples, fps, outdir=".", output_files=None, revcmp=False, send_stats=
             "R2": {key: gzip.open(fp_outs["R2"][key], "wt") for key in fp_outs["R2"].keys()},
             "I1": {key: gzip.open(fp_outs["I1"][key], "wt") for key in fp_outs["I1"].keys()}
             }
-        _trio_demux(fps, f_outs, samples, revcmp, send_stats)
+        _trio_demux(fps, f_outs, samples, dorevcmp, send_stats)
     finally:
         for f_out in f_outs["R1"].values():
             f_out.close()
@@ -100,7 +100,8 @@ def _trio_demux(fps, f_outs, samples, dorevcmp, send_stats):
         "F": [samples[s]["BarcodeFwdAttrs"]["Seq"] for s in samples],
         "R": [samples[s]["BarcodeRevAttrs"]["Seq"] for s in samples]
         }
-    bc_map = {(samples[s]["BarcodeFwdAttrs"]["Seq"], samples[s]["BarcodeRevAttrs"]["Seq"]): s for s in samples}
+    bckey = lambda s: (s["BarcodeFwdAttrs"]["Seq"], s["BarcodeRevAttrs"]["Seq"])
+    bc_map = {bckey(samples[sname]): sname for sname in samples}
     for key in bc_map:
         LOGGER.debug("%d barcode map: %s -> %s", PID, str(key), bc_map[key])
     counter = 0

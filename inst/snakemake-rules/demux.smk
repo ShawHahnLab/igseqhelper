@@ -33,7 +33,7 @@ for runid in RUNS.keys():
             i1="data/{run}/Undetermined_S0_L001_I1_001.fastq.gz".format(run=runid)
         params:
             samples=samples,
-            revcmp=revcmp,
+            dorevcmp=revcmp,
             outdir="analysis/demux/{run}".format(run=runid)
         log: "analysis/logs/demux.{run}.tsv".format(run=runid)
         run:
@@ -42,7 +42,7 @@ for runid in RUNS.keys():
                     samples=params.samples,
                     fps = {"R1": input.r1, "R2": input.r2, "I1": input.i1},
                     outdir=params.outdir, output_files=output,
-                    revcmp=params.revcmp, send_stats=f_log)
+                    dorevcmp=params.dorevcmp, send_stats=f_log)
 
 TARGET_DEMUX = expand(
     outputs_per_run("analysis/demux/{run}/{sample}.{{rp}}.fastq.gz", SAMPLES),
