@@ -53,12 +53,12 @@ PRESTO_OPTS = {
     }
 }
 
-def prep_primers_fwd(fp_csv_in, fp_fwd_out):
+def prep_primers_fwd(fp_csv_in, fp_fwd_out, seqid="5PIIA"):
     """Take our primer CSV and create fwd FASTA for pRESTO."""
     LOGGER.info("prep_primers_fwd: fp_csv_in: %s", fp_csv_in)
     LOGGER.info("prep_primers_fwd: fp_fwd_out: %s", fp_fwd_out)
     sequences = load_sequences(fp_csv_in)
-    fwd = sequences["5PIIA"]["Seq"]
+    fwd = sequences[seqid]["Seq"]
     LOGGER.debug("prep_primers_fwd: fwd primer seq: %s", fwd)
     fwd = SeqRecord(Seq(fwd), id="5PIIA", description="")
     SeqIO.write(fwd, fp_fwd_out, "fasta")
