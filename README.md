@@ -1,7 +1,7 @@
 # IgSeq Helpers
 
-My attempt at generalizing the R and Python code I've written for our Rhesus
-macaque antibody analyses.
+An attempt at generalizing our R and Python code for Rhesus macaque antibody
+analyses.
 
 See Also:
 
@@ -9,3 +9,4 @@ See Also:
  * <https://presto.readthedocs.io>
  * <https://docs.igdiscover.se>
  * <https://github.com/ukirik/giggle>
+ * <https://github.com/psathyrella/partis>
