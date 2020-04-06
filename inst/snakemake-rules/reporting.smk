@@ -1,6 +1,20 @@
 ### Reporting
 
-import igseq.reporting
+from igseq.reporting.trim import make_qualtrim_csv
+from igseq.reporting.sonar import (
+    get_rearr_centroids_by_raw_reads,
+    rarefy_sonar_clusters)
+from igseq.reporting.counts import (
+    counts_sample_summary,
+    counts_run_summary,
+    counts_specimen_summary,
+    counts_assembly_summary,
+    counts_presto_qual_summary)
+from igseq.reporting.igdiscover import (
+    convert_combined_alignment,
+    combine_aligned_segments,
+    align_next_segment,
+    gather_antibodies)
 from igseq.data import amplicon_files
 
 IGM_CHAINS = [entry["Chain"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
@@ -93,7 +107,7 @@ rule qualtrim_grid:
     """Make a CSV table summarizing cutadapt trim cutoffs vs output length."""
     output: "analysis/reporting/{run}/qualtrim.{sample}.{rp}.csv"
     input: "analysis/demux/{run}/{sample}.{rp}.fastq.gz"
-    run: igseq.reporting.make_qualtrim_csv(input[0], output[0])
+    run: make_qualtrim_csv(input[0], output[0])
 
 def input_sonar_clusters_by_read(w):
     targets = {}
@@ -116,12 +130,12 @@ rule sonar_clusters_by_read:
     run:
         fp_rearr = input.rearr
         fps_fqgz = [val for key, val in input.items() if key is not "rearr"]
-        igseq.reporting.get_rearr_centroids_by_raw_reads(fp_rearr, fps_fqgz, output[0])
+        get_rearr_centroids_by_raw_reads(fp_rearr, fps_fqgz, output[0])
 
 rule rarefy_sonar_clusters:
     output: "analysis/reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv"
     input: "analysis/reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
-    run: igseq.reporting.rarefy_sonar_clusters(input[0], output[0])
+    run: rarefy_sonar_clusters(input[0], output[0])
 
 # Sample-based
 
@@ -139,13 +153,13 @@ rule counts_sample_summary:
     """A per-sample summary of raw read counts."""
     output: "analysis/reporting/counts_by_sample.csv"
     input: "analysis/reporting/counts.csv"
-    run: igseq.reporting.counts_sample_summary(input[0], output[0], SAMPLES)
+    run: counts_sample_summary(input[0], output[0], SAMPLES)
 
 rule counts_run_summary:
     """A per-run summary of raw read counts."""
     output: "analysis/reporting/counts_by_run.csv"
     input: "analysis/reporting/counts_by_sample.csv"
-    run: igseq.reporting.counts_run_summary(input[0], output[0])
+    run: counts_run_summary(input[0], output[0])
 
 # Specimen+chain -based
 
@@ -153,19 +167,19 @@ rule counts_presto_amplicon_summary:
     """A per-amplicon summary of read counts."""
     output: "analysis/reporting/counts_amplicon_summary.csv"
     input: TARGET_AMPLICON_COUNTS
-    run: igseq.reporting.counts_specimen_summary(input, output[0], SPECIMENS)
+    run: counts_specimen_summary(input, output[0], SPECIMENS)
 
 rule counts_presto_assembly_summary:
     """A per-specimen summary of paired read counts."""
     output: "analysis/reporting/counts_assembly_summary.csv"
     input: TARGET_ASSEMBLY_COUNTS
-    run: igseq.reporting.counts_assembly_summary(input, output[0], SPECIMENS)
+    run: counts_assembly_summary(input, output[0], SPECIMENS)
 
 rule counts_presto_qual_summary:
     """A per-specimen summary of paired read counts."""
     output: "analysis/reporting/counts_presto_qual_summary.csv"
     input: TARGET_PRESTO_QUAL_COUNTS
-    run: igseq.reporting.counts_presto_qual_summary(input, output[0], SPECIMENS)
+    run: counts_presto_qual_summary(input, output[0], SPECIMENS)
 
 # TODO next: also tally after pRESTO's QC and primer checking.  Maybe do a
 # summary table in the report of counts following assembly, qc, and primer
@@ -199,7 +213,7 @@ rule igdiscover_allele_alignments_table:
     output: csv="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.csv"
     input: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.fasta"
     run:
-        igseq.reporting.convert_combined_alignment(
+        convert_combined_alignment(
             input.fasta, output.csv, SPECIMENS, ANTIBODY_ISOLATES, wildcards)
 
 rule igdiscover_allele_alignments_align_vdj:
@@ -215,7 +229,7 @@ rule igdiscover_allele_alignments_align_vdj:
             with_d = input.with_d
         else:
             with_d = None
-        igseq.reporting.combine_aligned_segments(\
+        combine_aligned_segments(\
             input.target, input.with_v, with_d, input.with_j, output.fasta)
 
 rule igdiscover_allele_alignments_align_j:
@@ -225,7 +239,7 @@ rule igdiscover_allele_alignments_align_j:
         target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
         with_d="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta",
         j="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/J.fasta"
-    run: igseq.reporting.align_next_segment(input.target, input.with_d, input.j, output.fasta)
+    run: align_next_segment(input.target, input.with_d, input.j, output.fasta)
 
 rule igdiscover_allele_alignments_align_d:
     """Align discovered D alleles to target sequences based on V alignment."""
@@ -236,7 +250,7 @@ rule igdiscover_allele_alignments_align_d:
         d="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/D.fasta"
     run:
         if wildcards.chain == "heavy":
-            igseq.reporting.align_next_segment(
+            align_next_segment(
                 input.target, input.with_v, input.d, output.fasta)
         else:
             shell("cp {input.with_v} {output.fasta}")
@@ -274,10 +288,9 @@ rule align_targets:
             fi
         """
 
-
 rule gather_antibody_sequences:
     """Gather mature antibody sequences to start off the alignment against."""
     output: "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.fasta"
     run:
-        igseq.reporting.gather_antibodies(
+        gather_antibodies(
             wildcards.antibody_lineage, wildcards.chain, ANTIBODY_ISOLATES, output[0])
