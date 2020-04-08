@@ -79,7 +79,7 @@ rule get_data:
     files.  (Add location of bcl2fatq to PATH if needed.)  If not, download from
     URLs listed in metadata.
     """
-    output: expand("data/{run}/" + RAW, run = "{run}", rp = ["R1", "R2", "I1"])
+    output: protected(expand("data/{run}/" + RAW, run = "{run}", rp = ["R1", "R2", "I1"]))
     input: lambda w: checkpoints.get_metadata.get().output
     params: runpath="/seq/runs"
     run: igseq.data.get_data(wildcards.run, Path(output[0]).parent, RUNS, params.runpath)
