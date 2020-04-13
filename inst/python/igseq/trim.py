@@ -2,8 +2,11 @@
 Helpers for trimming raw reads.
 """
 
+import logging
 from igseq.util import revcmp
 from igseq.data import MetadataError
+
+LOGGER = logging.getLogger(__name__)
 
 def adapter_fwd(sample, sequences):
     """Get the adapter sequence to trim off the end of R1.
@@ -51,6 +54,13 @@ def adapter_rev(sample, sequences):
         p5seq = sequences["P5_Seq"]["Seq"]
     except KeyError:
         raise MetadataError("Missing entry in sequence metadata: P5_Seq")
-    barcode = sample["BarcodeFwdAttrs"]["Seq"]
+    try:
+        bcattrs = sample["BarcodeFwdAttrs"]
+    except KeyError:
+        LOGGER.error(
+            "adapter_rev: No forward barcode for %s, trimming by P5_Seq only",
+            sample["Sample"])
+        return revcmp(p5seq)
+    barcode = bcattrs["Seq"]
     # Reverse complement the barcode and prepend to the constant region.
     return revcmp(barcode) + revcmp(p5seq)
