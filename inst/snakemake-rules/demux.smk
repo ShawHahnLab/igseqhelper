@@ -25,7 +25,7 @@ def demux_input_for(runattrs):
     elif runattrs["DemuxBy"] == "barcode":
         suffix = "fastq.gz"
     def demux_input(wildcards):
-        paths = expand("analysis/{run}/chunk_{chunk}_{rp}.{suffix}",
+        paths = expand("analysis/data/{run}/chunk_{chunk}_{rp}.{suffix}",
             run=runid, chunk=wildcards.chunk, rp=keys, suffix=suffix)
         return dict(zip(keys, paths))
     return demux_input
@@ -45,14 +45,14 @@ for runid in RUNS.keys():
     # Gather samples for just this run
     samples = gather_samples_for_demux(SAMPLES, runid)
     rule:
-        message: "demultiplexing chunk {chunk} for {run}".format(chunk=wildcards.chunk, run=runid)
-        output: "analysis/demux/{run}/{chunk}/{sample}.{rp}.fastq.gz", run=runid, sample=samples.keys(), rp=["R1", "R2", "I1"]))
-        input: unpack(demux_input_for(runid))
+        message: "demultiplexing chunk {{wildcards.chunk}} for {run}".format(run=runid)
+        output: expand("analysis/demux/{run}/{{chunk}}/{sample}.{rp}.fastq.gz", run=runid, sample=samples.keys(), rp=["R1", "R2", "I1"])
+        input: unpack(demux_input_for(RUNS[runid]))
         params:
             samples=samples,
             runattrs=RUNS[runid],
             outdir="analysis/demux/{run}".format(run=runid)
-        log: "analysis/logs/demux.{run}.tsv".format(run=runid)
+        log: "analysis/logs/demux/{run}/{{chunk}}.tsv".format(run=runid)
         run:
             with open(log[0], "w") as f_log:
                 demux(
@@ -110,7 +110,8 @@ rule igblast_db:
     shell: "makeblastdb -dbtype nucl -parse_seqids -in {input}"
 
 TARGET_DEMUX = expand(
-    outputs_per_run("analysis/demux/{run}/{sample}.{{rp}}.fastq.gz", SAMPLES),
+    outputs_per_run("analysis/demux/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz", SAMPLES),
+    chunk=make_chunk_str(20),
     rp=["R1", "R2", "I1"])
 
 rule all_demux:
