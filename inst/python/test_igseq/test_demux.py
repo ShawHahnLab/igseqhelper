@@ -7,7 +7,7 @@ from pathlib import Path
 from io import StringIO
 from tempfile import TemporaryDirectory
 from Bio import SeqIO
-from igseq.demux import (assign_barcode_fwd, assign_barcode_rev, demux, DemuxError)
+from igseq.demux import (assign_barcode_fwd, assign_barcode_rev, demux_by_barcode, DemuxError)
 from test_igseq.util import DATA
 
 
@@ -109,13 +109,13 @@ class TestDemux(unittest.TestCase):
         self.assertEqual(assigned, barcode_expected)
         self.assertEqual(stream.getvalue(), self.expected["stream_rev"])
 
-    def test_demux(self):
+    def test_demux_by_barcode(self):
         """Try demuxing a read pair using R1 and I1."""
         path_pat = str(DATA / "demux/demux_%s_%s.fastq.gz") % (self.record, "%s")
         fps = {key: path_pat % key for key in ("R1", "R2", "I1")}
         stream = StringIO()
         with TemporaryDirectory() as outdir:
-            demux(self.samples, fps, outdir, send_stats=stream)
+            demux_by_barcode(self.samples, fps, outdir, send_stats=stream)
             files_observed = sorted([str(x.name) for x in Path(outdir).iterdir()])
             self.assertEqual(files_observed, self.expected["files"])
             # Grab a simple structure of the read data: for each sample, a list
@@ -245,12 +245,12 @@ class TestDemuxRevcmp(TestDemux):
         self.assertEqual(assigned, barcode_expected)
         self.assertEqual(stream.getvalue(), self.expected["stream_rev"])
 
-    def test_demux(self):
+    def test_demux_by_barcode(self):
         path_pat = str(DATA / "demux/demux_%s_%s.fastq.gz") % (self.record, "%s")
         fps = {key: path_pat % key for key in ("R1", "R2", "I1")}
         stream = StringIO()
         with TemporaryDirectory() as outdir:
-            demux(self.samples, fps, outdir, dorevcmp=True, send_stats=stream)
+            demux_by_barcode(self.samples, fps, outdir, dorevcmp=True, send_stats=stream)
             files_observed = sorted([str(x.name) for x in Path(outdir).iterdir()])
             self.assertEqual(files_observed, self.expected["files"])
             sample_data = self.load_trio(outdir)
@@ -296,7 +296,7 @@ class TestDemuxIDMismatch(TestDemux):
             "stream_rev": stream_rev
             }
 
-    def test_demux(self):
+    def test_demux_by_barcode(self):
         """Test demux for mismatched sequence IDs.
 
         Here we should get a DemuxError because the sequence ID isn't identical
@@ -307,4 +307,4 @@ class TestDemuxIDMismatch(TestDemux):
         stream = StringIO()
         with TemporaryDirectory() as outdir:
             with self.assertRaises(DemuxError):
-                demux(self.samples, fps, outdir, dorevcmp=True, send_stats=stream)
+                demux_by_barcode(self.samples, fps, outdir, dorevcmp=True, send_stats=stream)

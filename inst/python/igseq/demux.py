@@ -18,7 +18,8 @@ from pathlib import Path
 from collections import defaultdict
 from Bio import SeqIO
 from Bio.Align import PairwiseAligner
-from igseq.util import revcmp
+from igseq.util import revcmp, normalize_read_files
+from igseq.data import MetadataError
 
 LOGGER = logging.getLogger(__name__)
 PID = os.getpid()
@@ -28,30 +29,68 @@ DEMUX_ALIGNER = PairwiseAligner()
 DEMUX_ALIGNER.target_internal_gap_score = -1000
 DEMUX_ALIGNER.query_internal_gap_score = -1000
 
-
 class DemuxError(Exception):
     """A special exception for demultiplexing problems."""
 
 
-def demux(samples, fps, outdir=".", output_files=None, dorevcmp=False, send_stats=sys.stdout):
+def check_can_demux_by_igblast(samples, runid):
+    """Check if demultiplexing via IgBLAST makes sense for these samples."""
+    cts = {"heavy": 0, "light": 0}
+    for sample_name, sample in samples.items():
+        cts[sample["Chain"]] += 1
+    if cts["heavy"] > 1 or cts["light"] > 1:
+        raise MetadataError(
+            ("IgBLAST demux specified for run %s, "
+             "but more than one heavy/light sample found") % runid)
+
+def demux(samples, fps, runattrs, outdir=".", send_stats=sys.stdout):
+    """Demultiplex one run.
+
+    samples: dictionary of sample attributes for this run
+    fps: either dict of "R1", "R2", and "I1" keys pointing to file paths to
+         fastq.gz, or path to directory containing the fastq.gz files.
+    outdir: output directory to write demultiplexed fastq.gz files to
+    send_stats: file object to write a table of per-read demux results to
+    """
+    dorevcmp = runattrs["ReverseComplement"] == "1"
+    if runattrs["DemuxBy"] == "igblast":
+        check_can_demux_by_igblast(samples, runattrs["Run"])
+        demux_by_igblast(samples, fps, outdir, dorevcmp=dorevcmp, send_stats=send_stats)
+    elif runattrs["DemuxBy"] == "barcode":
+        demux_by_barcode(samples, fps, outdir, dorevcmp=dorevcmp, send_stats=send_stats)
+    else:
+        raise ValueError("Run %s has DemuxBy of %s, should be barcode or igblast" % (
+            runattrs["Run"], runattrs["DemuxBy"]))
+
+def demux_by_igblast(
+        samples, fps, outdir=".", dorevcmp=False, send_stats=sys.stdout):
+    """Demultiplex one run based on sequence content.
+
+    This is only feasible if a run contains reads for only one specimen and
+    heavy/light chain is the only distinguishing characteristic.
+    """
+    raise NotImplementedError
+
+def demux_by_barcode(
+        samples, fps, outdir=".", dorevcmp=False, send_stats=sys.stdout):
     """Demultiplex one run based on dictionaries of sample and barcode data.
 
     samples: dictionary of sample attributes for this run
-    fps: dict of "R1", "R2", and "I1" keys pointing to file paths to fastq.gz.
+    fps: either dict of "R1", "R2", and "I1" keys pointing to file paths to
+         fastq.gz, or path to directory containing the fastq.gz files.
     outdir: output directory to write demultiplexed fastq.gz files to
-    output_files: expected output files; will touch empty ones if any aren't expected
     dorevcmp: reverse-complement R1 and R2 during demultiplexing?
     send_stats: file object to write a table of per-read demux results to
     """
     # pylint: disable=too-many-arguments
     LOGGER.debug("%d demux: dorevcmp: %s", PID, str(dorevcmp))
-    if not output_files:
-        output_files = []
-    else:
-        output_files = [Path(fp) for fp in output_files]
     Path(outdir).mkdir(parents=True, exist_ok=True)
-    for key in fps:
-        LOGGER.debug("%d demux: %s input file: %s", PID, key, fps[key])
+    # either a dictionary, or a single directory path
+    try:
+        for key, val in fps.items():
+            LOGGER.debug("%d demux: %s input file: %s", PID, key, val)
+    except AttributeError:
+        LOGGER.debug("%d demux: input path: %s", PID, fps)
     # NOTE
     # with too many samples at once, this will cause an OS error due to too
     # many open files. In that case we'd have to open/close as needed.  It's
@@ -83,13 +122,6 @@ def demux(samples, fps, outdir=".", output_files=None, dorevcmp=False, send_stat
             f_out.close()
         for f_out in f_outs["I1"].values():
             f_out.close()
-    fp_outs_all = \
-        list(fp_outs["R1"].values()) + \
-        list(fp_outs["R2"].values()) + \
-        list(fp_outs["I1"].values())
-    for extra in set(output_files) - set(fp_outs_all):
-        with gzip.open(extra, "wt") as _:
-            pass
 
 def _fqparse(f_in):
     """Convenience wrapper for FASTQ parser."""
@@ -106,36 +138,37 @@ def _trio_demux(fps, f_outs, samples, dorevcmp, send_stats):
         LOGGER.debug("%d barcode map: %s -> %s", PID, str(key), bc_map[key])
     counter = 0
     hits = defaultdict(int)
-    with _open_gzips(fps, "rt") as hndls:
-        for trio in zip(_fqparse(hndls["R1"]), _fqparse(hndls["R2"]), _fqparse(hndls["I1"])):
-            if not trio[0].id == trio[1].id == trio[2].id:
-                raise DemuxError("Sequence ID mismatch between R1/R2/I1")
-            trio = list(trio)
-            if dorevcmp:
-                trio[0] = revcmp(trio[0])
-                trio[1] = revcmp(trio[1])
-                trio[2] = revcmp(trio[2])
-            assigned = (
-                assign_barcode_fwd(trio[0], barcodes["F"], send_stats=send_stats),
-                assign_barcode_rev(trio[2], barcodes["R"], send_stats=send_stats))
-            hits[assigned] += 1
-            # trim barcode from forward read
-            if assigned[0]:
-                trio[0] = trio[0][len(assigned[0]):]
-            SeqIO.write(trio[0], f_outs["R1"][str(bc_map.get(assigned))], "fastq")
-            SeqIO.write(trio[1], f_outs["R2"][str(bc_map.get(assigned))], "fastq")
-            SeqIO.write(trio[2], f_outs["I1"][str(bc_map.get(assigned))], "fastq")
-            # Log message every 10,000th read trio
-            if counter % 10000 == 0:
-                keys = sorted(hits, key=hits.__getitem__)[::-1]
-                if len(keys) > 1:
-                    LOGGER.debug(
-                        "%d read trio %d: top hits so far: %s (%d reads), %s (%d reads)",
-                        PID,
-                        counter,
-                        str(keys[0]), hits[keys[0]],
-                        str(keys[1]), hits[keys[1]])
-            counter += 1
+    for fp_trio in normalize_read_files(fps):
+        with _open_gzips(fp_trio, "rt") as hndls:
+            for trio in zip(_fqparse(hndls["R1"]), _fqparse(hndls["R2"]), _fqparse(hndls["I1"])):
+                if not trio[0].id == trio[1].id == trio[2].id:
+                    raise DemuxError("Sequence ID mismatch between R1/R2/I1")
+                trio = list(trio)
+                if dorevcmp:
+                    trio[0] = revcmp(trio[0])
+                    trio[1] = revcmp(trio[1])
+                    trio[2] = revcmp(trio[2])
+                assigned = (
+                    assign_barcode_fwd(trio[0], barcodes["F"], send_stats=send_stats),
+                    assign_barcode_rev(trio[2], barcodes["R"], send_stats=send_stats))
+                hits[assigned] += 1
+                # trim barcode from forward read
+                if assigned[0]:
+                    trio[0] = trio[0][len(assigned[0]):]
+                SeqIO.write(trio[0], f_outs["R1"][str(bc_map.get(assigned))], "fastq")
+                SeqIO.write(trio[1], f_outs["R2"][str(bc_map.get(assigned))], "fastq")
+                SeqIO.write(trio[2], f_outs["I1"][str(bc_map.get(assigned))], "fastq")
+                # Log message every 10,000th read trio
+                if counter % 10000 == 0:
+                    keys = sorted(hits, key=hits.__getitem__)[::-1]
+                    if len(keys) > 1:
+                        LOGGER.debug(
+                            "%d read trio %d: top hits so far: %s (%d reads), %s (%d reads)",
+                            PID,
+                            counter,
+                            str(keys[0]), hits[keys[0]],
+                            str(keys[1]), hits[keys[1]])
+                counter += 1
 
 @contextmanager
 def _open_gzips(filenames, *args, **kwargs):

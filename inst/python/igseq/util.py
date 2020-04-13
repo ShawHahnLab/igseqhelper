@@ -2,10 +2,16 @@
 Misc utility functions.
 """
 import re
+import builtins
+import logging
+from math import ceil, log10
+from pathlib import Path
 from Bio import Phylo
 from Bio.Seq import Seq
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
+
+LOGGER = logging.getLogger(__name__)
 
 # https://www.bioinformatics.org/sms/iupac.html
 # With added stubs to more easily handle regular bases and gaps
@@ -161,3 +167,90 @@ def flatten(iterable):
         except TypeError:
             flat.append(obj)
     return flat
+
+def normalize_read_files(fps):
+    """Handle either a dict of R1/R2/I1 or a directory path, creating a list of dicts."""
+    try:
+        if Path(fps).is_dir():
+            fps = Path(fps).glob("*.fastq.gz")
+        else:
+            raise ValueError("give either R1/R2/I1 dict or directory path for demux")
+    except TypeError:
+        return [fps]
+    sets = {"R1": [], "R2": [], "I1": []}
+    samples = {"R1": [], "R2": [], "I1": []}
+    pattern = r"([^/]+)_S([0-9]+)_L[0-9]{3}_(R1|R2|I1|I2)_001*\.fastq\.gz"
+    for path in fps:
+        match = re.search(pattern, str(path))
+        if match.group(3) in sets:
+            sets[match.group(3)].append(path)
+            samples[match.group(3)].append(match.group(1))
+    if not samples["R1"] == samples["R2"] == samples["I1"]:
+        raise ValueError("Sample name mismatch between R1/R2/I1")
+    sets = zip(sets["R1"], sets["R2"], sets["I1"])
+    return [dict(zip(["R1", "R2", "I1"], s)) for s in sets]
+
+def make_chunk_str(count):
+    """10 -> ["001", "002", ..., "010"]"""
+    pad = max(3, ceil(log10(count)))
+    return [str(num+1).zfill(pad) for num in range(count)]
+
+class RoundRobinWriter:
+    """Split write calls cyclically to a list of files.
+
+    For example, if write is called 1000 times and three output filenames are
+    given, the first output file will have 334 writes and the second and third
+    will have 333 each.  If write is only called once, the second and third
+    file will exist but will be left empty. RoundRobinWriter objects implement
+    just three file-like methods: open, close, and write.  For this to work
+    each call to write must contain exactly one record.
+    """
+
+    def __init__(self, file_paths_out, opener=builtins.open, **kwargs):
+        """Set up output filenames and opener function.
+
+        open() isn't called yet.  That happens either explicitly or when
+        __enter__ is called as in "with RoundRobinWriter(...) as ...".  By
+        default the builtin file open function is used, but another open
+        function can supplied such as gzip.open.  Any other arguments are
+        passed to the opener when it is called.
+        """
+        LOGGER.info("RoundRobinWriter: file_paths_out: %s", file_paths_out)
+        LOGGER.info("RoundRobinWriter: opener: %s", opener)
+        self.file_paths_out = file_paths_out
+        self.files_out = None
+        self.opener = opener
+        self.idx = 0
+        self.kwargs = kwargs
+        self.kwargs["mode"] = self.kwargs.get("mode", "wt")
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type:
+            LOGGER.error("RoundRobinWriter: exc_type: %s", exc_type)
+            LOGGER.error("RoundRobinWriter: exc_value: %s", exc_value)
+            LOGGER.error("RoundRobinWriter: traceback: %s", traceback)
+        self.close()
+
+    def open(self):
+        """Open output files for writing."""
+        LOGGER.info("RoundRobinWriter: open")
+        self.files_out = [self.opener(fp, **self.kwargs) for fp in self.file_paths_out]
+
+    def close(self):
+        """Close all open file handles."""
+        LOGGER.info("RoundRobinWriter: close")
+        for obj in self.files_out:
+            obj.close()
+
+    def write(self, txt):
+        """File-like write method.
+
+        Bio.SeqIO.write calls _FormatToString[format] to get each txt for each
+        record, and calls fp.write once for each record.
+        """
+        self.files_out[self.idx].write(txt)
+        self.idx = (self.idx + 1) % len(self.file_paths_out)

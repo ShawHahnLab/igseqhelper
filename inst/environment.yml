@@ -13,6 +13,7 @@ dependencies:
   - cutadapt
   - rpy2
   - imagemagick
+  - igblast
   # For R package
   - r-devtools
   - r-ggplot2
