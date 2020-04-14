@@ -6,10 +6,11 @@ barcode arguments.
 """
 
 from igseq.trim import (adapter_fwd, adapter_rev)
+from igseq.util import make_chunk_str
 
 TARGET_TRIMMED = expand(
-    outputs_per_run("analysis/trim/{run}/{sample}.{{rp}}.fastq.gz", SAMPLES),
-    rp=["R1", "R2"])
+    outputs_per_run("analysis/trim/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz", SAMPLES),
+    chunk=make_chunk_str(20), rp=["R1", "R2"])
 
 rule all_trim:
     input: TARGET_TRIMMED
@@ -21,11 +22,11 @@ rule all_trim:
 # chance of getting mixed in with the biological sequence content.
 rule trim:
     output:
-        r1="analysis/trim/{run}/{sample}.R1.fastq.gz",
-        r2="analysis/trim/{run}/{sample}.R2.fastq.gz"
+        r1="analysis/trim/{run}/{chunk}/{sample}.R1.fastq.gz",
+        r2="analysis/trim/{run}/{chunk}/{sample}.R2.fastq.gz"
     input:
-        r1="analysis/demux/{run}/{sample}.R1.fastq.gz",
-        r2="analysis/demux/{run}/{sample}.R2.fastq.gz"
+        r1="analysis/demux/{run}/{chunk}/{sample}.R1.fastq.gz",
+        r2="analysis/demux/{run}/{chunk}/{sample}.R2.fastq.gz"
     threads: 4
     params:
         adapter_R1=lambda w: adapter_fwd(SAMPLES[w.sample], SEQUENCES),
@@ -36,7 +37,7 @@ rule trim:
         # https://cutadapt.readthedocs.io/en/stable/guide.html#quality-trimming
         # https://cutadapt.readthedocs.io/en/stable/algorithms.html#quality-trimming-algorithm
         quality_cutoff=15
-    log: "analysis/logs/trim.{run}.{sample}.log"
+    log: "analysis/logs/trim.{run}.{chunk}.{sample}.log"
     shell:
         """
             cutadapt --cores {threads} --quality-cutoff {params.quality_cutoff} \
