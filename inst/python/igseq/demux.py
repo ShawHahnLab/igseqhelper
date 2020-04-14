@@ -176,6 +176,7 @@ def _open_gzips(filenames, *args, **kwargs):
 
     Any additional arguments will be passed to gzip.open.
     """
+    handles = dict()
     try:
         handles = {key: gzip.open(filenames[key], *args, **kwargs) for key in filenames}
         # run the code
