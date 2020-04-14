@@ -2,10 +2,8 @@
 Custom demultiplexing for our IgSeq protocol.
 """
 
-import gzip
-from Bio import SeqIO
-from igseq.demux import demux, normalize_read_files
-from igseq.igblast import tabulate_igblast
+from pathlib import Path
+from igseq.demux import demux
 from igseq.util import make_chunk_str
 
 def gather_samples_for_demux(samples_all, runid):
@@ -27,7 +25,8 @@ def demux_input_for(runattrs):
     def demux_input(wildcards):
         paths = expand("analysis/data/{run}/chunk_{chunk}_{rp}.{suffix}",
             run=runid, chunk=wildcards.chunk, rp=keys, suffix=suffix)
-        return dict(zip(keys, paths))
+        targets = dict(zip(keys, paths))
+        return targets
     return demux_input
 
 # Inspired by the for loop that makes rules on the fly from IgDiscover:
@@ -51,32 +50,18 @@ for runid in RUNS.keys():
         params:
             samples=samples,
             runattrs=RUNS[runid],
-            outdir="analysis/demux/{run}".format(run=runid)
         log: "analysis/logs/demux/{run}/{{chunk}}.tsv".format(run=runid)
         run:
             with open(log[0], "w") as f_log:
                 demux(
                     samples=params.samples,
-                    fps=input,
+                    fps=dict(input),
                     runattrs=params.runattrs,
-                    outdir=params.outdir,
+                    outdir=Path(output[0]).parent,
                     send_stats=f_log)
 
-rule igblast_parse:
-    output: "analysis/data/igblast/{run}/chunk_{chunk}.csv"
-    input: "analysis/data/igblast/{run}/chunk_{chunk}.txt"
-    run: tabulate_igblast(input[0], output[0])
-
-rule igblast_seqids_by_chain:
-    """Split AIRR table of blast results in heavy and light."""
-    output:
-        heavy="analysis/data/igblast/{run}/chunk_{chunk}.heavy.txt",
-        light="analysis/data/igblast/{run}/chunk_{chunk}.light.txt"
-    input: "analysis/data/igblast/{run}/chunk_{chunk}.txt"
-    run: split_igblast_seqids_by_chain(input[0], output.heavy, output.light)
-
 rule igblast_raw:
-    output: "analysis/data/igblast/{run}/chunk_{chunk}.txt"
+    output: "analysis/data/igblast/{run}/chunk_{chunk}_airr.tsv"
     input:
         query="analysis/data/{run}/chunk_{chunk}_R1.fasta",
         db_v="analysis/data/igblast/v.fasta.nhr",
