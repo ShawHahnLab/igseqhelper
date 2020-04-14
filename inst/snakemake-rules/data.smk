@@ -7,7 +7,7 @@ done in analysis/data/{run}/.
 
 from pathlib import Path
 import igseq.data
-from igseq.util import make_chunk_str
+from igseq.util import make_chunk_str, normalize_read_files
 
 rule all_get_data:
     """Get data files for all sequencing runs.
