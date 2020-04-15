@@ -1,0 +1,9 @@
+# Just a variant of CircleCI's hello world to start with
+version: 2.1
+jobs:
+  build:
+    machine:
+      image: circleci/classic:latest
+    steps:
+      - checkout
+      - run: echo "hello world"
