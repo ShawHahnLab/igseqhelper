@@ -15,6 +15,7 @@ See also:
 
 from igseq.data import amplicon_files
 from igseq.presto import (PRESTO_OPTS, prep_primers_fwd)
+from igseq.util import make_chunk_str
 
 TARGET_PRESTO_DATA = expand(amplicon_files("analysis/presto/data/{chain}.{chain_type}/{specimen}.{{rp}}.fastq", SAMPLES, "IgG+"), rp=["R1", "R2"])
 TARGET_PRESTO_ASSEMBLY = amplicon_files("analysis/presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES, "IgG+")
@@ -41,15 +42,16 @@ def trimmed_specimen_samples(wildcards):
     We may have prepped and sequenced the same specimen multiple times so this
     will give a list of one or more files.
     """
-    pattern = "analysis/trim/{run}/{sample}.{rp}.fastq.gz"
+    pattern = "analysis/trim/{run}/{chunk}/{sample}.{rp}.fastq.gz"
     filepaths = []
     for samp_name, samp_attrs in SAMPLES.items():
         if \
             samp_attrs["Specimen"] == wildcards.specimen and \
             samp_attrs["Chain"] == wildcards.chain and \
             samp_attrs["Type"] == wildcards.chain_type:
-            filepaths.append(pattern.format(
+            filepaths.extend(expand(pattern,
                 run=samp_attrs["Run"],
+                chunk=make_chunk_str(20),
                 sample=samp_name,
                 rp=wildcards.rp))
     if not filepaths:
