@@ -15,7 +15,6 @@ See also:
 
 from igseq.data import amplicon_files
 from igseq.presto import (PRESTO_OPTS, prep_primers_fwd)
-from igseq.util import make_chunk_str
 
 TARGET_PRESTO_DATA = expand(amplicon_files("analysis/presto/data/{chain}.{chain_type}/{specimen}.{{rp}}.fastq", SAMPLES, "IgG+"), rp=["R1", "R2"])
 TARGET_PRESTO_ASSEMBLY = amplicon_files("analysis/presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES, "IgG+")
@@ -36,36 +35,13 @@ rule all_presto:
 
 ### Before pRESTO: demultiplex, trim reads. now, gather input data
 
-def trimmed_specimen_samples(wildcards):
-    """Get trimmed sequencer samples matching specimen+antibody type.
-
-    We may have prepped and sequenced the same specimen multiple times so this
-    will give a list of one or more files.
-    """
-    pattern = "analysis/trim/{run}/{chunk}/{sample}.{rp}.fastq.gz"
-    filepaths = []
-    for samp_name, samp_attrs in SAMPLES.items():
-        if \
-            samp_attrs["Specimen"] == wildcards.specimen and \
-            samp_attrs["Chain"] == wildcards.chain and \
-            samp_attrs["Type"] == wildcards.chain_type:
-            filepaths.extend(expand(pattern,
-                run=samp_attrs["Run"],
-                chunk=make_chunk_str(20),
-                sample=samp_name,
-                rp=wildcards.rp))
-    if not filepaths:
-        raise ValueError("No matching samples found for %s & %s & %s" %
-            (wildcards.specimen, wildcards.chain, wildcards.chain_type))
-    return filepaths
-
 rule presto_data:
     """Aggregate trimmed sequencer samples into per-specimen FASTQ files.
 
     pRESTO uses plaintext FASTQ so we'll leave them uncompressed, too.
     """
-    output: "analysis/presto/data/{chain}.{chain_type}/{specimen}.{rp}.fastq"
-    input: trimmed_specimen_samples
+    output: temp("analysis/presto/data/{chain}.{chain_type}/{specimen}.{rp}.fastq")
+    input: "analysis/reads-by-specimen/{chain}.{chain_type}/{specimen}.{rp}.fastq.gz"
     shell: "zcat {input} > {output}"
 
 rule presto_primers:

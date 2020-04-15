@@ -4,7 +4,7 @@ Custom demultiplexing for our IgSeq protocol.
 
 from pathlib import Path
 from igseq.demux import demux
-from igseq.util import make_chunk_str
+from igseq.util import normalize_read_files
 
 def gather_samples_for_demux(samples_all, runid):
     """Make dictionary of sample names to attrs for a given Run ID."""
@@ -57,6 +57,20 @@ for runid in RUNS.keys():
                     outdir=Path(output[0]).parent,
                     send_stats=f_log)
 
+rule chunk_raw_data:
+    """Split all fastq.gz files from run into fixed number of chunks.
+
+    This will let us parallelize the demultiplexing and any intermediate steps
+    and hides inconsistencies between raw outputs between runs (some maybe were
+    purportedly demultiplexed by the sequencer, some not).
+    """
+    output: expand("analysis/data/{{run}}/chunk_{chunk}_{{rp}}.fastq.gz", chunk=CHUNKS)
+    input: "data/{run}"
+    run:
+        fp_sets = normalize_read_files(input[0])
+        input_paths = [x[wildcards.rp] for x in fp_sets]
+        igseq.data.chunk_fqgz(input_paths, output)
+
 rule igblast_raw:
     output: "analysis/data/igblast/{run}/chunk_{chunk}_airr.tsv"
     input:
@@ -93,7 +107,7 @@ rule igblast_db:
 
 TARGET_DEMUX = expand(
     outputs_per_run("analysis/demux/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz", SAMPLES),
-    chunk=make_chunk_str(20),
+    chunk=CHUNKS,
     rp=["R1", "R2", "I1"])
 
 rule all_demux:

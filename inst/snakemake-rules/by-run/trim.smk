@@ -6,11 +6,10 @@ barcode arguments.
 """
 
 from igseq.trim import (adapter_fwd, adapter_rev)
-from igseq.util import make_chunk_str
 
 TARGET_TRIMMED = expand(
     outputs_per_run("analysis/trim/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz", SAMPLES),
-    chunk=make_chunk_str(20), rp=["R1", "R2"])
+    chunk=CHUNKS, rp=["R1", "R2"])
 
 rule all_trim:
     input: TARGET_TRIMMED

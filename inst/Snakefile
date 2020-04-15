@@ -36,11 +36,9 @@ wildcard_constraints:
 include: "snakemake-rules/counts.smk"
 include: "snakemake-rules/metadata.smk"
 include: "snakemake-rules/data.smk"
-include: "snakemake-rules/demux.smk"
-include: "snakemake-rules/trim.smk"
-include: "snakemake-rules/presto.smk"
-include: "snakemake-rules/igdiscover.smk"
-include: "snakemake-rules/sonar.smk"
+include: "snakemake-rules/by-run/by-run.smk"
+include: "snakemake-rules/by-specimen/by-specimen.smk"
+include: "snakemake-rules/by-subject/by-subject.smk"
 include: "snakemake-rules/reporting.smk"
 
 # TODO this should be the final sonar output, once up to date, and should
