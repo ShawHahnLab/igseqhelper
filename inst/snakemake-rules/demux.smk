@@ -18,10 +18,7 @@ def demux_input_for(runattrs):
     """Make Snakemake input function for demuxing a given run."""
     keys = ["R1", "R2", "I1"]
     runid=runattrs["Run"]
-    if runattrs["DemuxBy"] == "igblast":
-        suffix = "fasta"
-    elif runattrs["DemuxBy"] == "barcode":
-        suffix = "fastq.gz"
+    suffix = "fastq.gz"
     def demux_input(wildcards):
         paths = expand("analysis/data/{run}/chunk_{chunk}_{rp}.{suffix}",
             run=runid, chunk=wildcards.chunk, rp=keys, suffix=suffix)

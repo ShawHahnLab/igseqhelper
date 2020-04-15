@@ -53,14 +53,7 @@ def demux(samples, fps, runattrs, outdir=".", send_stats=sys.stdout):
     send_stats: file object to write a table of per-read demux results to
     """
     dorevcmp = runattrs["ReverseComplement"] == "1"
-    if runattrs["DemuxBy"] == "igblast":
-        check_can_demux_by_igblast(samples, runattrs["Run"])
-        demux_by_igblast(samples, fps, outdir, dorevcmp=dorevcmp, send_stats=send_stats)
-    elif runattrs["DemuxBy"] == "barcode":
-        demux_by_barcode(samples, fps, outdir, dorevcmp=dorevcmp, send_stats=send_stats)
-    else:
-        raise ValueError("Run %s has DemuxBy of %s, should be barcode or igblast" % (
-            runattrs["Run"], runattrs["DemuxBy"]))
+    demux_by_barcode(samples, fps, outdir, dorevcmp=dorevcmp, send_stats=send_stats)
 
 def demux_by_igblast(
         samples, fps, outdir=".", dorevcmp=False, send_stats=sys.stdout):
