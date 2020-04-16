@@ -6,7 +6,8 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-        keys: [ cache-{{ checksum "inst/environment.yml" }} ]
+        keys:
+          - cache-{{ checksum "inst/environment.yml" }}
       - run:
         name: install
         command: |
