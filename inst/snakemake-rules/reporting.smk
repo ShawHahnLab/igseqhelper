@@ -110,8 +110,8 @@ rule render_report:
 rule qualtrim_grid:
     """Make a CSV table summarizing cutadapt trim cutoffs vs output length."""
     output: "analysis/reporting/{run}/qualtrim.{sample}.{rp}.csv"
-    input: "analysis/demux/{run}/{sample}.{rp}.fastq.gz"
-    run: make_qualtrim_csv(input[0], output[0])
+    input: expand("analysis/demux/{{run}}/{chunk}/{{sample}}.{{rp}}.fastq.gz", chunk=CHUNKS)
+    run: make_qualtrim_csv(input, output[0])
 
 def input_sonar_clusters_by_read(w):
     targets = {}

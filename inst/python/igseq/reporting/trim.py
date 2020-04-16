@@ -9,8 +9,11 @@ from Bio import SeqIO
 from cutadapt import qualtrim
 LOGGER = logging.getLogger(__name__)
 
-def make_qualtrim_grid(fqgz_in, qual_breaks=None, len_breaks=None):
+def make_qualtrim_grid(fqgzs_in, qual_breaks=None, len_breaks=None):
     """Tally how many reads would be trimmed to what lengths at what quality cutoffs.
+
+    This runs per-sample but takes a list of fastq.gz paths in to support
+    chunked data.  Just give a list of one to disregard that.
 
     This produces a grid (in the form of a per-quality-beak dictionary with
     each value being a per-length dictionary containing read counts).  Each
@@ -31,24 +34,25 @@ def make_qualtrim_grid(fqgz_in, qual_breaks=None, len_breaks=None):
     len_breaks = sorted(len_breaks)
 
     tally = {b: {lenb: 0 for lenb in len_breaks} for b in qual_breaks}
-    with gzip.open(fqgz_in, "rt") as f_in:
-        for record in SeqIO.parse(f_in, "fastq"):
-            qual = [chr(val+33) for val in record.letter_annotations["phred_quality"]]
-            qual = ''.join(qual)
-            for cutoff in qual_breaks:
-                _, trim = qualtrim.quality_trim_index(qual, 0, cutoff)
-                diffs = [abs(len_break - trim) for len_break in len_breaks]
-                len_break = len_breaks[diffs.index(min(diffs))]
-                tally[cutoff][len_break] += 1
+    for fqgz_in in fqgzs_in:
+        with gzip.open(fqgz_in, "rt") as f_in:
+            for record in SeqIO.parse(f_in, "fastq"):
+                qual = [chr(val+33) for val in record.letter_annotations["phred_quality"]]
+                qual = ''.join(qual)
+                for cutoff in qual_breaks:
+                    _, trim = qualtrim.quality_trim_index(qual, 0, cutoff)
+                    diffs = [abs(len_break - trim) for len_break in len_breaks]
+                    len_break = len_breaks[diffs.index(min(diffs))]
+                    tally[cutoff][len_break] += 1
     return tally
 
-def make_qualtrim_csv(fqgz_in, fp_csv, qual_breaks=None, len_breaks=None):
+def make_qualtrim_csv(fqgzs_in, fp_csv, qual_breaks=None, len_breaks=None):
     """CSV writer for make_qualtrim_grid.
 
     This writes a CSV file with quality cutoffs on rows, sequence lengths on
     columns, and counts of occurrences in each cell.
     """
-    grid = make_qualtrim_grid(fqgz_in, qual_breaks, len_breaks)
+    grid = make_qualtrim_grid(fqgzs_in, qual_breaks, len_breaks)
     keys_qual = sorted(grid.keys())
     keys_len = sorted(grid[keys_qual[0]].keys())
     with open(fp_csv, "wt") as f_out:
