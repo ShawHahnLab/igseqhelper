@@ -58,14 +58,14 @@ def munge_seqid_for_sonar(seqid, seqids_seen):
     seqids_seen.add(new_id)
     return new_id
 
-def gather_mature(antibody_isolates, subject, chain, output_fp):
+def gather_mature(antibody_isolates, antibody_lineage, chain, output_fp):
     """Get the heavy or light antibody sequences for a given subject as FASTA."""
     col_key = {"heavy": "HeavySeq", "light": "LightSeq"}.get(chain)
     if not col_key:
         raise data.MetadataError("chain should be \"heavy\" or \"light\", not \"%s\"" % chain)
     with open(output_fp, "w") as f_out:
         for isolate_name, isolate_attrs in antibody_isolates.items():
-            if isolate_attrs["AntibodyLineageAttrs"]["Subject"] == subject:
+            if isolate_attrs["AntibodyLineage"] == antibody_lineage:
                 seq = isolate_attrs[col_key]
                 seqid = isolate_name + "_" + col_key
                 rec = SeqRecord(Seq(seq), id=seqid, description="")

@@ -127,6 +127,7 @@ rule sonar_gather_germline:
 # conserved region anyway.
 
 rule sonar_module_1:
+    """SONAR 1: Collect good sequences and tabulate AIRR info from raw input."""
     output:
         fasta=(WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa"),
         rearr=(WD_SONAR / "output/tables/{specimen}_rearrangements.tsv"),
@@ -154,12 +155,12 @@ rule sonar_module_1:
         """
 
 rule sonar_gather_mature:
-    """Get heavy or light chain mature antibody sequences for a subject."""
+    """Get heavy or light chain mature antibody sequences for a lineage."""
     output: WD_SONAR.parent / "mab.fasta"
     run:
         igseq.sonar.gather_mature(
             ANTIBODY_ISOLATES,
-            wildcards.subject,
+            wildcards.antibody_lineage,
             wildcards.chain, 
             output[0])
 
@@ -179,6 +180,10 @@ def sonar_allele_j(wildcards):
 
 # Automated intradonor analysis and grouping
 rule sonar_module_2:
+    """SONAR 2: Automated intradonor analysis.
+
+    We're not using this currently; see id_div rules below.
+    """ 
     output: str(WD_SONAR / "output/tables/{specimen}_lineages.txt")
     input: unpack(igseq.sonar.sonar_module_2_inputs)
     singularity: "docker://scharch/sonar"
@@ -216,9 +221,8 @@ rule sonar_module_2:
 # automatic.  The second part-- selecting points on the scatterplots-- is
 # manual and requires X11. (The third is just extracting the selected sequences
 # from the original FASTA.)
-
-# Part 1 of 3: Calculate % identity to each of the mature antibodies.
 rule sonar_module_2_id_div:
+    """SONAR 2: Calc seqs' identity to MABs vs divergence from germline V."""
     output:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab"
     input:
@@ -244,6 +248,7 @@ rule sonar_module_2_id_div:
 # haven't been able to get this part working with snakemake's
 # singularity/docker stuff
 rule sonar_module_2_id_div_island:
+    """SONAR 2: Select "island" of interest from ID/DIV plots."""
     output:
         seqids=WD_SONAR / "output/tables/islandSeqs.txt"
     input:
@@ -263,6 +268,7 @@ rule sonar_module_2_id_div_island:
 
 # Part 3 of 3: Extract those goodVJ cluster sequences given in the id/div lists
 rule sonar_module_2_id_div_getfasta:
+    """SONAR 2: Extract FASTA matching selected island's seq IDs."""
     output:
         fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_islandSeqs.fa"
     input:
@@ -296,7 +302,6 @@ def sonar_module_3_collect_inputs(wildcards):
 
     pattern = str(WD_SONAR.parent /
         "{other_specimen}/output/sequences/nucleotide/{other_specimen}_islandSeqs.fa")
-    # TODO fix this; also make sure chain type is available for other_specimen.
     def filter_sample_md(vec):
         match = lambda trio: trio[1] == wildcards.subject and trio[2] == wildcards.chain_type
         trios = zip(vec, SAMPLE_MD_IGG["subjects"], SAMPLE_MD_IGG["chaintypes"])
@@ -318,7 +323,7 @@ def sonar_module_3_collect_seqs(wildcards, input):
     return " ".join(args)
 
 rule sonar_module_3_collect:
-    """Gather the selected island sequences from each specimen for a given subject and chain."""
+    """SONAR 3: Gather selected sequences from each specimen for given subject and chain."""
     output:
         collected=WD_SONAR / "output/sequences/nucleotide/longitudinal-collected.fa"
     input: unpack(sonar_module_3_collect_inputs)
@@ -334,7 +339,7 @@ rule sonar_module_3_collect:
         """
 
 rule sonar_module_3_igphyml:
-    """Run phylogenetic anaysis and generate tree across specimens for a given subject and chain."""
+    """SONAR 3: Run phylogenetic analysis and generate tree across specimens."""
     output:
         tree=WD_SONAR / "output/longitudinal_igphyml.tree",
         inferred_nucl=WD_SONAR / "output/sequences/nucleotide/longitudinal_inferredAncestors.fa",
