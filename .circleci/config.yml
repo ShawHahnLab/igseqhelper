@@ -6,8 +6,8 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-        keys:
-          - cache-{{ checksum "inst/environment.yml" }}
+          keys:
+            - cache-{{ checksum "inst/environment.yml" }}
       - run:
         name: install
         command: |
@@ -15,5 +15,5 @@ jobs:
           bash Miniconda3-latest-Linux-x86_64.sh -b
           ~/miniconda3/bin/conda update --file inst/environment.yml
       - save_cache:
-        paths: [ ~/miniconda3 ]
-        key: cache-{{ checksum "inst/environment.yml" }}
+          paths: [ ~/miniconda3 ]
+          key: cache-{{ checksum "inst/environment.yml" }}
