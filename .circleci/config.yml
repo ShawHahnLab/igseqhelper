@@ -4,24 +4,25 @@ jobs:
     machine:
       image: circleci/classic:latest
     steps:
-      - checkout
+      - checkout:
+          path: igseq
       - restore_cache:
           keys:
-            - cache-{{ checksum "inst/environment.yml" }}
+            - cache-{{ checksum "igseq/inst/environment.yml" }}
       - run:
           name: Install
           command: |
             if [[ ! -e ~/miniconda3/envs/igseq ]]; then
               wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
               bash Miniconda3-latest-Linux-x86_64.sh -b
-              ~/miniconda3/bin/conda env update --file inst/environment.yml --quiet
+              ~/miniconda3/bin/conda env update --file igseq/inst/environment.yml --quiet
             fi
       - save_cache:
           paths: [ ~/miniconda3 ]
-          key: cache-{{ checksum "inst/environment.yml" }}
+          key: cache-{{ checksum "igseq/inst/environment.yml" }}
       - run:
           name: Test python package
           command: |
-            cd inst/python
+            cd igseq/inst/python
             source ~/miniconda3/bin/activate igseq
             python -m unittest
