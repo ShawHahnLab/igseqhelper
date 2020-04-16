@@ -4,11 +4,24 @@ Test data and metadata functions.
 
 import re
 import unittest
+import builtins
+import gzip
 import logging
+from tempfile import NamedTemporaryFile
 import igseq.data
 from igseq.data import MetadataError
 from test_igseq.util import ROOT
 
+
+def cat(file_path, opener=builtins.open, **kwargs):
+    """Read in contents of file."""
+    with opener(file_path, **kwargs) as f_in:
+        return f_in.read()
+
+def zcat(file_path, **kwargs):
+    """Read in contents of gzipped text file."""
+    kwargs["mode"] = kwargs.get("mode", "rt")
+    return cat(file_path, gzip.open, **kwargs)
 
 class TestMetadataBase(unittest.TestCase):
     """Base test class for metadata loading from spreadsheets.
@@ -257,6 +270,9 @@ class TestMetadataDuplicates(TestMetadataBase):
 class TestData(unittest.TestCase):
     """Basic tests for data helper functions."""
 
+    def setUp(self):
+        self.path = ROOT / "data"
+
     def test_get_data(self):
         """Test getting run data from local disk or URL."""
         self.skipTest("not yet implemented")
@@ -267,6 +283,26 @@ class TestData(unittest.TestCase):
         self.assertEqual(
             igseq.data.md5("/dev/null"),
             "d41d8cd98f00b204e9800998ecf8427e")
+
+    def test_chunk_fqgz(self):
+        """Test divvying up a fastq.gz into a fixed number of files."""
+
+        path_in = self.path / "stub.fastq.gz"
+        # With 1:1 you get the same thing out as you put in
+        with NamedTemporaryFile() as path_out:
+            igseq.data.chunk_fqgz([path_in], [path_out.name])
+            self.assertEqual(zcat(path_in), zcat(path_out.name))
+        # With 1:N it's split up and will leave empty files for any extras
+        paths_out = [NamedTemporaryFile() for _ in range(6)]
+        igseq.data.chunk_fqgz([path_in], paths_out)
+        for path_out in paths_out:
+            path_out.flush()
+        self.assertEqual(
+            zcat(path_in),
+            "".join([zcat(path_out.name) for path_out in paths_out]))
+        self.assertEqual("", zcat(paths_out[-1].name))
+        for path_out in paths_out:
+            path_out.close()
 
     def test_amplicon_files(self):
         """Test filename helper for files per specimen per target chain type."""
