@@ -258,3 +258,21 @@ def amplicon_files(pattern, samples, cell_type_keep=None):
                 LOGGER.debug("amplicon_files: add target: %s", text)
                 target.append(text)
     return target
+
+def transpose_sample_md(samples, celltype):
+    """Set up dictionaries of lists of sample metadata for a cell type.
+
+    NOTE: I think this overlaps a lot with amplicon_files.  refactor?
+    """
+    sonar_md = {
+        "chains": [sample["Chain"] for sample in samples.values()],
+        "chaintypes": [sample["Type"] for sample in samples.values()],
+        "celltypes": [sample["SpecimenAttrs"]["CellType"] for sample in samples.values()],
+        "subjects": [sample["SpecimenAttrs"]["Subject"] for sample in samples.values()],
+        "timepoints": [sample["SpecimenAttrs"]["Timepoint"] for sample in samples.values()],
+        "specimens": [sample["Specimen"] for sample in samples.values()]
+    }
+    keeps = [celltype in entry for entry in sonar_md["celltypes"]]
+    for key in sonar_md:
+        sonar_md[key] = [val for i, val in enumerate(sonar_md[key]) if keeps[i]]
+    return sonar_md

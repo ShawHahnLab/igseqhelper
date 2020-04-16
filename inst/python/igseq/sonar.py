@@ -71,24 +71,24 @@ def gather_mature(antibody_isolates, subject, chain, output_fp):
                 rec = SeqRecord(Seq(seq), id=seqid, description="")
                 SeqIO.write(rec, f_out, "fasta")
 
-def get_antibody_alleles(antibody_lineages, subject, chain, segment):
-    """Get a list of antibody lineage germline allele IDs for a given subject/chain/segment.
+def get_antibody_allele(antibody_lineages, antibody_lineage, subject, chain, segment):
+    """Get the antibody lineage germline allele ID for a given lineage/subject/chain/segment.
 
-    This could be more than one, but right now we're assuming elsewhere that
-    we're only pursuing one lineage per subject.  A MetadataError is raised if
-    an allele definition is blank.
+    A MetadataError is raised if an allele definition is blank or if no
+    matching lineage is found.
     """
-    seqids = []
     for lineage_attrs in antibody_lineages.values():
-        if lineage_attrs["Subject"] == subject:
+        if lineage_attrs["Subject"] == subject and \
+                lineage_attrs["AntibodyLineage"] == antibody_lineage:
             key = segment + {"heavy": "H", "light": "L"}[chain]
             seqid = lineage_attrs[key]
             if not seqid:
                 msg = "Missing allele definition for antibody lineage %s %s chain" % (
                     lineage_attrs["AntibodyLineage"], chain)
                 raise data.MetadataError(msg)
-            seqids.append(seqid)
-    return seqids
+            return seqid
+    raise data.MetadataError("No antibody lineage %s found for subject %s" % (
+        antibody_lineage, subject))
 
 def igdiscover_final_db(samples, subject, chain, chain_type, segment):
     """Get an IgDiscover output DB FASTA for a single segment."""
@@ -126,17 +126,20 @@ def sonar_module_1_inputs(wildcards):
         segments = ["V", "J"]
     else:
         raise ValueError('Chain should be either "heavy" or "light"')
-    targets = dict(zip(segments, expand(
+    targets = expand(
         "analysis/sonar/{subject}/{chain}.{chain_type}/germline.{segment}.fasta",
         subject=wildcards.subject,
         chain=wildcards.chain,
         chain_type=wildcards.chain_type,
-        segment=segments)))
+        segment=segments)
+    targets = dict(zip(segments, targets))
     targets["fastq"] = expand(
-        "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",
+        "analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/" \
+        "{specimen}/{specimen}.fastq",
         subject=wildcards.subject,
         chain=wildcards.chain,
         chain_type=wildcards.chain_type,
+        antibody_lineage=wildcards.antibody_lineage,
         specimen=wildcards.specimen)[0]
     return targets
 
@@ -167,19 +170,4 @@ def sonar_module_2_inputs(wildcards):
         chain=wildcards.chain,
         chain_type=wildcards.chain_type,
         specimen=wildcards.specimen)[0]
-    return targets
-
-def sonar_islands_for_subject(samples, subject, chain, chain_type):
-    """Get the islandSeqs FASTA files for all specimens for a particular subject/chain/chain_type"""
-    islight = lambda s: "IgG+" in s["SpecimenAttrs"]["CellType"] and s["Type"] == chain_type
-    specimens = [entry["Specimen"] for entry in samples.values() if islight(entry)]
-    targets = {}
-    for spec in specimens:
-        targets[spec] = (
-            "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/"
-            "output/sequences/nucleotide/{specimen}_islandSeqs.fa").format(
-                subject=subject,
-                chain=chain,
-                chain_type=chain_type,
-                specimen=specimens)
     return targets

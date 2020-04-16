@@ -22,12 +22,9 @@ from igseq.reporting.igdiscover import (
     combine_aligned_segments,
     align_next_segment,
     gather_antibodies)
-from igseq.data import amplicon_files
+from igseq.data import amplicon_files, transpose_sample_md
 
-IGM_CHAINS = [entry["Chain"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
-IGM_CHAINTYPES = [entry["Type"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
-IGM_SUBJECTS = [entry["SpecimenAttrs"]["Subject"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
-IGM_SPECIMENS = [entry["Specimen"] for entry in SAMPLES.values() if "IgM+" in entry["SpecimenAttrs"]["CellType"]]
+SAMPLE_MD_IGM = transpose_sample_md(SAMPLES, "IgM+")
 
 TARGET_QUALTRIM_GRID = expand(
     outputs_per_run("analysis/reporting/{run}/qualtrim.{sample}.{{rp}}.csv", SAMPLES),
@@ -35,13 +32,13 @@ TARGET_QUALTRIM_GRID = expand(
 
 TARGET_IGDISCOVER_CLUSTERPLOTS = expand(
     "analysis/reporting/igdiscover/{chain}.{chain_type}/{specimen}/clusterplots.png",
-    zip, chain=IGM_CHAINS, chain_type=IGM_CHAINTYPES, specimen=IGM_SPECIMENS)
+    zip, chain=SAMPLE_MD_IGM["chains"], chain_type=SAMPLE_MD_IGM["chaintypes"], specimen=SAMPLE_MD_IGM["specimens"])
 
 def _get_allele_alignment_targets():
     targets = []
     for sample, sample_attrs in SAMPLES.items():
         specimen = sample_attrs["Specimen"]
-        if not specimen in IGM_SPECIMENS:
+        if not specimen in SAMPLE_MD_IGM["specimens"]:
             continue
         chain = sample_attrs["Chain"]
         chain_type = sample_attrs["Type"]
@@ -61,7 +58,7 @@ TARGET_IGDISCOVER_ALLELE_ALIGNMENTS = _get_allele_alignment_targets()
 
 TARGET_SONAR_RAREFACTION = expand(
     "analysis/reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
-    zip, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
+    zip, chain=SAMPLE_MD_IGG["chains"], chain_type=SAMPLE_MD_IGG["chaintypes"], specimen=SAMPLE_MD_IGG["specimens"])
 
 rule all_qualtrim_grid:
     input: TARGET_QUALTRIM_GRID

@@ -8,7 +8,7 @@ dependencies:
   - clustalw
   - pear
   - seqmagick
-  - snakemake>=5.4
+  - snakemake>=5.9.1
   - vsearch
   - cutadapt
   - rpy2

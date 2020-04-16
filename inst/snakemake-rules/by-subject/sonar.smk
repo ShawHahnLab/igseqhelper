@@ -13,49 +13,74 @@ run successfully anywhere else.
 """
 
 import igseq.sonar
-from igseq.data import MetadataError
+from igseq.data import MetadataError, transpose_sample_md
 
-IGG_CHAINS = [entry["Chain"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
-IGG_CHAINTYPES = [entry["Type"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
-IGG_SUBJECTS = [entry["SpecimenAttrs"]["Subject"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
-IGG_SPECIMENS = [entry["Specimen"] for entry in SAMPLES.values() if "IgG+" in entry["SpecimenAttrs"]["CellType"]]
+SAMPLE_MD_IGG = transpose_sample_md(SAMPLES, "IgG+")
 
-TARGET_SONAR_PREP = expand(
-    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq",
-    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
-TARGET_SONAR_MODULE_1 = expand(
-    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
-TARGET_SONAR_MODULE_2_AUTO = expand(
-    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_lineages.txt",
-    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
-TARGET_SONAR_MODULE_2_ID_DIV = expand(
-    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
-    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
-TARGET_SONAR_MODULE_2_ID_DIV_ISLAND = expand(
-    "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa",
-    zip, subject=IGG_SUBJECTS, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, specimen=IGG_SPECIMENS)
-TARGET_SONAR_MODULE_3 = expand(
-    "analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/{subject}/output/longitudinal_igphyml.tree",
-    zip, chain=IGG_CHAINS, chain_type=IGG_CHAINTYPES, subject=IGG_SUBJECTS) 
+# The working directory (as a format string) for a single SONAR analysis.  One
+# level up will contain information shared by specimens but unique to that
+# lineage.  One more, shared by lineages but unique for that
+# subject/chain/chain type.
+WD_SONAR = Path("analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}")
+
+def setup_sonar_targets(sample_md_igg, antibody_lineages):
+    """Create dictionary of targets for various SONAR rules.
+
+    The interleaved paths with many templated variables get really intricate
+    here, so I'm hiding the complexity in this setup fuction and storing the
+    targets in a single unified dictionary based on SONAR module.
+    """
+
+    lineages_per_subject = {}
+    for lineage_name, lineage_attrs in antibody_lineages.items():
+        subject_name = lineage_attrs["Subject"]
+        if not lineage_attrs["Subject"] in lineages_per_subject:
+            lineages_per_subject[subject_name] = []
+        lineages_per_subject[subject_name].append(lineage_name)
+
+    pattern_root = "analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}"
+    patterns = {
+        "prep": pattern_root + "/{specimen}/{specimen}.fastq",
+        "module_1": pattern_root + "/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        "module_2_auto": pattern_root + "/{specimen}/output/tables/{specimen}_lineages.txt",
+        "module_2_id_div": pattern_root + "/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
+        "module_2_id_div_island": pattern_root + "/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa",
+        "module_3": pattern_root + "/longitudinal/output/longitudinal_igphyml.tree"}
+    targets = {key: [] for key in patterns}
+
+    for subject in lineages_per_subject:
+        filter_to_subject = lambda vec: [x for x, y in zip(vec, sample_md_igg["subjects"]) if y == subject]
+        for lineage in lineages_per_subject[subject]:
+            for name, pattern in patterns.items():
+                targets[name].extend(expand(
+                    pattern,
+                    zip,
+                    subject=filter_to_subject(sample_md_igg["subjects"]),
+                    chain=filter_to_subject(sample_md_igg["chains"]),
+                    chain_type=filter_to_subject(sample_md_igg["chaintypes"]),
+                    antibody_lineage=[lineage] * len(filter_to_subject(sample_md_igg["subjects"])),
+                    specimen=filter_to_subject(sample_md_igg["specimens"])))
+    return targets
+
+TARGETS_SONAR = setup_sonar_targets(SAMPLE_MD_IGG, ANTIBODY_LINEAGES)
 
 rule all_sonar_prep_input:
-    input: TARGET_SONAR_PREP
+    input: TARGETS_SONAR["prep"]
 
 rule all_sonar_module_1:
-    input: TARGET_SONAR_MODULE_1
+    input: TARGETS_SONAR["module_1"]
 
 rule all_sonar_module_2_auto:
-    input: TARGET_SONAR_MODULE_2_AUTO
+    input: TARGETS_SONAR["module_2_auto"]
 
 rule all_sonar_module_2_id_div:
-    input: TARGET_SONAR_MODULE_2_ID_DIV
+    input: TARGETS_SONAR["module_2_id_div"]
 
 rule all_sonar_module_2_id_div_island:
-    input: TARGET_SONAR_MODULE_2_ID_DIV_ISLAND
+    input: TARGETS_SONAR["module_2_id_div_island"]
 
 rule all_sonar_module_3:
-    input: TARGET_SONAR_MODULE_3
+    input: TARGETS_SONAR["module_3"]
 
 def sonar_gather_germline_inputs(wildcards):
     """Get IgDiscover per-specimen paths for a given per-subject output."""
@@ -65,9 +90,11 @@ def sonar_gather_germline_inputs(wildcards):
 
 rule sonar_prep_input_from_presto:
     """Gather input sequences from pRESTO's initial processing."""
-    output: "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/{specimen}.fastq"
+    output: (WD_SONAR / "{specimen}.fastq")
     input: "analysis/presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
-    shell: "ln {input} {output}"
+    params:
+        input=lambda w, input: Path(input[0]).resolve()
+    shell: "ln {params.input} {output}"
 
 rule sonar_gather_germline:
     """Gather germline alleles from IgDiscover's analysis of IgM+ specimens.
@@ -82,10 +109,12 @@ rule sonar_gather_germline:
     the corresponding chain types for the samples here for SONAR will be gamma
     for heavy and lambda/kappa for light.
     """
-    output: "analysis/sonar/{subject}/{chain}.{chain_type}/germline.{segment}.fasta"
+    output: WD_SONAR.parent.parent / "germline.{segment}.fasta"
     input: sonar_gather_germline_inputs
+    params:
+        output=lambda w, input, output: output[0].resolve()
     run:
-        igseq.sonar.gather_germline(input, output[0])
+        igseq.sonar.gather_germline(input, params.output)
 
 # use --jmotif arguent to sonar finalize?
 # ("Conserved nucleotide sequence indicating the start of FWR4 on the J gene.
@@ -99,24 +128,26 @@ rule sonar_gather_germline:
 
 rule sonar_module_1:
     output:
-        fasta="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        rearr="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv",
+        fasta=(WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa"),
+        rearr=(WD_SONAR / "output/tables/{specimen}_rearrangements.tsv"),
     input: unpack(igseq.sonar.sonar_module_1_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
+        wd_sonar=WD_SONAR,
+        input_fastq=lambda w, input: Path(input.fastq).resolve(),
         cluster_id_fract=.97,
         cluster_min2=2,
         # What we give for the V(D)J command-line argments depends on which
         # chain we're doing.  We could handle this during the rule itself with
         # a run: directive but then it won't let us use singularity.
-        libv_arg=lambda w, input: "--lib ../" + str(Path(input.V).name),
-        libd_arg=lambda w, input: "D" in input and "--dlib ../" + str(Path(input.D).name) or "--noD",
-        libj_arg=lambda w, input: "--jlib ../" + str(Path(input.J).name)
+        libv_arg=lambda w, input: "--lib " + str(Path(input.V).resolve()),
+        libd_arg=lambda w, input: "D" in input and "--dlib " + str(Path(input.D).resolve()) or "--noD",
+        libj_arg=lambda w, input: "--jlib " + str(Path(input.J).resolve())
     shell:
         """
-            cd $(dirname {input.fastq})
-            sonar blast_V --fasta ../../../../../{input.fastq} {params.libv_arg} --derep --threads {threads}
+            cd {params.wd_sonar}
+            sonar blast_V --fasta {params.input_fastq} {params.libv_arg} --derep --threads {threads}
             sonar blast_J {params.libd_arg} {params.libj_arg} --noC --threads {threads}
             sonar finalize --noclean --threads {threads}
             sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2}
@@ -124,7 +155,7 @@ rule sonar_module_1:
 
 rule sonar_gather_mature:
     """Get heavy or light chain mature antibody sequences for a subject."""
-    output: "analysis/sonar/{subject}/{chain}.{chain_type}/mab.fasta"
+    output: WD_SONAR.parent / "mab.fasta"
     run:
         igseq.sonar.gather_mature(
             ANTIBODY_ISOLATES,
@@ -136,31 +167,30 @@ rule sonar_gather_mature:
 
 def sonar_allele_v(wildcards):
     """Get the sequence ID for the expected germline V allele"""
-    seqids = get_antibody_alleles(ANTIBODY_LINEAGES, wildcards.subject, wildcards.chain, "V")
-    if len(seqids) != 1:
-        raise MetadataError("More than one antibody lineage for subject: %s" % wildcards.subject)
-    return seqids[0]
+    seqid = igseq.sonar.get_antibody_allele(
+        ANTIBODY_LINEAGES, wildcards.antibody_lineage, wildcards.subject, wildcards.chain, "V")
+    return seqid
 
 def sonar_allele_j(wildcards):
     """Get the sequence ID for the expected germline J allele"""
-    seqids = get_antibody_alleles(ANTIBODY_LINEAGES, wildcards.subject, wildcards.chain, "J")
-    if len(seqids) != 1:
-        raise MetadataError("More than one antibody lineage for subject: %s" % wildcards.subject)
-    return seqids[0]
+    seqid = igseq.sonar.get_antibody_allele(
+        ANTIBODY_LINEAGES, wildcards.antibody_lineage, wildcards.subject, wildcards.chain, "J")
+    return seqid
 
 # Automated intradonor analysis and grouping
 rule sonar_module_2:
-    output: "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_lineages.txt"
+    output: str(WD_SONAR / "output/tables/{specimen}_lineages.txt")
     input: unpack(igseq.sonar.sonar_module_2_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
+        wd_sonar=WD_SONAR,
         v_id=sonar_allele_v,
         j_id=sonar_allele_j
     shell:
         """
             # Start from the top-level directory for this specimen's analysis
-            cd $(dirname {input.module1})/../../../..
+            cd {params.wd_sonar}
             libv=../germline.V.fasta
             mab=../mab.fasta
             # 2) Automated intradonor analysis
@@ -190,18 +220,22 @@ rule sonar_module_2:
 # Part 1 of 3: Calculate % identity to each of the mature antibodies.
 rule sonar_module_2_id_div:
     output:
-        iddiv="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"
+        iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab"
     input:
-        fasta="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        mab="analysis/sonar/{subject}/{chain}.{chain_type}/mab.fasta",
-        germline_v="analysis/sonar/{subject}/{chain}.{chain_type}/germline.V.fasta"
+        fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        mab=WD_SONAR.parent / "mab.fasta",
+        germline_v=WD_SONAR.parent.parent / "germline.V.fasta"
+    params:
+        wd_sonar=WD_SONAR,
+        input_v=lambda w, input: Path(input.germline_v).resolve(),
+        input_mab=lambda w, input: Path(input.mab).resolve()
     singularity: "docker://scharch/sonar"
     threads: 4
     shell:
         """
-            cd $(dirname {input.fasta})/../../..
-            libv=../germline.V.fasta
-            mab=../mab.fasta
+            cd {params.wd_sonar}
+            libv={params.input_v}
+            mab={params.input_mab}
             sonar id-div -g "$libv" -a "$mab" -t {threads}
         """
 
@@ -211,90 +245,119 @@ rule sonar_module_2_id_div:
 # singularity/docker stuff
 rule sonar_module_2_id_div_island:
     output:
-        seqids="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/islandSeqs.txt"
+        seqids=WD_SONAR / "output/tables/islandSeqs.txt"
     input:
-        iddiv="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"
+        iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab"
     params:
+        wd_sonar=WD_SONAR,
+        input_iddiv=lambda w, input: Path(input.iddiv).resolve(),
         mab="=a", # =a means use all antibodies in mab input file
     shell:
         """
             set +e
             set +u
             source ~/miniconda3/bin/activate sonar
-            cd $(dirname {input.iddiv})/../..
-            sonar get_island ../../../../../{input.iddiv} --mab "{params.mab}"
+            cd {params.wd_sonar}
+            sonar get_island {params.input_iddiv} --mab "{params.mab}"
         """
 
 # Part 3 of 3: Extract those goodVJ cluster sequences given in the id/div lists
 rule sonar_module_2_id_div_getfasta:
     output:
-        fasta="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa"
+        fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_islandSeqs.fa"
     input:
-        fasta="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        seqids="analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/islandSeqs.txt"
+        fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        seqids=WD_SONAR / "output/tables/islandSeqs.txt"
     singularity: "docker://scharch/sonar"
+    params:
+        wd_sonar=WD_SONAR,
+        input_fasta=lambda w, input: Path(input.fasta).resolve(),
+        input_seqids=lambda w, input: Path(input.seqids).resolve(),
+        output_fasta=lambda w, input, output: Path(output.fasta).resolve()
     shell:
         """
-            cd $(dirname {input.fasta})/../../..
+            cd {params.wd_sonar}
             # Pull out sequences using our selected island from the above
             # id-div step.  I think this is essentially "seqmagick convert
             # --include-from-file ..."
             sonar getFastaFromList \
-                -l ../../../../../{input.seqids} \
-                -f ../../../../../{input.fasta} \
-                -o ../../../../../{output.fasta}
+                -l {params.input_seqids} \
+                -f {params.input_fasta} \
+                -o {params.output_fasta}
         """
 
 def sonar_module_3_collect_inputs(wildcards):
-    """List the inputs needed for SONAR module 3's collection step."""
-    return igseq.sonar.sonar_islands_for_subject(
-        SAMPLES, wildcards.subject, wildcards.chain, wildcards.chain_type)
+    """List the inputs needed for SONAR module 3's collection step.
 
-def sonar_module_3_collect_seqs(wildcards, inputs):
-    args = ["--seqs ../../../../{key} --labels {val}".format() for key, val in inputs.items()]
+    This gives a dictionary of timepoint -> islandSeqs.fa pairs.  We need to
+    include all other specimens that include samples for the same chain type as
+    specified here.
+    """
+
+    pattern = str(WD_SONAR.parent /
+        "{other_specimen}/output/sequences/nucleotide/{other_specimen}_islandSeqs.fa")
+    # TODO fix this; also make sure chain type is available for other_specimen.
+    def filter_sample_md(vec):
+        match = lambda trio: trio[1] == wildcards.subject and trio[2] == wildcards.chain_type
+        trios = zip(vec, SAMPLE_MD_IGG["subjects"], SAMPLE_MD_IGG["chaintypes"])
+        return [trio[0] for trio in trios if match(trio)]
+    timepoints = filter_sample_md(SAMPLE_MD_IGG["timepoints"])
+    specimens = filter_sample_md(SAMPLE_MD_IGG["specimens"])
+    targets = expand(pattern,
+        subject=wildcards.subject,
+        chain=wildcards.chain,
+        chain_type=wildcards.chain_type,
+        antibody_lineage=wildcards.antibody_lineage,
+        other_specimen=specimens)
+    timepoints = ["wk" + txt for txt in timepoints]
+    targets = dict(zip(timepoints, targets))
+    return targets
+
+def sonar_module_3_collect_seqs(wildcards, input):
+    args = [" --labels {key} --seqs {val}".format(key=key, val=Path(val).resolve()) for key, val in input.items()]
     return " ".join(args)
 
 rule sonar_module_3_collect:
     """Gather the selected island sequences from each specimen for a given subject and chain."""
     output:
-        collected="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal-collected.fa"
+        collected=WD_SONAR / "output/sequences/nucleotide/longitudinal-collected.fa"
     input: unpack(sonar_module_3_collect_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
-        wd="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal",
+        wd_sonar=WD_SONAR,
         seqs=sonar_module_3_collect_seqs
     shell:
         """
-            cd {params.wd}
+            cd {params.wd_sonar}
             sonar merge_time {params.seqs}
         """
 
 rule sonar_module_3_igphyml:
     """Run phylogenetic anaysis and generate tree across specimens for a given subject and chain."""
     output:
-        tree="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/longitudinal_igphyml.tree",
-        inferred_nucl="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal_inferredAncestors.fa",
-        inferred_prot="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/amino_acid/longitudinal_inferredAncestors.fa",
-        stats="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/logs/longitudinal_igphyml_stats.txt"
+        tree=WD_SONAR / "output/longitudinal_igphyml.tree",
+        inferred_nucl=WD_SONAR / "output/sequences/nucleotide/longitudinal_inferredAncestors.fa",
+        inferred_prot=WD_SONAR / "output/sequences/amino_acid/longitudinal_inferredAncestors.fa",
+        stats=WD_SONAR / "output/logs/longitudinal_igphyml_stats.txt"
     input:
-        collected="analysis/sonar/{subject}/{chain}.{chain_type}/longitudinal/output/sequences/nucleotide/longitudinal-collected.fa",
-        ref_hv="analysis/sonar/{subject}/{chain}.{chain_type}/germline.V.fasta",
-        natives="analysis/sonar/{subject}/{chain}.{chain_type}/mab.fasta"
+        collected=WD_SONAR / "output/sequences/nucleotide/longitudinal-collected.fa",
+        germline_v=WD_SONAR.parent.parent / "germline.V.fasta",
+        natives=WD_SONAR.parent / "mab.fasta"
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
+        wd_sonar=WD_SONAR,
+        input_germline_v=lambda w, input: Path(input.germline_v).resolve(),
+        input_natives=lambda w, input: Path(input.natives).resolve(),
         v_id=sonar_allele_v,
         args="-f"
     shell:
         """
-            #set +e
-            #set +u
-            #source ~/miniconda3/bin/activate sonar
-            cd $(dirname {input.collected})/../../../..
+            cd {params.wd_sonar}
             sonar igphyml \
                 -v '{params.v_id}' \
-                --lib ../germline.V.fasta \
-                --natives {input.natives} \
+                --lib {params.input_germline_v} \
+                --natives {params.input_natives} \
                 {params.args}
         """
