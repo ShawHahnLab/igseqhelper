@@ -16,12 +16,12 @@ jobs:
               bash Miniconda3-latest-Linux-x86_64.sh -b
               ~/miniconda3/bin/conda env update --file inst/environment.yml --quiet
             fi
+      - save_cache:
+          paths: [ ~/miniconda3 ]
+          key: cache-{{ checksum "inst/environment.yml" }}
       - run:
           name: Test python package
           command: |
             cd inst/python
             source ~/miniconda3/bin/activate igseq
             python -m unittest
-      - save_cache:
-          paths: [ ~/miniconda3 ]
-          key: cache-{{ checksum "inst/environment.yml" }}
