@@ -9,11 +9,19 @@ jobs:
           keys:
             - cache-{{ checksum "inst/environment.yml" }}
       - run:
-          name: install
+          name: Install
           command: |
-            wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-            bash Miniconda3-latest-Linux-x86_64.sh -b
-            ~/miniconda3/bin/conda env update --file inst/environment.yml --quiet
+            if [[ ! -e ~/miniconda3/envs/igseq ]]; then
+              wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+              bash Miniconda3-latest-Linux-x86_64.sh -b
+              ~/miniconda3/bin/conda env update --file inst/environment.yml --quiet
+            fi
+      - run:
+          name: Test python package
+          command: |
+            cd inst/python
+            source ~/miniconda3/bin/activate igseq
+            python -m unittest
       - save_cache:
           paths: [ ~/miniconda3 ]
           key: cache-{{ checksum "inst/environment.yml" }}
