@@ -35,7 +35,7 @@ rule get_data:
     output: protected(directory("data/{run}"))
     input: lambda w: checkpoints.get_metadata.get().output
     params: runpath="/seq/runs"
-    run: igseq.data.get_data(wildcards.run, Path(output[0]).parent, RUNS, params.runpath)
+    run: igseq.data.get_data(wildcards.run, output[0], RUNS, params.runpath)
 
 #############
 
