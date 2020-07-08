@@ -49,7 +49,10 @@ rule igdiscover_db:
 
 # SNAKEMAKES ON SNAKEMAKES
 rule igdiscover_init:
-    output: "analysis/igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml"
+    output:
+        yaml="analysis/igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml",
+        r1="analysis/igdiscover/{chain}.{chain_type}/{specimen}/reads.1.fastq",
+        r2="analysis/igdiscover/{chain}.{chain_type}/{specimen}/reads.2.fastq"
     input:
         # IgDiscover always wants a "D" even for light
         db_v="analysis/igdiscover/{chain}.{chain_type}/V.fasta",
@@ -63,16 +66,16 @@ rule igdiscover_init:
         primer_fwd=SEQUENCES.get("5PIIA", {}).get("Seq")
     shell:
         """
-            rmdir $(dirname {output})
+            rmdir $(dirname {output.yaml})
             igdiscover init \
                 --db $(dirname {input.db_v}) \
                 --reads {input.r1} \
-                $(dirname {output})
+                $(dirname {output.yaml})
             # This is a sloppy way of handling the YAML!  Re-work this probably
             # by parsing in Python and writing back out.
-            sed -i 's/^iterations: 1$/iterations: {params.iterations}/' {output}
-            sed -i 's/^stranded: false$/stranded: {params.stranded}/' {output}
-            sed -i 's/^forward_primers:$/forward_primers:\\n - {params.primer_fwd}/' {output}
+            sed -i 's/^iterations: 1$/iterations: {params.iterations}/' {output.yaml}
+            sed -i 's/^stranded: false$/stranded: {params.stranded}/' {output.yaml}
+            sed -i 's/^forward_primers:$/forward_primers:\\n - {params.primer_fwd}/' {output.yaml}
         """
 
 rule igdiscover_run:
@@ -81,7 +84,10 @@ rule igdiscover_run:
         db_v="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/V.fasta",
         db_d="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/D.fasta",
         db_j="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/J.fasta"
-    input: "analysis/igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml"
+    input:
+        yaml="analysis/igdiscover/{chain}.{chain_type}/{specimen}/igdiscover.yaml",
+        r1="analysis/igdiscover/{chain}.{chain_type}/{specimen}/reads.1.fastq",
+        r2="analysis/igdiscover/{chain}.{chain_type}/{specimen}/reads.2.fastq"
     threads: 20
     shell:
         """

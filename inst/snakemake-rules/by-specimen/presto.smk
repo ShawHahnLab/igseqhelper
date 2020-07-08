@@ -40,7 +40,7 @@ rule presto_data:
 
     pRESTO uses plaintext FASTQ so we'll leave them uncompressed, too.
     """
-    output: temp("analysis/presto/data/{chain}.{chain_type}/{specimen}.{rp}.fastq")
+    output: "analysis/presto/data/{chain}.{chain_type}/{specimen}.{rp}.fastq"
     input: "analysis/reads-by-specimen/{chain}.{chain_type}/{specimen}.{rp}.fastq.gz"
     shell: "zcat {input} > {output}"
 
