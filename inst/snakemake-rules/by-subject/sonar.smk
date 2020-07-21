@@ -112,7 +112,7 @@ rule sonar_gather_germline:
     output: WD_SONAR.parent.parent / "germline.{segment}.fasta"
     input: sonar_gather_germline_inputs
     params:
-        output=lambda w, input, output: output[0].resolve()
+        output=lambda w, input, output: Path(output[0]).resolve()
     run:
         igseq.sonar.gather_germline(input, params.output)
 
@@ -130,12 +130,12 @@ rule sonar_module_1:
     """SONAR 1: Collect good sequences and tabulate AIRR info from raw input."""
     output:
         fasta=(WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa"),
-        rearr=(WD_SONAR / "output/tables/{specimen}_rearrangements.tsv"),
+        rearr=(WD_SONAR / "output/tables/{specimen}_rearrangements.tsv")
     input: unpack(igseq.sonar.sonar_module_1_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
-        wd_sonar=WD_SONAR,
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_fastq=lambda w, input: Path(input.fastq).resolve(),
         cluster_id_fract=.97,
         cluster_min2=2,
@@ -189,7 +189,7 @@ rule sonar_module_2:
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
-        wd_sonar=WD_SONAR,
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         v_id=sonar_allele_v,
         j_id=sonar_allele_j
     shell:
