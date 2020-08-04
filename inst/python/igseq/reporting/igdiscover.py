@@ -82,7 +82,7 @@ def combine_aligned_segments(target_fasta, with_v, with_d, with_j, output_fasta)
     targets = {key: [entry for entry in aligned[key] if entry.id in ab_ids] for key in aligned}
     lengths = {key: max([len(rec) for rec in targets[key]]) for key in targets}
     if len(set(lengths)) > 1:
-        LOGGER.warning("Aligned tarets differ in length; will pad to max length.")
+        LOGGER.warning("Aligned targets differ in length; will pad to max length.")
     with open(output_fasta, "wt") as f_out:
         for record in aligned["v"]:
             record.seq = Seq(str(record.seq).ljust(max(lengths.values()), "-"))
