@@ -230,7 +230,7 @@ rule sonar_module_2_id_div:
         mab=WD_SONAR.parent / "mab.fasta",
         germline_v=WD_SONAR.parent.parent / "germline.V.fasta"
     params:
-        wd_sonar=WD_SONAR,
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_v=lambda w, input: Path(input.germline_v).resolve(),
         input_mab=lambda w, input: Path(input.mab).resolve()
     singularity: "docker://scharch/sonar"
@@ -254,7 +254,7 @@ rule sonar_module_2_id_div_island:
     input:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab"
     params:
-        wd_sonar=WD_SONAR,
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_iddiv=lambda w, input: Path(input.iddiv).resolve(),
         mab="=a", # =a means use all antibodies in mab input file
     shell:
@@ -276,7 +276,7 @@ rule sonar_module_2_id_div_getfasta:
         seqids=WD_SONAR / "output/tables/islandSeqs.txt"
     singularity: "docker://scharch/sonar"
     params:
-        wd_sonar=WD_SONAR,
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_fasta=lambda w, input: Path(input.fasta).resolve(),
         input_seqids=lambda w, input: Path(input.seqids).resolve(),
         output_fasta=lambda w, input, output: Path(output.fasta).resolve()
@@ -330,7 +330,7 @@ rule sonar_module_3_collect:
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
-        wd_sonar=WD_SONAR,
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         seqs=sonar_module_3_collect_seqs
     shell:
         """
@@ -352,7 +352,7 @@ rule sonar_module_3_igphyml:
     singularity: "docker://scharch/sonar"
     threads: 4
     params:
-        wd_sonar=WD_SONAR,
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_germline_v=lambda w, input: Path(input.germline_v).resolve(),
         input_natives=lambda w, input: Path(input.natives).resolve(),
         v_id=sonar_allele_v,
