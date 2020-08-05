@@ -17,10 +17,11 @@ def counts_sample_summary(
     rows = []
     for runid in samples_per_run:
         for sample in samples_per_run[runid] + ["unassigned"]:
-            key = "counts/demux/{run}/{sample}.I1.fastq.gz.counts".format(
+            pattern = "analysis/counts/demux/{run}/[0-9]+/{sample}.I1.fastq.gz.counts".format(
                 run=runid,
                 sample=sample)
-            cts = int(counts[key]["NumSequences"])
+            matches = [key for key in counts if re.match(pattern, key)]
+            cts = sum([int(counts[key]["NumSequences"]) for key in matches])
             try:
                 cellcount = samples[sample]["SpecimenAttrs"]["CellCount"]
                 ratio = divide(cts, cellcount)
@@ -105,9 +106,13 @@ def amplicon_summary(input_fps, specimens, regex):
             raise MetadataError("Unknown specimen %s" % specimen)
         with open(fp_in) as f_in:
             cts = int(next(f_in))
+        try:
+            timepoint = str(int(specimens[specimen]["Timepoint"]))
+        except ValueError:
+            timepoint = ""
         counts.append({
             "Subject": specimens[specimen]["Subject"],
-            "Timepoint": int(specimens[specimen]["Timepoint"]),
+            "Timepoint": timepoint,
             "Chain": chain,
             "ChainType": chain_type,
             "Specimen": specimen,
@@ -122,7 +127,7 @@ def counts_specimen_summary(input_fps, output_fp, specimens):
     counts, fieldnames = amplicon_summary(
         input_fps,
         specimens,
-        r"counts/presto/data/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+).R1.fastq.counts")
+        r"analysis/counts/presto/data/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+).R1.fastq.counts")
     # Add some additional columns of interest for this specific case
     for cts in counts:
         cts["CellCount"] = specimens[cts["Specimen"]]["CellCount"]
@@ -138,7 +143,7 @@ def counts_assembly_summary(input_fps, output_fp, specimens):
     counts, fieldnames = amplicon_summary(
         input_fps,
         specimens,
-        r"counts/presto/assemble/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+)_assemble-pass.fastq.counts")
+        r"analysis/counts/presto/assemble/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+)_assemble-pass.fastq.counts")
     with open(output_fp, "wt") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=fieldnames)
         writer.writeheader()
@@ -149,7 +154,7 @@ def counts_presto_qual_summary(input_fps, output_fp, specimens):
     counts, fieldnames = amplicon_summary(
         input_fps,
         specimens,
-        r"counts/presto/qual/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+)_quality-pass.fastq.counts")
+        r"analysis/counts/presto/qual/([a-z]+)\.([a-z]+)/([A-Za-z0-9]+)_quality-pass.fastq.counts")
     with open(output_fp, "wt") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=fieldnames)
         writer.writeheader()
@@ -157,6 +162,10 @@ def counts_presto_qual_summary(input_fps, output_fp, specimens):
 
 def divide(val1, val2, fmt="{:.6f}"):
     """Divide val1 by val2 as floats and return formatted string."""
-    num = float(val1)/float(val2)
-    num = fmt.format(num)
+    try:
+        num = float(val1)/float(val2)
+    except ValueError:
+        num = ""
+    else:
+        num = fmt.format(num)
     return num

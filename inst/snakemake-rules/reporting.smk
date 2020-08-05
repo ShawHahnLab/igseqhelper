@@ -83,10 +83,12 @@ TARGET_REPORT_INPUTS = expand(
            TARGET_IGDISCOVER_ALLELE_ALIGNMENTS
 
 TARGET_REPORT_COUNTS = expand(
-    outputs_per_run("analysis/counts/demux/{run}/{sample}.{{rp}}.fastq.gz.counts", SAMPLES),
+    outputs_per_run("analysis/counts/demux/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz.counts", SAMPLES),
+    chunk=CHUNKS,
     rp=["R1", "R2", "I1"]) + expand(
-        "analysis/counts/demux/{run}/unassigned.{rp}.fastq.gz.counts",
+        "analysis/counts/demux/{run}/{chunk}/unassigned.{rp}.fastq.gz.counts",
         run=set([entry["Run"] for entry in SAMPLES.values()]),
+        chunk=CHUNKS,
         rp=["R1", "R2", "I1"])
 
 TARGET_AMPLICON_COUNTS = amplicon_files(
@@ -147,11 +149,16 @@ rule counts_table:
     """Just a big ol' list of file paths and read counts."""
     output: "analysis/reporting/counts.csv"
     input: TARGET_REPORT_COUNTS
-    shell:
-        """
-            echo "Filename,NumSequences" > {output}
-            paste -d , <(echo "{input}" | tr ' ' '\\n') <(cat {input}) >> {output}
-        """
+    run:
+        import csv
+        with open(output[0], "wt") as f_out:
+            writer = csv.DictWriter(
+                f_out, fieldnames=["Filename", "NumSequences"], lineterminator="\n")
+            writer.writeheader()
+            for countsfile in input:
+                with open(countsfile) as f_in:
+                    counts = f_in.read().strip()
+                writer.writerow({"Filename": countsfile, "NumSequences": counts})
 
 rule counts_sample_summary:
     """A per-sample summary of raw read counts."""
@@ -298,3 +305,72 @@ rule gather_antibody_sequences:
     run:
         gather_antibodies(
             wildcards.antibody_lineage, wildcards.chain, ANTIBODY_ISOLATES, output[0])
+
+
+
+
+
+
+
+### Another approach: by lineage
+
+rule lineage_gather_antibody_sequences:
+    """Gather mature antibody sequences to start off the alignment against.
+
+    This is the same as gather_antibody_sequences but handles the output differently.
+    """
+    output: "analysis/reporting/lineages/{subject}.{lineage}.{chain}/antibodies.fasta"
+    run:
+        gather_antibodies(
+            wildcards.lineage, wildcards.chain, ANTIBODY_ISOLATES, output[0])
+
+def lineage_gather_germline_input(w):
+    """Input for lineage_gather_germline rule.
+
+    This uses info from antibody lineage metadata to find the right germline
+    allele FASTA files for the appropriate locus and segments for a given
+    subject and chain."""
+    # Pretty sure I us this logic in a dozen different places.  Should clean up.
+    lineage_attrs = ANTIBODY_LINEAGES[w.lineage]
+    if w.chain == "heavy":
+        chain_type = "gamma"
+        segments = ["V", "D", "J"]
+    elif w.chain == "light":
+        if "IGLV" in lineage_attrs["VL"]:
+            chain_type = "lambda"
+        elif "IGKV" in lineage_attrs["VL"]:
+            chain_type = "kappa"
+        else:
+            raise ValueError("VL of %s not recognized" % lineage_attrs["VL"])
+        segments = ["V", "J"]
+    else:
+        raise ValueError("heavy or light, not %s" % w.chain)
+    fmt = "analysis/sonar/{subject}/{chain}.{chain_type}/germline.{segment}.fasta"
+    mktarget = lambda s: fmt.format(
+        subject=w.subject, chain=w.chain, chain_type=chain_type, segment=s)
+    targets = {segment: mktarget(segment) for segment in segments}
+    return targets
+
+from Bio import SeqIO
+
+rule lineage_gather_germline:
+    """Get the germline alleles (across segments) matched to a given linage.
+
+    This will create a FASTA file with at most three (V/D/J, for heavy) or two
+    (V/J, for light) sequences.
+    """
+    output: "analysis/reporting/lineages/{subject}.{lineage}.{chain}/germline.fasta"
+    input: unpack(lineage_gather_germline_input)
+    run:
+        lineage_attrs = ANTIBODY_LINEAGES[wildcards.lineage]
+        with open(output[0], "w") as f_out:
+            for key, val in input.items():
+                if wildcards.chain == "heavy":
+                    seqid = lineage_attrs[key + "H"]
+                else:
+                    seqid = lineage_attrs[key + "L"]
+                with open(val) as f_in:
+                    for record in SeqIO.parse(f_in, "fasta"):
+                        if record.id == seqid:
+                            SeqIO.write(record, f_out, "fasta")
+                            break
