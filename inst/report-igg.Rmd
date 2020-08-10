@@ -1,14 +1,7 @@
 # IgG+ Specimens - Lineage analysis with SONAR
 
-## pRESTO processing
-
-pRESTO pairs forward and reverse reads, applies a quality filter, and checks for
-the expected primer sequence at the start of the amplicons.  We can the sequence
-counts as compared with the cell counts through each step.
-
-```{r}
-drawtab(subset(counts_presto, select = -c(Subject, Timepoint, Chain)))
-```
+As I've implemented it, SONAR uses pRESTO's merged, quality-filtered,
+primer-matching reads as input.
 
 ## SONAR Analysis - Module 1
 

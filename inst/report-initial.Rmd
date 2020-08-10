@@ -30,14 +30,16 @@ if (! is.null(counts_stats$by_amplicon)) {
   if (! (length(handle) == length(unique(handle)))) {
     stop("Non-unique IDs for specimen handling")
   }
-
-  idx <- match(handle, with(counts_stats$assembly, paste(Timepoint, Specimen, Chain, ChainType)))
-  counts_presto$SeqsAssembled <- counts_stats$assembly$Seqs[idx]
-  idx <- match(handle, with(counts_stats$qual, paste(Timepoint, Specimen, Chain, ChainType)))
-  counts_presto$SeqsQualFilt <- counts_stats$qual$Seqs[idx]
-
-  counts_presto <- counts_presto[, c(colnames(counts_presto)["CellCount" != colnames(counts_presto)], "CellCount")]
-  counts_presto$FinalRatio <- with(counts_presto, round(SeqsQualFilt/CellCount, 8))
+  if (! is.null(counts_stats$assembly)) {
+    idx <- match(handle, with(counts_stats$assembly, paste(Timepoint, Specimen, Chain, ChainType)))
+    counts_presto$SeqsAssembled <- counts_stats$assembly$Seqs[idx]
+    if (! is.null(counts_stats$qual)) {
+     idx <- match(handle, with(counts_stats$qual, paste(Timepoint, Specimen, Chain, ChainType)))
+      counts_presto$SeqsQualFilt <- counts_stats$qual$Seqs[idx]
+      counts_presto <- counts_presto[, c(colnames(counts_presto)["CellCount" != colnames(counts_presto)], "CellCount")]
+      counts_presto$FinalRatio <- with(counts_presto, round(SeqsQualFilt/CellCount, 8))
+    }
+  }
 }
 ```
 
@@ -79,7 +81,7 @@ qualgrids_r2 <- list()
 for (idx in 1:nrow(counts_stats$by_sample)) {
   prefix <- file.path(
     ROOT,
-    "reporting",
+    "analysis", "reporting",
     counts_stats$by_sample$Run[idx],
     paste0("qualtrim.", counts_stats$by_sample$Sample[idx]))
   fp_r1 <- paste0(prefix, ".R1.csv")
@@ -117,7 +119,8 @@ for (sample in counts_stats$by_sample$Sample) {
 
 In some cases we've sequenced the same physical specimen multiple times, so we 
 combine these replicates for analysis (this way deduplication and such works
-across replicates).
+across replicates).  Again, we hope to see a high ratio (at least ten sequences
+per cell) to imply we've sequenced deeply.
 
 ```{r}
 with(NULL, {
@@ -128,4 +131,19 @@ with(NULL, {
   drawtab(tbl)
 })
 
+```
+
+
+## pRESTO processing
+
+pRESTO pairs forward and reverse reads, applies a quality filter, and checks for
+the expected primer sequence at the start of the amplicons.  We can check the 
+sequence counts as compared with the cell counts again through each step.  (I've
+set up SONAR to use the last step's output as input for IgG samples, while 
+IgDiscover uses the earlier per-specimen files and does its own read-merging 
+before analyzing the IgM samples.)  Since these numbers are not deduplicated in
+any way yet, we ideally will not lose many reads relative to the previous table.
+
+```{r}
+drawtab(subset(counts_presto, select = -c(Subject, Timepoint, Chain)))
 ```
