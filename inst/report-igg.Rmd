@@ -27,21 +27,34 @@ plot_rarefaction_curve <- function(data, metadata, samp) {
 }
 
 with(NULL, {
-  samps <- subset(metadata$samples, grepl("IgG+", SpecimenCellType))
-  fps <- file.path(
-    ROOT,
-    "analysis/reporting",
-    paste(samps$Specimen, samps$Chain, samps$Type, sep = "."),
-    "sonar_clusters_rarefaction.csv")
-  for (idx in 1:nrow(samps)) {
-      cat(paste0("\n\n### ", "Rarefaction Curve - ", samps$Specimen[idx], ".", samps$Chain[idx], ".", samps$Type[idx]), "\n\n")
-      fp <- fps[idx]
-      if (file.exists(fp)) {
-        data <- read.csv(fp)
-        # TODO make y-axis scaled by cell count, x axis by total reads
-        plot_rarefaction_curve(data, metadata, samps$Sample[idx])
-      } else {
-      cat("No rarefaction curve available.\n")
+
+  for (idx in 1:nrow(metadata$antibody_lineages)) {
+    lineage <- metadata$antibody_lineages$AntibodyLineage[idx]
+    subject <- metadata$antibody_lineages$Subject[idx]
+    samps <- subset(metadata$samples, grepl("IgG+", SpecimenCellType) & SpecimenSubject == subject)
+    if (nrow(samps) == 0) {
+      next
+    }
+    samps$Lineage <- lineage
+    fps <- file.path(
+      ROOT,
+      "analysis/reporting",
+      paste(samps$Specimen, samps$Lineage, samps$Chain, samps$Type, sep = "."),
+      "sonar_clusters_rarefaction.csv")
+      for (s_idx in 1:nrow(samps)) {
+        cat(paste0(
+          "\n\n### ",
+          "Rarefaction Curve - ",
+          samps$Specimen[s_idx], ".", samps$Lineage[s_idx], ".", samps$Chain[s_idx], ".", samps$Type[s_idx]),
+          "\n\n")
+        fp <- fps[s_idx]
+        if (file.exists(fp)) {
+          data <- read.csv(fp)
+          # TODO make y-axis scaled by cell count, x axis by total reads
+          plot_rarefaction_curve(data, metadata, samps$Sample[s_idx])
+        } else {
+        cat("No rarefaction curve available.\n")
+      }
     }
   }
 })
