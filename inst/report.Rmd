@@ -21,6 +21,8 @@ if (! "ROOT" %in% ls()) {
     ROOT <- normalizePath(file.path(getwd()))
   }
 }
+library(ggplot2)
+library(ggrepel)
 devtools::load_all(file.path(ROOT, "igseq"))
 ```
 

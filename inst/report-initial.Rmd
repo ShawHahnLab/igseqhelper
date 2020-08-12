@@ -64,16 +64,6 @@ drawtab(counts_stats$by_sample)
 
 ## By Sequencing Sample - Adapter and Quality Trimming
 
-The below heatmaps summarize read lengths after cutadapt's quality-based
-trimming with a range of possible quality thresholds.  The Y axis is a given
-cutadapt quality threshold, the X axis trimmed read length, and color signifies
-log10 count of reads trimmed to that length.  (For very low quality thresholds
-all reads are left full-length while for very high thresholds all are trimmed to
-zero.)  We can use this to choose a threshold that fits our reads well, for
-example by showing a distribution of read lengths that should be biologically
-plausible (i.e. some sequences for both chains will be shorter than the
-sequencer's configured read length).  This trimming is independent of the
-barcode+primer trimming that cutadapt also performs.
 
 ```{r}
 qualgrids_r1 <- list()
@@ -101,6 +91,59 @@ names(qualgrids_r1) <- counts_stats$by_sample$Sample
 names(qualgrids_r2) <- counts_stats$by_sample$Sample
 ```
 
+Our read trimming includes both adapter-matching and a quality threshold. 
+Different quality thresholds lead to more or less aggressive triming at the
+(typically lower-quality) ends of the reads.  Generally speaking, if the quality
+scores for a given sample's reads are high, then a varying threshold won't have
+much of an effect on the final read length, while if they're low, even a slight
+threshold will reduce read length substantially.
+
+I've come up with a value between zero and one for each sample (for both R1 and 
+R2) summarizing how much read length tends to change with a varying quality 
+threshold.  Values toward zero imply that reads are trimmed substantially with
+even a low threshold while values toward one imply that the read length is 
+largely unaffected.  The summary scatterplot below shows all samples with the R1
+values on the x-axis and R2 values on the y-axis.  Ideally our samples should
+stay toward the upper-right; if not, we may have a read quality problem.
+
+```{r fig.width=8, fig.height=6}
+qualtrim_metric <- function(qualgrid) {
+  # At each quality score, what's the median length?  (The math gets goofy
+  # because I've already binned the values into the matrix.)
+  vec <- apply(qualgrid, 1, function(row) {
+    match(TRUE, cumsum(row) > sum(row)/2) })
+  # Now, normalizing both axes, what's the integral of the length with respect
+  # to the quality?  This will give us a value from zero to one, with lower
+  # numbers implying more aggressive trimming for a given quality threshold than
+  # higher numbers.
+  sum(vec/max(vec))/length(vec)
+}
+
+qualmetrics <- data.frame(
+  Sample = names(qualgrids_r1),
+  R1Metric = sapply(qualgrids_r1, qualtrim_metric),
+  R2Metric = sapply(qualgrids_r2, qualtrim_metric),
+  stringsAsFactors = FALSE)
+
+ggplot(
+  qualmetrics,
+  aes(x = R1Metric, y = R2Metric, label = Sample)) +
+  geom_point() +
+  geom_text_repel(size = 2) +
+  labs(xlab = "R1 Metric", ylab = "R2 Metric")
+```
+
+The below heatmaps summarize read lengths after cutadapt's quality-based
+trimming with a range of possible quality thresholds.  The Y axis is a given
+cutadapt quality threshold, the X axis trimmed read length, and color signifies
+log10 count of reads trimmed to that length.  (For very low quality thresholds
+all reads are left full-length while for very high thresholds all are trimmed to
+zero.)  We can use this to choose a threshold that fits our reads well, for
+example by showing a distribution of read lengths that should be biologically
+plausible (i.e. some sequences for both chains will be shorter than the
+sequencer's configured read length).  This trimming is independent of the
+barcode+primer trimming that cutadapt also performs.
+
 ```{r fig.width = 3.7, fig.height = 3, dev="png", dpi=150}
 for (sample in counts_stats$by_sample$Sample) {
   if (! is.null(qualgrids_r1[[sample]]) && ! is.null(qualgrids_r2[[sample]]) && sum(qualgrids_r1[[sample]]) > 100) {
@@ -127,14 +170,15 @@ with(NULL, {
   tbl <- counts_stats$by_amplicon
   idx <- match(counts_stats$by_amplicon$Specimen, metadata$specimens$Specimen)
   tbl$CellType <- metadata$specimens$CellType[idx]
-  tbl <- tbl[, c("Timepoint", "Chain", "ChainType", "CellType", "Specimen", "Seqs", "CellCount", "Ratio")]
+  tbl <- tbl[, c("Subject", "Timepoint", "ChainType", "CellType", "Specimen", "Seqs", "CellCount", "Ratio")]
+  tbl <- tbl[do.call(order, tbl), ]
   drawtab(tbl)
 })
 
 ```
 
 
-## pRESTO processing
+### pRESTO processing
 
 pRESTO pairs forward and reverse reads, applies a quality filter, and checks for
 the expected primer sequence at the start of the amplicons.  We can check the 
@@ -145,5 +189,7 @@ before analyzing the IgM samples.)  Since these numbers are not deduplicated in
 any way yet, we ideally will not lose many reads relative to the previous table.
 
 ```{r}
-drawtab(subset(counts_presto, select = -c(Subject, Timepoint, Chain)))
+tbl2 <- subset(counts_presto, select = -c(Subject, Timepoint, Chain))
+idx <- order(match(with(tbl2, paste(Specimen, ChainType)), with(tbl, paste(Specimen, ChainType))))
+drawtab(tbl2[idx, ])
 ```
