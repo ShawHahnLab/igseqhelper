@@ -5,6 +5,7 @@ Summarizing and reporting helper functions - Sequence counts.
 import csv
 import re
 import logging
+from collections import defaultdict
 from igseq.data import load_csv, get_samples_per_run, MetadataError
 
 LOGGER = logging.getLogger(__name__)
@@ -159,6 +160,24 @@ def counts_presto_qual_summary(input_fps, output_fp, specimens):
         writer = csv.DictWriter(f_out, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(counts)
+
+def counts_sonar_module1_summary(input_fps, output_fp, attrs):
+    """Take a list of per-specimen SONAR rearrangment files and make a summary table."""
+    fields_attrs = ["subject", "antibody_lineage", "chain", "chain_type", "specimen"]
+    fields_cts = ["good", "nonproductive", "indel", "noCDR3", "noJ", "noV", "stop"]
+    with open(output_fp, "wt", 1) as f_out:
+        writer = csv.DictWriter(f_out, lineterminator="\n", fieldnames=fields_attrs + fields_cts)
+        writer.writeheader()
+        for idx, input_fp in enumerate(input_fps):
+            attrs_here = {key: vec[idx] for key, vec in attrs.items()}
+            cts = {key: 0 for key in fields_cts}
+            with open(input_fp) as f_in:
+                reader = csv.DictReader(f_in, delimiter="\t")
+                for row in reader:
+                    cts[row["status"]] += int(row["duplicate_count"])
+            for key in cts:
+                attrs_here[key] = cts[key]
+            writer.writerow(attrs_here)
 
 def divide(val1, val2, fmt="{:.6f}"):
     """Divide val1 by val2 as floats and return formatted string."""

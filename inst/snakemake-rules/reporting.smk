@@ -16,7 +16,8 @@ from igseq.reporting.counts import (
     counts_run_summary,
     counts_specimen_summary,
     counts_assembly_summary,
-    counts_presto_qual_summary)
+    counts_presto_qual_summary,
+    counts_sonar_module1_summary)
 from igseq.reporting.igdiscover import (
     convert_combined_alignment,
     combine_aligned_segments,
@@ -58,7 +59,7 @@ TARGET_IGDISCOVER_ALLELE_ALIGNMENTS = _get_allele_alignment_targets()
 
 TARGET_SONAR_RAREFACTION = expand(
     "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
-    zip, **setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
+    zip, **igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
 
 rule all_qualtrim_grid:
     input: TARGET_QUALTRIM_GRID
@@ -198,6 +199,16 @@ rule counts_presto_qual_summary:
     output: "analysis/reporting/counts_presto_qual_summary.csv"
     input: TARGET_PRESTO_QUAL_COUNTS
     run: counts_presto_qual_summary(input, output[0], SPECIMENS)
+
+rule counts_sonar_module1_summary:
+    """A per-specimen summary of clustered and categorized read counts."""
+    output: "analysis/reporting/counts_sonar_module1_summary.csv"
+    input: expand("analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/{specimen}_rearrangements.tsv", zip, **igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
+    run:
+        counts_sonar_module1_summary(
+            input,
+            output[0],
+            igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
 
 # TODO next: also tally after pRESTO's QC and primer checking.  Maybe do a
 # summary table in the report of counts following assembly, qc, and primer
