@@ -36,9 +36,9 @@ load_csv_maybe <- function(fp, ...) {
   data
 }
 
-drawtab <- function(df) {
+drawtab <- function(df, ...) {
   kableExtra::kable_styling(
-    knitr::kable(df, digits = 3, row.names = FALSE, booktabs = TRUE))
+    knitr::kable(df, digits = 3, row.names = FALSE, booktabs = TRUE), ...)
 }
 ```
 

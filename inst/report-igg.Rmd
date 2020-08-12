@@ -5,9 +5,19 @@ primer-matching reads as input.
 
 ## SONAR Analysis - Module 1
 
+
 SONAR's first step is to cluster duplicate and similar sequences together,
 categorize sequences (full-length, productive, non-productive, etc.), and
 identify regions such as V(D)J segments and CDR3.
+
+
+```{r}
+tbl <- subset(counts_stats$sonar, select = -c(chain, antibody_lineage))
+colnames(tbl)[match("nonproductive", colnames(tbl))] <- "nonprod"
+tbl$GoodRatio <- tbl$good/(
+  tbl$good + tbl$nonprod + tbl$indel + tbl$noCDR3 + tbl$noJ + tbl$noV + tbl$stop)
+ drawtab(tbl, font_size=8)
+```
 
 To try to demonstrate that we have sufficient sequencing depth per cell and cell
 counts per specimen, we can subsample the raw reads and tabulate number of

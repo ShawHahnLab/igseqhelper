@@ -20,6 +20,7 @@ counts_stats <- within(list(), {
   by_amplicon <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_amplicon_summary.csv"), NA)
   assembly <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_assembly_summary.csv"), NA)
   qual <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_presto_qual_summary.csv"), NA)
+  sonar <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_sonar_module1_summary.csv"), NA)
 })
 ```
 

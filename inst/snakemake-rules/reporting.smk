@@ -76,9 +76,9 @@ rule all_sonar_rarefaction:
 TARGET_REPORT_ALL = [Path("analysis/report.pdf").resolve()]
 
 TARGET_REPORT_INPUTS = expand(
-    "analysis/reporting/{thing}.csv",
-    thing=["counts_by_sample", "counts_by_run", "counts_amplicon_summary",
-           "counts_assembly_summary", "counts_presto_qual_summary"]) + \
+    "analysis/reporting/counts_{thing}.csv",
+    thing=["by_sample", "by_run", "amplicon_summary",
+           "assembly_summary", "presto_qual_summary", "sonar_module1_summary"]) + \
            TARGET_QUALTRIM_GRID + \
            TARGET_IGDISCOVER_CLUSTERPLOTS + \
            TARGET_SONAR_RAREFACTION + \
