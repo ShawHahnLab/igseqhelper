@@ -57,8 +57,8 @@ def _get_allele_alignment_targets():
 TARGET_IGDISCOVER_ALLELE_ALIGNMENTS = _get_allele_alignment_targets()
 
 TARGET_SONAR_RAREFACTION = expand(
-    "analysis/reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
-    zip, chain=SAMPLE_MD_IGG["chains"], chain_type=SAMPLE_MD_IGG["chaintypes"], specimen=SAMPLE_MD_IGG["specimens"])
+    "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
+    zip, **setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
 
 rule all_qualtrim_grid:
     input: TARGET_QUALTRIM_GRID
@@ -80,6 +80,7 @@ TARGET_REPORT_INPUTS = expand(
            "counts_assembly_summary", "counts_presto_qual_summary"]) + \
            TARGET_QUALTRIM_GRID + \
            TARGET_IGDISCOVER_CLUSTERPLOTS + \
+           TARGET_SONAR_RAREFACTION + \
            TARGET_IGDISCOVER_ALLELE_ALIGNMENTS
 
 TARGET_REPORT_COUNTS = expand(
@@ -118,29 +119,35 @@ rule qualtrim_grid:
 def input_sonar_clusters_by_read(w):
     targets = {}
     subject = SPECIMENS[w.specimen]["Subject"]
-    targets["rearr"] = "analysis/sonar/{subject}/{chain}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv".format(
-        subject=subject, chain=w.chain, chain_type=w.chain_type, specimen=w.specimen)
+    targets["rearr"] = "analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/{specimen}_rearrangements.tsv".format(
+        subject=subject, chain=w.chain, chain_type=w.chain_type, antibody_lineage=w.antibody_lineage, specimen=w.specimen)
     for samp_name, samp_attrs in SAMPLES.items():
         if samp_attrs["Specimen"] == w.specimen and \
             samp_attrs["Chain"] == w.chain and \
             samp_attrs["Type"] == w.chain_type:
-            targets[samp_name] = "analysis/demux/{run}/{sample}.I1.fastq.gz".format(
+            if not samp_name in targets:
+                targets[samp_name] = []
+            targets[samp_name] += expand("analysis/demux/{run}/{chunk}/{sample}.I1.fastq.gz",
                 run=samp_attrs["Run"],
+                chunk=CHUNKS,
                 sample=samp_name)
     return targets
 
 rule sonar_clusters_by_read:
     """Make a CSV pairing raw sequence read IDs with the SONAR cluster they map to."""
-    output: "analysis/reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
+    output: "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
     input: unpack(input_sonar_clusters_by_read)
     run:
         fp_rearr = input.rearr
-        fps_fqgz = [val for key, val in input.items() if key is not "rearr"]
+        fps_fqgz = []
+        for key, val in input.items():
+            if key is not "rearr":
+                fps_fqgz.extend(val)
         get_rearr_centroids_by_raw_reads(fp_rearr, fps_fqgz, output[0])
 
 rule rarefy_sonar_clusters:
-    output: "analysis/reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv"
-    input: "analysis/reporting/{specimen}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
+    output: "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv"
+    input: "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
     run: rarefy_sonar_clusters(input[0], output[0])
 
 # Sample-based

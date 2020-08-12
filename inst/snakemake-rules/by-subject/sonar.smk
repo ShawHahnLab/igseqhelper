@@ -23,14 +23,12 @@ SAMPLE_MD_IGG = transpose_sample_md(SAMPLES, "IgG+")
 # subject/chain/chain type.
 WD_SONAR = Path("analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}")
 
-def setup_sonar_targets(sample_md_igg, antibody_lineages):
-    """Create dictionary of targets for various SONAR rules.
+def setup_sonar_combos(sample_md_igg, antibody_lineages):
+    """Create dictoniary of lists of attributes used for various SONAR rules.
 
-    The interleaved paths with many templated variables get really intricate
-    here, so I'm hiding the complexity in this setup fuction and storing the
-    targets in a single unified dictionary based on SONAR module.
+    The output is structured to work easily with expand(pattern, zip, **output)
+    in snakemake rules.
     """
-
     lineages_per_subject = {}
     for lineage_name, lineage_attrs in antibody_lineages.items():
         subject_name = lineage_attrs["Subject"]
@@ -38,6 +36,36 @@ def setup_sonar_targets(sample_md_igg, antibody_lineages):
             lineages_per_subject[subject_name] = []
         lineages_per_subject[subject_name].append(lineage_name)
 
+    # These are the key attributes we refer to for SONAR, named to match the
+    # wildcards used in the rules.
+    combos = {
+        "subject": [],
+        "antibody_lineage": [],
+        "chain": [],
+        "chain_type": [],
+        "specimen": []}
+    for subject in lineages_per_subject:
+        filter_to_subject = lambda vec: [x for x, y in zip(vec, sample_md_igg["subjects"]) if y == subject]
+        for lineage in lineages_per_subject[subject]:
+            chains = filter_to_subject(sample_md_igg["chains"])
+            chain_types = filter_to_subject(sample_md_igg["chaintypes"])
+            specimens = filter_to_subject(sample_md_igg["specimens"])
+            for chain, chain_type, specimen in zip(chains, chain_types, specimens):
+                combos["subject"].append(subject)
+                combos["antibody_lineage"].append(lineage)
+                combos["chain"].append(chain)
+                combos["chain_type"].append(chain_type)
+                combos["specimen"].append(specimen)
+    return combos
+
+def setup_sonar_targets(sample_md_igg, antibody_lineages):
+    """Create dictionary of targets for various SONAR rules.
+
+    The interleaved paths with many templated variables get really intricate
+    here, so I'm hiding the complexity in this setup fuction and storing the
+    targets in a single unified dictionary based on SONAR module.
+    """
+    sonar_combos = setup_sonar_combos(sample_md_igg, antibody_lineages)
     pattern_root = "analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}"
     patterns = {
         "prep": pattern_root + "/{specimen}/{specimen}.fastq",
@@ -46,20 +74,7 @@ def setup_sonar_targets(sample_md_igg, antibody_lineages):
         "module_2_id_div": pattern_root + "/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
         "module_2_id_div_island": pattern_root + "/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa",
         "module_3": pattern_root + "/longitudinal/output/longitudinal_igphyml.tree"}
-    targets = {key: [] for key in patterns}
-
-    for subject in lineages_per_subject:
-        filter_to_subject = lambda vec: [x for x, y in zip(vec, sample_md_igg["subjects"]) if y == subject]
-        for lineage in lineages_per_subject[subject]:
-            for name, pattern in patterns.items():
-                targets[name].extend(expand(
-                    pattern,
-                    zip,
-                    subject=filter_to_subject(sample_md_igg["subjects"]),
-                    chain=filter_to_subject(sample_md_igg["chains"]),
-                    chain_type=filter_to_subject(sample_md_igg["chaintypes"]),
-                    antibody_lineage=[lineage] * len(filter_to_subject(sample_md_igg["subjects"])),
-                    specimen=filter_to_subject(sample_md_igg["specimens"])))
+    targets = {key: expand(pattern, zip, **sonar_combos) for key, pattern in patterns.items()}
     return targets
 
 TARGETS_SONAR = setup_sonar_targets(SAMPLE_MD_IGG, ANTIBODY_LINEAGES)
