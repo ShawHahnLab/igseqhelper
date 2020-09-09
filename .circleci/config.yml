@@ -15,7 +15,7 @@ jobs:
             if [[ ! -e ~/miniconda3/envs/igseq ]]; then
               wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
               bash Miniconda3-latest-Linux-x86_64.sh -b
-              ~/miniconda3/bin/conda env update --file igseq/inst/environment.yml
+              ~/miniconda3/bin/conda env update --file igseq/inst/environment.yml --quiet
             fi
           no_output_timeout: 20m
       - save_cache:
