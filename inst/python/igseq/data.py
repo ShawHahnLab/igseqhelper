@@ -136,7 +136,7 @@ def load_csv(fp_in, key=None):
             entries[row_key] = row
     return entries
 
-def get_data(runid, outdir, runs, runpath=None):
+def get_data(runid, outdir, runs, runpath=None, threads=None):
     """Get the raw data files for a single run, either from local disk or from URLs.
 
     runid: Illumina Run ID
@@ -156,40 +156,10 @@ def get_data(runid, outdir, runs, runpath=None):
         "I1": Path(outdir) / "Undetermined_S0_L001_I1_001.fastq.gz"}
     # Get data from raw run data
     if rundir and rundir.is_dir():
-        LOGGER.info("get_data: running bcl2fastq")
-        shell(
-            """
-                bcl2fastq --create-fastq-for-index-reads \
-                    -R /seq/runs/{runid} \
-                    -o {outdir}
-            """)
+        _get_data_bcl2fastq(runid, outdir, threads)
     # Get data from URLs
     else:
-        url = runs[runid].get("URL")
-        # If there's a unified URL, it's a zip file with R2/R2/I1 inside.
-        if url:
-            LOGGER.info("get_data: downloading single zip")
-            shell("cd $(dirname {outdir}) && wget -q '{url}' && unzip \"$(basename '{url}')\"")
-        # If there are separate URLs, they're the R1/R2/I1 fastq.gz themselves.
-        else:
-            urls = {key: runs[runid].get(key) for key in ("URLR1", "URLR2", "URLI1")}
-            if urls["URLR1"] and urls["URLR2"] and urls["URLI1"]:
-                LOGGER.info("get_data: downloading separate zips")
-                urlr1 = urls["URLR1"]
-                urlr2 = urls["URLR2"]
-                urli1 = urls["URLI1"]
-                outr1 = outfiles["R1"].name
-                outr2 = outfiles["R2"].name
-                outi1 = outfiles["I1"].name
-                shell(
-                    """
-                        cd {outdir}
-                        wget -q '{urlr1}' && mv $(basename '{urlr1}') {outr1}
-                        wget -q '{urlr2}' && mv $(basename '{urlr2}') {outr2}
-                        wget -q '{urli1}' && mv $(basename '{urli1}') {outi1}
-                    """)
-            else:
-                raise ValueError("Need raw data or URLs for run %s" % runid)
+        _get_data_download(runid, outdir, runs, outfiles)
     # Check files against expected checksums, if present.
     md5s = {key: runs[runid].get(key) for key in ("MD5R1", "MD5R2", "MD5I1")}
     if md5s["MD5R1"] and not md5s["MD5R1"] == md5(outfiles["R1"]):
@@ -201,6 +171,53 @@ def get_data(runid, outdir, runs, runpath=None):
     if md5s["MD5I1"] and not md5s["MD5I1"] == md5(outfiles["I1"]):
         outfiles["I1"].rename(str(outfiles["I1"]) + ".failed")
         raise ValueError("MD5 mismatch on %s" % outfiles["I1"])
+
+def _get_data_bcl2fastq(runid, outdir, threads):
+    """Get data locally by running bcl2fastq on raw run directory."""
+    LOGGER.info("get_data: running bcl2fastq")
+    if threads:
+        shell(
+            """
+                bcl2fastq --create-fastq-for-index-reads \
+                    -r {threads} -d {threads} -p {threads} -w {threads} \
+                    -R /seq/runs/{runid} \
+                    -o {outdir}
+            """.format(runid=runid, outdir=outdir, threads=threads))
+    else:
+        shell(
+            """
+                bcl2fastq --create-fastq-for-index-reads \
+                    -R /seq/runs/{runid} \
+                    -o {outdir}
+            """.format(runid=runid, outdir=outdir))
+
+def _get_data_download(runid, outdir, runs, outfiles):
+    """Get data remotely by downloading zip files."""
+    url = runs[runid].get("URL")
+    # If there's a unified URL, it's a zip file with R2/R2/I1 inside.
+    if url:
+        LOGGER.info("get_data: downloading single zip")
+        shell("cd $(dirname {outdir}) && wget -q '{url}' && unzip \"$(basename '{url}')\"")
+    # If there are separate URLs, they're the R1/R2/I1 fastq.gz themselves.
+    else:
+        urls = {key: runs[runid].get(key) for key in ("URLR1", "URLR2", "URLI1")}
+        if urls["URLR1"] and urls["URLR2"] and urls["URLI1"]:
+            LOGGER.info("get_data: downloading separate zips")
+            urlr1 = urls["URLR1"]
+            urlr2 = urls["URLR2"]
+            urli1 = urls["URLI1"]
+            outr1 = outfiles["R1"].name
+            outr2 = outfiles["R2"].name
+            outi1 = outfiles["I1"].name
+            shell(
+                """
+                    cd {outdir}
+                    wget -q '{urlr1}' && mv $(basename '{urlr1}') {outr1}
+                    wget -q '{urlr2}' && mv $(basename '{urlr2}') {outr2}
+                    wget -q '{urli1}' && mv $(basename '{urli1}') {outi1}
+                """)
+        else:
+            raise ValueError("Need raw data or URLs for run %s" % runid)
 
 def md5(fp_in):
     """Get MD5 checksum of a file as a hex string."""
@@ -222,10 +239,15 @@ def chunk_fqgz(files_in, files_out):
                     SeqIO.write(record, f_out, "fastq")
 
 def get_samples_per_run(samples):
-    """Make a dictionary of run names -> lists of sample names."""
+    """Make a dictionary of run names -> lists of sample names.
+
+    Samples with no run specified are skipped.
+    """
     samples_per_run = {}
     for sample_name, sample_attrs in samples.items():
         runid = sample_attrs["Run"]
+        if not runid:
+            continue
         if not runid in samples_per_run:
             samples_per_run[runid] = []
         samples_per_run[runid].append(sample_name)
