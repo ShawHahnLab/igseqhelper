@@ -43,7 +43,7 @@ except FileNotFoundError:
     ANTIBODY_LINEAGES = {}
     ANTIBODY_ISOLATES = {}
 
-checkpoint get_metadata:
+rule get_metadata:
     """Create CSV files from Google sheets based on metadata YAML."""
     output:
        sequences="metadata/sequences.csv",

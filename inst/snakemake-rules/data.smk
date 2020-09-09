@@ -11,12 +11,12 @@ import igseq.data
 rule all_get_data:
     """Get data files for all sequencing runs.
 
-    This lists the metadata checkpoint output as input so that we know what the
+    This lists the metadata rule output as input so that we know what the
     sequencing runs are before running the rule.
     """
     input:
         rundir=expand("data/{run}", run = SAMPLES.keys()),
-        metadata=lambda w: checkpoints.get_metadata.get().output
+        metadata=ancient(rules.get_metadata.output)
 
 rule get_data:
     """Get data files for a run.
@@ -33,9 +33,10 @@ rule get_data:
     what's R1, R2, and I1).
     """
     output: protected(directory("data/{run}"))
-    input: lambda w: checkpoints.get_metadata.get().output
+    input: ancient(rules.get_metadata.output)
     params: runpath="/seq/runs"
-    run: igseq.data.get_data(wildcards.run, output[0], RUNS, params.runpath)
+    threads: 8
+    run: igseq.data.get_data(wildcards.run, output[0], RUNS, params.runpath, threads)
 
 #############
 
