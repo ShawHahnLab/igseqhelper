@@ -1,10 +1,24 @@
 """
 Custom demultiplexing for our IgSeq protocol.
+
+Some optional rules at the end blast the unassigned reads to try to roughly
+categorize what wasn't assigned to samples.
 """
 
 from pathlib import Path
+import gzip
+from Bio import SeqIO
 from igseq.demux import demux
 from igseq.util import normalize_read_files
+from igseq.blast import blast, group_blast_results, BLAST_TAX_GROUPS
+
+TARGET_DEMUX = expand(
+    outputs_per_run("analysis/demux/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz", SAMPLES),
+    chunk=CHUNKS,
+    rp=["R1", "R2", "I1"])
+
+rule all_demux:
+    input: TARGET_DEMUX
 
 def gather_samples_for_demux(samples_all, runid):
     """Make dictionary of sample names to attrs for a given Run ID."""
@@ -71,44 +85,73 @@ rule chunk_raw_data:
         input_paths = [x[wildcards.rp] for x in fp_sets]
         igseq.data.chunk_fqgz(input_paths, output)
 
-rule igblast_raw:
-    output: "analysis/data/igblast/{run}/chunk_{chunk}_airr.tsv"
-    input:
-        query="analysis/data/{run}/chunk_{chunk}_R1.fasta",
-        db_v="analysis/data/igblast/v.fasta.nhr",
-        db_d="analysis/data/igblast/d.fasta.nhr",
-        db_j="analysis/data/igblast/j.fasta.nhr"
-    params:
-        outfmt=19, # AIRR TSV format
-        organism="rhesus_monkey"
+#rule igblast_raw:
+#    output: "analysis/data/igblast/{run}/chunk_{chunk}_airr.tsv"
+#    input:
+#        query="analysis/data/{run}/chunk_{chunk}_R1.fasta",
+#        db_v="analysis/data/igblast/v.fasta.nhr",
+#        db_d="analysis/data/igblast/d.fasta.nhr",
+#        db_j="analysis/data/igblast/j.fasta.nhr"
+#    params:
+#        outfmt=19, # AIRR TSV format
+#        organism="rhesus_monkey"
+#    shell:
+#        """
+#            dbv={input.db_v}
+#            dbv=${{dbv%.nhr}}
+#            dbd={input.db_d}
+#            dbd=${{dbd%.nhr}}
+#            dbj={input.db_j}
+#            dbj=${{dbj%.nhr}}
+#            igblastn \
+#                -germline_db_V $dbv \
+#                -germline_db_D $dbd \
+#                -germline_db_J $dbj \
+#                -outfmt {params.outfmt} \
+#                -organism {params.organism} \
+#                -ig_seqtype Ig \
+#                -query {input.query} \
+#                -out {output}
+#        """
+#
+#rule igblast_db:
+#    output: "analysis/data/igblast/{prefix}.fasta.nhr"
+#    input: "analysis/data/igblast/{prefix}.fasta"
+#    shell: "makeblastdb -dbtype nucl -parse_seqids -in {input}"
+
+rule categorize_blast_results:
+    """Group the BLAST results from blast_unassigned into a few main categories"""
+    output: csv="analysis/demux/{run}/{chunk}/unassigned.{rp}.blast_grouped.csv"
+    input: tsv="analysis/demux/{run}/{chunk}/unassigned.{rp}.blast_dedup.tsv"
+    run: group_blast_results(output.csv, input.tsv, BLAST_TAX_GROUPS)
+
+rule blast_dedup:
+    """Keep only the first BLAST result for each query ID"""
+    output: "analysis/demux/{run}/{chunk}/unassigned.{rp}.blast_dedup.tsv"
+    input: "analysis/demux/{run}/{chunk}/unassigned.{rp}.blast.tsv"
+    # only keep the first entry seen for each sequeence ID (later entries will
+    # have nonzero counts in awk's dictionary here)
     shell:
         """
-            dbv={input.db_v}
-            dbv=${{dbv%.nhr}}
-            dbd={input.db_d}
-            dbd=${{dbd%.nhr}}
-            dbj={input.db_j}
-            dbj=${{dbj%.nhr}}
-            igblastn \
-                -germline_db_V $dbv \
-                -germline_db_D $dbd \
-                -germline_db_J $dbj \
-                -outfmt {params.outfmt} \
-                -organism {params.organism} \
-                -ig_seqtype Ig \
-                -query {input.query} \
-                -out {output}
+            awk '!seen[$1]++' < {input} > {output}
         """
 
-rule igblast_db:
-    output: "analysis/data/igblast/{prefix}.fasta.nhr"
-    input: "analysis/data/igblast/{prefix}.fasta"
-    shell: "makeblastdb -dbtype nucl -parse_seqids -in {input}"
+rule blast_unassigned:
+    """BLAST reads that didn't match any known sample against nt.
 
-TARGET_DEMUX = expand(
-    outputs_per_run("analysis/demux/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz", SAMPLES),
-    chunk=CHUNKS,
-    rp=["R1", "R2", "I1"])
+    These are large because there many be many hits per query but we'll
+    deduplicate in the next rule.
+    """
+    output: tsv=temp("analysis/demux/{run}/{chunk}/unassigned.{rp}.blast.tsv")
+    input: fasta="analysis/demux/{run}/{chunk}/unassigned.{rp}.fasta"
+    threads: 4
+    run: blast(output.tsv, input.fasta, threads)
 
-rule all_demux:
-    input: TARGET_DEMUX
+rule unassigned_fasta:
+    """A simple FASTQ to FASTA rule for blastn."""
+    output: fasta=temp("analysis/demux/{run}/{chunk}/unassigned.{rp}.fasta")
+    input: fastq="analysis/demux/{run}/{chunk}/unassigned.{rp}.fastq.gz"
+    run:
+        with open(output.fasta, "wt") as f_out, gzip.open(input.fastq, "rt") as f_in:
+            for record in SeqIO.parse(f_in, "fastq"):
+                SeqIO.write(record, f_out, "fasta")
