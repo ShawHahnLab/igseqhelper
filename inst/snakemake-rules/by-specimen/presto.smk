@@ -46,7 +46,7 @@ rule presto_data:
 
 rule presto_primers:
     output: fwd="analysis/presto/vprimers.fasta"
-    input: sequences="metadata/sequences.csv"
+    input: sequences=ancient("metadata/sequences.csv")
     run: prep_primers_fwd(input.sequences, output.fwd)
 
 ### Paired-end Assembly
