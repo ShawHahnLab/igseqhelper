@@ -27,8 +27,11 @@ from igseq.data import amplicon_files, transpose_sample_md
 
 SAMPLE_MD_IGM = transpose_sample_md(SAMPLES, "IgM+")
 
+# Only for samples where we have the run info
 TARGET_QUALTRIM_GRID = expand(
-    outputs_per_run("analysis/reporting/{run}/qualtrim.{sample}.{{rp}}.csv", SAMPLES),
+    outputs_per_run(
+        "analysis/reporting/{run}/qualtrim.{sample}.{{rp}}.csv",
+        {key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}),
     rp=["R1", "R2", "I1"])
 
 TARGET_IGDISCOVER_CLUSTERPLOTS = expand(
@@ -59,7 +62,10 @@ TARGET_IGDISCOVER_ALLELE_ALIGNMENTS = _get_allele_alignment_targets()
 
 TARGET_SONAR_RAREFACTION = expand(
     "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
-    zip, **igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
+    zip, **igseq.sonar.setup_sonar_combos(
+        transpose_sample_md({key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}, "IgG+"),
+        ANTIBODY_LINEAGES))
+
 
 rule all_qualtrim_grid:
     input: TARGET_QUALTRIM_GRID
@@ -85,11 +91,11 @@ TARGET_REPORT_INPUTS = expand(
            TARGET_IGDISCOVER_ALLELE_ALIGNMENTS
 
 TARGET_REPORT_COUNTS = expand(
-    outputs_per_run("analysis/counts/demux/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz.counts", SAMPLES),
+    outputs_per_run("analysis/counts/demux/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz.counts", {key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}),
     chunk=CHUNKS,
     rp=["R1", "R2", "I1"]) + expand(
         "analysis/counts/demux/{run}/{chunk}/unassigned.{rp}.fastq.gz.counts",
-        run=set([entry["Run"] for entry in SAMPLES.values()]),
+        run=set([entry["Run"] for entry in SAMPLES.values() if entry["Run"]]),
         chunk=CHUNKS,
         rp=["R1", "R2", "I1"])
 
