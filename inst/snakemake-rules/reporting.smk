@@ -30,7 +30,7 @@ SAMPLE_MD_IGM = transpose_sample_md(SAMPLES, "IgM+")
 # Only for samples where we have the run info
 TARGET_QUALTRIM_GRID = expand(
     outputs_per_run(
-        "analysis/reporting/{run}/qualtrim.{sample}.{{rp}}.csv",
+        "analysis/reporting/by-run/{run}/qualtrim.{sample}.{{rp}}.csv",
         {key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}),
     rp=["R1", "R2", "I1"])
 
@@ -50,7 +50,7 @@ def _get_allele_alignment_targets():
         for lineage, lineage_attrs in ANTIBODY_LINEAGES.items():
             if lineage_attrs["Subject"] == subject:
                 targets.append(
-                    ("analysis/reporting/{specimen}.{chain}.{chain_type}"
+                    ("analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}"
                     "/antibodies.{lineage}/VDJ.aligned.csv").format(
                         specimen=specimen,
                         chain=chain,
@@ -61,7 +61,7 @@ def _get_allele_alignment_targets():
 TARGET_IGDISCOVER_ALLELE_ALIGNMENTS = _get_allele_alignment_targets()
 
 TARGET_SONAR_RAREFACTION = expand(
-    "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
+    "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
     zip, **igseq.sonar.setup_sonar_combos(
         transpose_sample_md({key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}, "IgG+"),
         ANTIBODY_LINEAGES))
@@ -82,7 +82,7 @@ rule all_sonar_rarefaction:
 TARGET_REPORT_ALL = [Path("analysis/report.pdf").resolve()]
 
 TARGET_REPORT_INPUTS = expand(
-    "analysis/reporting/counts_{thing}.csv",
+    "analysis/reporting/counts/counts_{thing}.csv",
     thing=["by_sample", "by_run", "amplicon_summary",
            "assembly_summary", "presto_qual_summary", "sonar_module1_summary"]) + \
            TARGET_QUALTRIM_GRID + \
@@ -119,7 +119,7 @@ rule render_report:
 
 rule qualtrim_grid:
     """Make a CSV table summarizing cutadapt trim cutoffs vs output length."""
-    output: "analysis/reporting/{run}/qualtrim.{sample}.{rp}.csv"
+    output: "analysis/reporting/by-run/{run}/qualtrim.{sample}.{rp}.csv"
     input: expand("analysis/demux/{{run}}/{chunk}/{{sample}}.{{rp}}.fastq.gz", chunk=CHUNKS)
     run: make_qualtrim_csv(input, output[0])
 
@@ -142,7 +142,7 @@ def input_sonar_clusters_by_read(w):
 
 rule sonar_clusters_by_read:
     """Make a CSV pairing raw sequence read IDs with the SONAR cluster they map to."""
-    output: "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
+    output: "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
     input: unpack(input_sonar_clusters_by_read)
     run:
         fp_rearr = input.rearr
@@ -153,15 +153,15 @@ rule sonar_clusters_by_read:
         get_rearr_centroids_by_raw_reads(fp_rearr, fps_fqgz, output[0])
 
 rule rarefy_sonar_clusters:
-    output: "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv"
-    input: "analysis/reporting/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
+    output: "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv"
+    input: "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
     run: rarefy_sonar_clusters(input[0], output[0])
 
 # Sample-based
 
 rule counts_table:
     """Just a big ol' list of file paths and read counts."""
-    output: "analysis/reporting/counts.csv"
+    output: "analysis/reporting/counts/counts.csv"
     input: TARGET_REPORT_COUNTS
     run:
         import csv
@@ -176,39 +176,39 @@ rule counts_table:
 
 rule counts_sample_summary:
     """A per-sample summary of raw read counts."""
-    output: "analysis/reporting/counts_by_sample.csv"
-    input: "analysis/reporting/counts.csv"
+    output: "analysis/reporting/counts/counts_by_sample.csv"
+    input: "analysis/reporting/counts/counts.csv"
     run: counts_sample_summary(input[0], output[0], SAMPLES)
 
 rule counts_run_summary:
     """A per-run summary of raw read counts."""
-    output: "analysis/reporting/counts_by_run.csv"
-    input: "analysis/reporting/counts_by_sample.csv"
+    output: "analysis/reporting/counts/counts_by_run.csv"
+    input: "analysis/reporting/counts/counts_by_sample.csv"
     run: counts_run_summary(input[0], output[0])
 
 # Specimen+chain -based
 
 rule counts_presto_amplicon_summary:
     """A per-amplicon summary of read counts."""
-    output: "analysis/reporting/counts_amplicon_summary.csv"
+    output: "analysis/reporting/counts/counts_amplicon_summary.csv"
     input: TARGET_AMPLICON_COUNTS
     run: counts_specimen_summary(input, output[0], SPECIMENS)
 
 rule counts_presto_assembly_summary:
     """A per-specimen summary of paired read counts."""
-    output: "analysis/reporting/counts_assembly_summary.csv"
+    output: "analysis/reporting/counts/counts_assembly_summary.csv"
     input: TARGET_ASSEMBLY_COUNTS
     run: counts_assembly_summary(input, output[0], SPECIMENS)
 
 rule counts_presto_qual_summary:
     """A per-specimen summary of paired read counts."""
-    output: "analysis/reporting/counts_presto_qual_summary.csv"
+    output: "analysis/reporting/counts/counts_presto_qual_summary.csv"
     input: TARGET_PRESTO_QUAL_COUNTS
     run: counts_presto_qual_summary(input, output[0], SPECIMENS)
 
 rule counts_sonar_module1_summary:
     """A per-specimen summary of clustered and categorized read counts."""
-    output: "analysis/reporting/counts_sonar_module1_summary.csv"
+    output: "analysis/reporting/counts/counts_sonar_module1_summary.csv"
     input: expand("analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/{specimen}_rearrangements.tsv", zip, **igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
     run:
         counts_sonar_module1_summary(
@@ -245,20 +245,20 @@ rule igdiscover_clusterplot_grid:
 
 rule igdiscover_allele_alignments_table:
     """Convert combined alignment into CSV of relevant attributes per sequence."""
-    output: csv="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.csv"
-    input: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.fasta"
+    output: csv="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.csv"
+    input: fasta="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.fasta"
     run:
         convert_combined_alignment(
             input.fasta, output.csv, SPECIMENS, ANTIBODY_ISOLATES, wildcards)
 
 rule igdiscover_allele_alignments_align_vdj:
     """Combine V(D)J alignments into one combined alignment."""
-    output: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.fasta"
+    output: fasta="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/VDJ.aligned.fasta"
     input:
-        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
-        with_v="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta",
-        with_d="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta",
-        with_j="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/J.aligned.fasta"
+        target="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
+        with_v="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta",
+        with_d="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta",
+        with_j="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/J.aligned.fasta"
     run:
         if wildcards.chain == "heavy":
             with_d = input.with_d
@@ -269,19 +269,19 @@ rule igdiscover_allele_alignments_align_vdj:
 
 rule igdiscover_allele_alignments_align_j:
     """Align discovered J alleles to target sequences based on V/J alignment."""
-    output: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/J.aligned.fasta"
+    output: fasta="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/J.aligned.fasta"
     input:
-        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
-        with_d="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta",
+        target="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
+        with_d="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta",
         j="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/J.fasta"
     run: align_next_segment(input.target, input.with_d, input.j, output.fasta)
 
 rule igdiscover_allele_alignments_align_d:
     """Align discovered D alleles to target sequences based on V alignment."""
-    output: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta"
+    output: fasta="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/D.aligned.fasta"
     input:
-        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
-        with_v="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta",
+        target="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
+        with_v="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta",
         d="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/D.fasta"
     run:
         if wildcards.chain == "heavy":
@@ -297,9 +297,9 @@ rule igdiscover_allele_alignments_align_v:
     gather_antibody_sequences, but if another FASTA is provided manually it'll
     work with that instead.
     """
-    output: fasta="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta"
+    output: fasta="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}/V.aligned.fasta"
     input:
-        target="analysis/reporting/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
+        target="analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/{target}.aln.fa",
         v="analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/V.fasta",
     shell:
         """
@@ -312,8 +312,8 @@ rule igdiscover_allele_alignments_align_v:
 
 rule align_targets:
     """Align target sequences to one another before bringing discovered alleles into the mix."""
-    output: "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.aln.fa"
-    input: "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.fasta"
+    output: "analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.aln.fa"
+    input: "analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.fasta"
     shell:
         """
             if [[ -s {input} ]]; then
@@ -325,7 +325,7 @@ rule align_targets:
 
 rule gather_antibody_sequences:
     """Gather mature antibody sequences to start off the alignment against."""
-    output: "analysis/reporting/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.fasta"
+    output: "analysis/reporting/by-specimen/{specimen}.{chain}.{chain_type}/antibodies.{antibody_lineage}.fasta"
     run:
         gather_antibodies(
             wildcards.antibody_lineage, wildcards.chain, ANTIBODY_ISOLATES, output[0])
@@ -343,7 +343,7 @@ rule lineage_gather_antibody_sequences:
 
     This is the same as gather_antibody_sequences but handles the output differently.
     """
-    output: "analysis/reporting/lineages/{subject}.{lineage}.{chain}/antibodies.fasta"
+    output: "analysis/reporting/by-lineage/{subject}.{lineage}.{chain}/antibodies.fasta"
     run:
         gather_antibodies(
             wildcards.lineage, wildcards.chain, ANTIBODY_ISOLATES, output[0])
@@ -383,7 +383,7 @@ rule lineage_gather_germline:
     This will create a FASTA file with at most three (V/D/J, for heavy) or two
     (V/J, for light) sequences.
     """
-    output: "analysis/reporting/lineages/{subject}.{lineage}.{chain}/germline.fasta"
+    output: "analysis/reporting/by-lineage/{subject}.{lineage}.{chain}/germline.fasta"
     input: unpack(lineage_gather_germline_input)
     run:
         lineage_attrs = ANTIBODY_LINEAGES[wildcards.lineage]

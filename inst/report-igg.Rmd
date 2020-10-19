@@ -48,7 +48,7 @@ with(NULL, {
     samps$Lineage <- lineage
     fps <- file.path(
       ROOT,
-      "analysis/reporting",
+      "analysis/reporting/by-specimen",
       paste(samps$Specimen, samps$Lineage, samps$Chain, samps$Type, sep = "."),
       "sonar_clusters_rarefaction.csv")
       for (s_idx in 1:nrow(samps)) {

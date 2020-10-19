@@ -14,13 +14,13 @@ metadata <- within(list(), {
 })
 
 counts_stats <- within(list(), {
-  by_sample <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_by_sample.csv"), NA)
+  by_sample <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_by_sample.csv"), NA)
   by_sample <- subset(by_sample, Sample != "unassigned")
-  by_run <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_by_run.csv"))
-  by_amplicon <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_amplicon_summary.csv"), NA)
-  assembly <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_assembly_summary.csv"), NA)
-  qual <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_presto_qual_summary.csv"), NA)
-  sonar <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts_sonar_module1_summary.csv"), NA)
+  by_run <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_by_run.csv"))
+  by_amplicon <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_amplicon_summary.csv"), NA)
+  assembly <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_assembly_summary.csv"), NA)
+  qual <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_presto_qual_summary.csv"), NA)
+  sonar <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_sonar_module1_summary.csv"), NA)
 })
 ```
 
@@ -72,7 +72,7 @@ qualgrids_r2 <- list()
 for (idx in 1:nrow(counts_stats$by_sample)) {
   prefix <- file.path(
     ROOT,
-    "analysis", "reporting",
+    "analysis", "reporting", "counts",
     counts_stats$by_sample$Run[idx],
     paste0("qualtrim.", counts_stats$by_sample$Sample[idx]))
   fp_r1 <- paste0(prefix, ".R1.csv")
