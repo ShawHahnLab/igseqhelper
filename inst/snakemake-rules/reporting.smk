@@ -10,7 +10,9 @@ before going in the Rmarkdown for the report.
 from igseq.reporting.trim import make_qualtrim_csv
 from igseq.reporting.sonar import (
     get_rearr_centroids_by_raw_reads,
-    rarefy_sonar_clusters)
+    rarefy_sonar_clusters,
+    sonar_island_summary,
+    sonar_island_stats)
 from igseq.reporting.counts import (
     counts_sample_summary,
     counts_run_summary,
@@ -156,6 +158,38 @@ rule rarefy_sonar_clusters:
     output: "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv"
     input: "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
     run: rarefy_sonar_clusters(input[0], output[0])
+
+def sonar_island_stats_input(w):
+    subject = SPECIMENS[w.specimen]["Subject"]
+    targets = {
+        "island": expand(
+            "analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/islandSeqs.txt",
+            subject=subject, chain=w.chain, chain_type=w.chain_type, antibody_lineage=w.antibody_lineage, specimen=w.specimen)[0],
+        "iddiv": expand(
+            "analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
+            subject=subject, chain=w.chain, chain_type=w.chain_type, antibody_lineage=w.antibody_lineage, specimen=w.specimen)[0]}
+    return targets
+rule sonar_island_stats:
+    """Condense the full ID/DIV stats to just those for one island and sumamrize across antibodies."""
+    output: "analysis/reporting/by-lineage/{antibody_lineage}/{specimen}.{chain}.{chain_type}/island_stats.csv"
+    input: unpack(sonar_island_stats_input)
+    run: sonar_island_stats(output[0], input.island, input.iddiv)
+
+def sonar_island_summary_input(w):
+    keep = lambda spec: spec["Subject"] == ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"] and "IgG" in spec["CellType"]
+    specimens = [specname for specname, specattrs in SPECIMENS.items() if keep(specattrs)]
+    return expand(
+        "analysis/reporting/by-lineage/{antibody_lineage}/{specimen}.{chain}.{chain_type}/island_stats.csv",
+        antibody_lineage=w.antibody_lineage,
+        specimen=specimens,
+        chain=w.chain,
+        chain_type=w.chain_type)
+
+rule sonar_island_summary:
+    """Further condense ID/DIV stats to one file per lineage."""
+    output: "analysis/reporting/by-lineage/{antibody_lineage}/{chain}.{chain_type}/island_stats_summary.csv"
+    input: sonar_island_summary_input
+    run: sonar_island_summary(output[0], input, SPECIMENS)
 
 # Sample-based
 
