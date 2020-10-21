@@ -72,7 +72,7 @@ qualgrids_r2 <- list()
 for (idx in 1:nrow(counts_stats$by_sample)) {
   prefix <- file.path(
     ROOT,
-    "analysis", "reporting", "counts",
+    "analysis", "reporting", "by-run",
     counts_stats$by_sample$Run[idx],
     paste0("qualtrim.", counts_stats$by_sample$Sample[idx]))
   fp_r1 <- paste0(prefix, ".R1.csv")
@@ -109,6 +109,9 @@ stay toward the upper-right; if not, we may have a read quality problem.
 
 ```{r fig.width=8, fig.height=6}
 qualtrim_metric <- function(qualgrid) {
+  if (is.null(qualgrid)) {
+    return(NA)
+  }
   # At each quality score, what's the median length?  (The math gets goofy
   # because I've already binned the values into the matrix.)
   vec <- apply(qualgrid, 1, function(row) {
@@ -145,7 +148,7 @@ plausible (i.e. some sequences for both chains will be shorter than the
 sequencer's configured read length).  This trimming is independent of the
 barcode+primer trimming that cutadapt also performs.
 
-```{r fig.width = 3.7, fig.height = 3, dev="png", dpi=150}
+```{r fig.width = 3.7, fig.height = 3, dev="png", dpi=150, eval=config$plot_qualgrid}
 for (sample in counts_stats$by_sample$Sample) {
   if (! is.null(qualgrids_r1[[sample]]) && ! is.null(qualgrids_r2[[sample]]) && sum(qualgrids_r1[[sample]]) > 100) {
   plot_qualgrid(qualgrids_r1[[sample]], main=paste(sample, "R1"),
@@ -168,12 +171,16 @@ per cell) to imply we've sequenced deeply.
 
 ```{r}
 with(NULL, {
-  tbl <- counts_stats$by_amplicon
-  idx <- match(counts_stats$by_amplicon$Specimen, metadata$specimens$Specimen)
-  tbl$CellType <- metadata$specimens$CellType[idx]
-  tbl <- tbl[, c("Subject", "Timepoint", "ChainType", "CellType", "Specimen", "Seqs", "CellCount", "Ratio")]
-  tbl <- tbl[do.call(order, tbl), ]
-  drawtab(tbl)
+  if (! is.null(counts_stats$by_amplicon)) {
+    tbl <- counts_stats$by_amplicon
+    idx <- match(counts_stats$by_amplicon$Specimen, metadata$specimens$Specimen)
+    tbl$CellType <- metadata$specimens$CellType[idx]
+    tbl <- tbl[, c("Subject", "Timepoint", "ChainType", "CellType", "Specimen", "Seqs", "CellCount", "Ratio")]
+    tbl <- tbl[do.call(order, tbl), ]
+    drawtab(tbl)
+  } else {
+    cat("by-amplicon CSV not found")
+  }
 })
 
 ```
@@ -190,7 +197,10 @@ before analyzing the IgM samples.)  Since these numbers are not deduplicated in
 any way yet, we ideally will not lose many reads relative to the previous table.
 
 ```{r}
-tbl2 <- subset(counts_presto, select = -c(Subject, Timepoint, Chain))
-idx <- order(match(with(tbl2, paste(Specimen, ChainType)), with(tbl, paste(Specimen, ChainType))))
-drawtab(tbl2[idx, ])
+if (! is.null(counts_stats$by_amplicon)) {
+  tbl2 <- subset(counts_presto, select = -c(Subject, Timepoint, Chain))
+  idx <- order(match(with(tbl2, paste(Specimen, ChainType)), with(tbl, paste(Specimen, ChainType))))
+  drawtab(tbl2[idx, ])
+}
+
 ```

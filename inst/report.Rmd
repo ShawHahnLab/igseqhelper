@@ -24,6 +24,11 @@ if (! "ROOT" %in% ls()) {
 library(ggplot2)
 library(ggrepel)
 devtools::load_all(file.path(ROOT, "igseq"))
+
+config <- list(
+  "plot_qualgrid" = FALSE,
+  "plot_rarefaction_curve" = FALSE,
+  "plot_igdiscover_clusters" = FALSE)
 ```
 
 ```{r}
@@ -37,8 +42,13 @@ load_csv_maybe <- function(fp, ...) {
 }
 
 drawtab <- function(df, ...) {
+  # https://stackoverflow.com/a/44490399/4499968
+  # https://stackoverflow.com/a/49018919/4499968
   kableExtra::kable_styling(
-    knitr::kable(df, digits = 3, row.names = FALSE, booktabs = TRUE), ...)
+    knitr::kable(
+      df, digits = 3, row.names = FALSE, booktabs = TRUE, longtable = TRUE, linesep = ""),
+    latex_options = c("hold_position", "repeat_header"),
+    ...)
 }
 ```
 

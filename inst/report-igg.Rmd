@@ -12,11 +12,16 @@ identify regions such as V(D)J segments and CDR3.
 
 
 ```{r}
-tbl <- subset(counts_stats$sonar, select = -c(chain, antibody_lineage))
-colnames(tbl)[match("nonproductive", colnames(tbl))] <- "nonprod"
-tbl$GoodRatio <- tbl$good/(
-  tbl$good + tbl$nonprod + tbl$indel + tbl$noCDR3 + tbl$noJ + tbl$noV + tbl$stop)
- drawtab(tbl, font_size=8)
+if (! is.null(counts_stats$sonar)) {
+  tbl <- subset(counts_stats$sonar, select = -c(chain, antibody_lineage))
+  tbl <- unique(tbl) # we've duplicated effort for those with multiple lineages
+  colnames(tbl)[match("nonproductive", colnames(tbl))] <- "nonprod"
+  tbl$GoodRatio <- tbl$good/(
+    tbl$good + tbl$nonprod + tbl$indel + tbl$noCDR3 + tbl$noJ + tbl$noV + tbl$stop)
+   drawtab(tbl, font_size=8)
+} else {
+  cat("sonar counts CSV not found")
+}
 ```
 
 To try to demonstrate that we have sufficient sequencing depth per cell and cell
@@ -26,12 +31,13 @@ approaches the asymptote well before all reads are included, and if the
 asymptote falls well below the number of cells (i.e., there are far fewer
 sequences than cells) we have some confidence that we've sampled deeply.
 
-```{r results="asis"}
+```{r results="asis", eval=config$plot_rarefaction_curve}
 
 plot_rarefaction_curve <- function(data, metadata, samp) {
+  samples <- subset(metadata$samples, Sample == samp) # should be just one
   plot(
     x = data$ReadsUsed,
-    y = data$UniqueCentroids / subset(metadata$samples, Sample == samp)$SpecimenCellCount,
+    y = data$UniqueCentroids / samples$SpecimenCellCount,
     pch=19, cex=0.7,
     xlab="Reads Included", ylab="Clusters to Input Cells")
 }
