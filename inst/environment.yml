@@ -36,3 +36,5 @@ dependencies:
   - biopython>=1.65
   - pip:
     - presto
+  # Not essential but should allow manually running SONAR's R scripts
+  - r-docopt
