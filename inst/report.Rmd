@@ -61,5 +61,8 @@ drawtab <- function(df, ...) {
 ```{r child="report-igg.Rmd"}
 ```
 
+```{r child="report-lineages.Rmd"}
+```
+
 ```{r child="report-tech-details.Rmd", eval=FALSE}
 ```
