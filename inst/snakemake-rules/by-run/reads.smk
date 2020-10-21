@@ -4,6 +4,8 @@ Helpers finishing up the per-run processing.
 
 def reads_by_sample_input(wildcards):
     runid = SAMPLES[wildcards.sample]["Run"]
+    if not runid:
+        raise ValueError("No run given for sample %s" % wildcards.sample)
     return expand(
         "analysis/trim/{run}/{chunk}/{{sample}}.{{rp}}.fastq.gz",
         run=runid, chunk=CHUNKS)
@@ -17,4 +19,8 @@ rule reads_by_sample:
     """
     output: "analysis/reads-by-sample/{sample}.{rp}.fastq.gz"
     input: reads_by_sample_input
-    shell: "cat {input} > {output}"
+    run:
+        if input:
+            shell("cat {input} > {output}")
+        else:
+            shell("echo -n | gzip > {output}")
