@@ -42,6 +42,10 @@ load_csv_maybe <- function(fp, ...) {
 }
 
 drawtab <- function(df, ...) {
+  if (is.null(df)) {
+    warning("data not found")
+    return()
+  }
   # https://stackoverflow.com/a/44490399/4499968
   # https://stackoverflow.com/a/49018919/4499968
   kableExtra::kable_styling(

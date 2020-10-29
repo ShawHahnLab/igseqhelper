@@ -15,7 +15,7 @@ metadata <- within(list(), {
 
 counts_stats <- within(list(), {
   by_sample <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_by_sample.csv"), NA)
-  by_sample <- subset(by_sample, Sample != "unassigned")
+  by_sample <- if (!is.null(by_sample)) { subset(by_sample, Sample != "unassigned") }
   by_run <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_by_run.csv"))
   by_amplicon <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_amplicon_summary.csv"), NA)
   assembly <- load_csv_maybe(file.path(ROOT, "analysis/reporting/counts/counts_assembly_summary.csv"), NA)
@@ -44,7 +44,6 @@ if (! is.null(counts_stats$by_amplicon)) {
 }
 ```
 
-
 ## By Sequencing Run
 
 We aim for a 50/50 ratio of library to PhiX. Assuming the unassigned reads are
@@ -69,27 +68,29 @@ drawtab(counts_stats$by_sample)
 ```{r}
 qualgrids_r1 <- list()
 qualgrids_r2 <- list()
-for (idx in 1:nrow(counts_stats$by_sample)) {
-  prefix <- file.path(
-    ROOT,
-    "analysis", "reporting", "by-run",
-    counts_stats$by_sample$Run[idx],
-    paste0("qualtrim.", counts_stats$by_sample$Sample[idx]))
-  fp_r1 <- paste0(prefix, ".R1.csv")
-  fp_r2 <- paste0(prefix, ".R2.csv")
-  if (file.exists(fp_r1)) {
-    qualgrids_r1 <- c(qualgrids_r1, list(load_qualgrid(fp_r1)))
-  } else {
-    qualgrids_r1 <- c(qualgrids_r1, list(NULL))
+if (! is.null(counts_stats$by_sample)) {
+  for (idx in 1:nrow(counts_stats$by_sample)) {
+    prefix <- file.path(
+      ROOT,
+      "analysis", "reporting", "by-run",
+      counts_stats$by_sample$Run[idx],
+      paste0("qualtrim.", counts_stats$by_sample$Sample[idx]))
+    fp_r1 <- paste0(prefix, ".R1.csv")
+    fp_r2 <- paste0(prefix, ".R2.csv")
+    if (file.exists(fp_r1)) {
+      qualgrids_r1 <- c(qualgrids_r1, list(load_qualgrid(fp_r1)))
+    } else {
+      qualgrids_r1 <- c(qualgrids_r1, list(NULL))
+    }
+    if (file.exists(fp_r2)) {
+      qualgrids_r2 <- c(qualgrids_r2, list(load_qualgrid(fp_r2)))
+    } else {
+      qualgrids_r2 <- c(qualgrids_r2, list(NULL))
+    }
   }
-  if (file.exists(fp_r2)) {
-    qualgrids_r2 <- c(qualgrids_r2, list(load_qualgrid(fp_r2)))
-  } else {
-    qualgrids_r2 <- c(qualgrids_r2, list(NULL))
-  }
+  names(qualgrids_r1) <- counts_stats$by_sample$Sample
+  names(qualgrids_r2) <- counts_stats$by_sample$Sample
 }
-names(qualgrids_r1) <- counts_stats$by_sample$Sample
-names(qualgrids_r2) <- counts_stats$by_sample$Sample
 ```
 
 Our read trimming includes both adapter-matching and a quality threshold. 
@@ -123,18 +124,20 @@ qualtrim_metric <- function(qualgrid) {
   sum(vec/max(vec))/length(vec)
 }
 
-qualmetrics <- data.frame(
-  Sample = names(qualgrids_r1),
-  R1Metric = sapply(qualgrids_r1, qualtrim_metric),
-  R2Metric = sapply(qualgrids_r2, qualtrim_metric),
-  stringsAsFactors = FALSE)
+if (! is.null(counts_stats$by_sample)) {
+ qualmetrics <- data.frame(
+    Sample = names(qualgrids_r1),
+    R1Metric = sapply(qualgrids_r1, qualtrim_metric),
+    R2Metric = sapply(qualgrids_r2, qualtrim_metric),
+    stringsAsFactors = FALSE)
 
-ggplot(
-  qualmetrics,
-  aes(x = R1Metric, y = R2Metric, label = Sample)) +
-  geom_point() +
-  geom_text_repel(size = 2) +
-  labs(xlab = "R1 Metric", ylab = "R2 Metric")
+  ggplot(
+    qualmetrics,
+    aes(x = R1Metric, y = R2Metric, label = Sample)) +
+    geom_point() +
+    geom_text_repel(size = 2) +
+    labs(xlab = "R1 Metric", ylab = "R2 Metric")
+}
 ```
 
 The below heatmaps summarize read lengths after cutadapt's quality-based
@@ -184,7 +187,6 @@ with(NULL, {
 })
 
 ```
-
 
 ### pRESTO processing
 
