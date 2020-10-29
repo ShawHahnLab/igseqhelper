@@ -96,16 +96,6 @@ rule sonar_gather_germline:
     run:
         igseq.sonar.gather_germline(input, params.output)
 
-# use --jmotif arguent to sonar finalize?
-# ("Conserved nucleotide sequence indicating the start of FWR4 on the J gene.
-# Defaults to either TGGGG for heavy chains or TT[C|T][G|A]G for light chains;
-# set manually for custom light chain libraries or for species with a different
-# motif.")
-# In the files from IMGT, we do have TGGGG in all of the IGHJ.fasta sequences
-# and TTCGG in all of the IGLJ.fasta sequences, so maybe that's OK as the
-# default? Also, our amplicons seem to end with just a tiny fragment of this
-# conserved region anyway.
-
 rule sonar_module_1:
     """SONAR 1: Collect good sequences and tabulate AIRR info from raw input."""
     output:
@@ -119,18 +109,31 @@ rule sonar_module_1:
         input_fastq=lambda w, input: Path(input.fastq).resolve(),
         cluster_id_fract=.97,
         cluster_min2=2,
-        # What we give for the V(D)J command-line argments depends on which
-        # chain we're doing.  We could handle this during the rule itself with
-        # a run: directive but then it won't let us use singularity.
+        # What we give for the V(D)J command-line argments and the J motif
+        # depends on which chain we're doing.  We could handle this during the
+        # rule itself with a run: directive but then it won't let us use
+        # singularity.
+        # Note that if we DON'T give an explicit argument for --jmotif, SONAR
+        # will use a regular expression combining the default heavy AND light
+        # chain patterns.  Most of the time this is fine, but in some cases (so
+        # far I saw this only in IGHJ6*01) the gene just happens to have a
+        # short section matching the wrong chain's motif, and the CDR3 region
+        # is marked incorrectly.  Instead we'll always explicitly specify
+        # either the heavy or light motif to avoid this problem.
+        # (SONAR says --jmotif specifies "Conserved nucleotide sequence
+        # indicating the start of FWR4 on the J gene.  Defaults to either TGGGG
+        # for heavy chains or TT[C|T][G|A]G for light chains; set manually for
+        # custom light chain libraries or for species with a different motif.")
         libv_arg=lambda w, input: "--lib " + str(Path(input.V).resolve()),
         libd_arg=lambda w, input: "D" in input and "--dlib " + str(Path(input.D).resolve()) or "--noD",
-        libj_arg=lambda w, input: "--jlib " + str(Path(input.J).resolve())
+        libj_arg=lambda w, input: "--jlib " + str(Path(input.J).resolve()),
+        jmotif=lambda w: {"gamma": "TGGGG", "kappa": "TT[C|T][G|A]G", "lambda": "TT[C|T][G|A]G"}[w.chain_type]
     shell:
         """
             cd {params.wd_sonar}
             sonar blast_V --fasta {params.input_fastq} {params.libv_arg} --derep --threads {threads}
             sonar blast_J {params.libd_arg} {params.libj_arg} --noC --threads {threads}
-            sonar finalize --noclean --threads {threads}
+            sonar finalize --noclean --jmotif {params.jmotif} --threads {threads}
             sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2}
         """
 
@@ -329,7 +332,7 @@ rule sonar_module_3_igphyml:
         collected=WD_SONAR / "output/sequences/nucleotide/longitudinal-collected.fa",
         germline_v=WD_SONAR.parent.parent / "germline.V.fasta",
         natives=WD_SONAR.parent / "mab.fasta"
-    singularity: "docker://scharch/sonar"
+    #singularity: "docker://scharch/sonar"
     threads: 4
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
@@ -340,6 +343,11 @@ rule sonar_module_3_igphyml:
     shell:
         """
             cd {params.wd_sonar}
+
+            set +e
+            set +u
+            source ~/miniconda3/bin/activate sonar
+
             sonar igphyml \
                 -v '{params.v_id}' \
                 --lib {params.input_germline_v} \
