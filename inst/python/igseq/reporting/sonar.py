@@ -116,7 +116,7 @@ def sonar_island_stats(fp_output, fp_input_island, fp_input_iddiv, fp_input_fast
     Creates one CSV file per specimen/lineage/chain combo, taking the median of
     divergence values across antibodies.
     """
-    fieldnames = ["sequence_id", "v_gene", "germ_div", "ab_id_median"]
+    fieldnames = ["sequence_id", "v_gene", "germ_div", "ab_id_min", "ab_id_median", "ab_id_max"]
     if extras:
         fieldnames = list(extras.keys()) + fieldnames
     else:
@@ -140,14 +140,20 @@ def sonar_island_stats(fp_output, fp_input_island, fp_input_iddiv, fp_input_fast
             keep = lambda key: key not in ["sequence_id", "v_gene", "germ_div"]
             vals = [float(val) for key, val in row.items() if keep(key)]
             if vals:
-                med = round(median(vals), 4)
+                ab_min = min(vals)
+                ab_med = round(median(vals), 4)
+                ab_max = max(vals)
             else:
-                med = ''
+                ab_min = ''
+                ab_med = ''
+                ab_max = ''
             row_out = {**extras, **{
                 "sequence_id": row["sequence_id"],
                 "v_gene": row["v_gene"],
                 "germ_div": row["germ_div"],
-                "ab_id_median": med}}
+                "ab_id_min": ab_min,
+                "ab_id_median": ab_med,
+                "ab_id_max": ab_max}}
             for key in desc_keys:
                 row_out[key] = descs[row["sequence_id"]].get(key, "")
             writer.writerow(row_out)
