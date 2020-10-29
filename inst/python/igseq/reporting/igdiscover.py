@@ -97,12 +97,16 @@ def combine_aligned_segments(target_fasta, with_v, with_d, with_j, output_fasta)
             if record.id not in ab_ids:
                 SeqIO.write(record, f_out, "fasta")
 
-def convert_combined_alignment(fasta_in, csv_out, specimens, antibody_isolates, wildcards):
+def convert_combined_alignment(fasta_in, csv_out, antibody_lineages, antibody_isolates, wildcards):
     """Convert VDJ+antibody alignment from FASTA into CSV form."""
-    fields = ["Specimen", "Subject", "Chain", "Type", "Category", "LineageDist", "SeqName", "Seq"]
+    wildcards = dict(wildcards)
+    if "antibody_lineage" in wildcards:
+        subject_lut = {lin["AntibodyLineage"]: lin["Subject"] for lin in antibody_lineages.values()}
+        wildcards["subject"] = subject_lut[wildcards["antibody_lineage"]]
+    fields = ["Category", "LineageDist", "SeqName", "Seq"]
+    fields += list(wildcards.keys())
     segments = ["IGHV", "IGHD", "IGHJ", "IGLV", "IGLJ", "IGKV", "IGKJ"]
     categories = ["???", "AntibodyLineage", "AntibodyIsolate"] + segments
-    subject_lut = {specimen["Specimen"]: specimen["Subject"] for specimen in specimens.values()}
     rows = []
     def categorize(seqid):
         if seqid in antibody_isolates.keys():
@@ -116,10 +120,8 @@ def convert_combined_alignment(fasta_in, csv_out, specimens, antibody_isolates, 
         return "???"
     for record in SeqIO.parse(fasta_in, "fasta"):
         row = {}
-        row["Specimen"] = wildcards.specimen
-        row["Subject"] = subject_lut[wildcards.specimen]
-        row["Chain"] = wildcards.chain
-        row["Type"] = wildcards.chain_type
+        for key, val in wildcards.items():
+            row[key] = val
         row["Category"] = categorize(record.id)
         row["SeqName"] = record.id
         row["Seq"] = str(record.seq)
