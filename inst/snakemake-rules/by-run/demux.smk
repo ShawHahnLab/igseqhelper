@@ -8,7 +8,7 @@ categorize what wasn't assigned to samples.
 from pathlib import Path
 import gzip
 from Bio import SeqIO
-from igseq.demux import demux
+from igseq.demux import demux, annotate
 from igseq.util import normalize_read_files
 from igseq.blast import blast, group_blast_results, BLAST_TAX_GROUPS
 
@@ -70,6 +70,21 @@ for runid in RUNS.keys():
                     runattrs=params.runattrs,
                     outdir=Path(output[0]).parent,
                     send_stats=f_log)
+
+rule barcode_annotate:
+    """Create a table of all recognized barcodes by read ID for one chunk."""
+    output: "analysis/demux/{run}/{chunk}.barcodes.csv"
+    input:
+        R1="analysis/data/{run}/chunk_{chunk}_R1.fastq.gz",
+        R2="analysis/data/{run}/chunk_{chunk}_R2.fastq.gz",
+        I1="analysis/data/{run}/chunk_{chunk}_I1.fastq.gz"
+    params:
+        bcs_fwd=[attrs["Seq"] for key, attrs in SEQUENCES.items() if "BC_" in key],
+        bcs_rev=[attrs["Seq"] for key, attrs in SEQUENCES.items() if "i7_" in key],
+        runattrs=lambda w: RUNS[w.run]
+    run:
+        dorevcmp = params.runattrs["ReverseComplement"] == "1"
+        annotate(params.bcs_fwd, params.bcs_rev, dict(input), output[0], dorevcmp)
 
 rule chunk_raw_data:
     """Split all fastq.gz files from run into fixed number of chunks.

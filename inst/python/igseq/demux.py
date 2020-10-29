@@ -9,10 +9,11 @@ through the user guide I don't think it's flexible enough to handle this
 weirdness.
 """
 
+import os
 import sys
+import csv
 import gzip
 import logging
-import os
 from contextlib import contextmanager
 from pathlib import Path
 from collections import defaultdict
@@ -115,6 +116,51 @@ def demux_by_barcode(
             f_out.close()
         for f_out in f_outs["I1"].values():
             f_out.close()
+
+def annotate(bcs_fwd, bcs_rev, fps, fp_out, dorevcmp=False):
+    """Tabulate reads with identified forward and reverse barcodes.
+
+    bcs_fwd: list of strings for all possible forward barcodes
+    bcs_rev: list of strings for all possible reverse barcodes
+    fps: dict of "R1", "R2", and "I1" keys pointing to file paths to
+         fastq.gz
+    fp_out: path to write CSV to
+    dorevcmp: reverse-complement R1 and R2 for barcode-matching?
+
+    Note that none of this considers sample assignment or any naming for
+    barcodes, just sequence content.
+
+    I originally wrote this to help troubleshoot a strange run, but now that I
+    look at it this might be a better way to structure the demux steps anyway:
+    annotate first with any barcode pair, and then extract the recognized pairs
+    for samples.
+    """
+    LOGGER.debug("%d annotate: dorevcmp: %s", PID, str(dorevcmp))
+    for key, val in fps.items():
+        LOGGER.debug("%d annotate: %s input file: %s", PID, key, val)
+    LOGGER.debug("%d annotate: fp_out: %s", PID, fp_out)
+    fieldnames = ["SeqID", "BCFWD", "BCREV"]
+    log = open("/home/jesse/foo", "wt")
+    with _open_gzips(fps, "rt") as hndls_in, open(fp_out, "wt") as f_out:
+        writer = csv.DictWriter(f_out, fieldnames=fieldnames, lineterminator="\n")
+        writer.writeheader()
+        for trio in zip(
+                _fqparse(hndls_in["R1"]), _fqparse(hndls_in["R2"]), _fqparse(hndls_in["I1"])):
+            if not trio[0].id == trio[1].id == trio[2].id:
+                raise DemuxError("Sequence ID mismatch between R1/R2/I1")
+            trio = list(trio)
+            if dorevcmp:
+                trio[0] = revcmp(trio[0])
+                trio[1] = revcmp(trio[1])
+                trio[2] = revcmp(trio[2])
+            assigned = (
+                assign_barcode_fwd(trio[0], bcs_fwd, send_stats=None),
+                assign_barcode_rev(trio[2], bcs_rev, send_stats=None))
+            #annot = " BCFWD=%s BCREV=%s" % assigned
+            writer.writerow({
+                "SeqID": trio[0].id,
+                "BCFWD": assigned[0],
+                "BCREV": assigned[1]})
 
 def _fqparse(f_in):
     """Convenience wrapper for FASTQ parser."""
