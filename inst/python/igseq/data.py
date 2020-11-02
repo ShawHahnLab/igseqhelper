@@ -42,7 +42,9 @@ def load_runs(fp_in):
     Output is a dictionary of run IDs to run attributes.
     """
     LOGGER.info("load_runs: fp_in %s", fp_in)
-    return load_csv(fp_in, "Run")
+    runs = load_csv(fp_in, "Run")
+    runs = {k: v for k, v in runs.items() if v["Skip"] != "T"}
+    return runs
 
 def load_specimens(fp_in):
     """Load specimen metadata CSV.
