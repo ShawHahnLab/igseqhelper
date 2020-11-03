@@ -3,6 +3,20 @@
 ```{r}
 #### These helpers should move to the R package eventually, but keeping here for now
 
+chain_type_for <- function(lineage, chain, metadata) {
+  lineage_attrs <- subset(metadata$antibody_lineages, AntibodyLineage == lineage)
+  vl <- subset(metadata$antibody_lineages, AntibodyLineage == lineage)$VL
+  if (chain == "heavy") {
+    "gamma"
+  } else if (chain == "light") {
+    if (grepl("^IGLV", vl)) {
+      "lambda"
+    } else {
+      "kappa"
+    }
+  }
+}
+
 # Load my own SONAR ID/DIV summary data from the various per-sample and 
 # per-chain files.  If only one of heavy/light is found that one is included. 
 # If neither is found, this returns NULL.
@@ -10,16 +24,7 @@ load_island_stats <- function(lineage, metadata, root=ROOT) {
   chunks <- lapply(c("heavy", "light"), function(chain) {
     lineage_attrs <- subset(metadata$antibody_lineages, AntibodyLineage == lineage)
     subject <- lineage_attrs$Subject
-    vl <- subset(metadata$antibody_lineages, AntibodyLineage == lineage)$VL
-    chain_type <- if (chain == "heavy") {
-      "gamma"
-    } else if (chain == "light") {
-      if (grepl("^IGLV", vl)) {
-        "lambda"
-      } else {
-        "kappa"
-      }
-    }
+    chain_type <- chain_type_for(lineage, chain, metadata)
     # select specimens matching chain and chain type
     specimens <- subset(metadata$samples, Chain == chain & Type == chain_type)$Specimen
     # select specimens matching subject
@@ -68,6 +73,33 @@ load_island_stats <- function(lineage, metadata, root=ROOT) {
   result
 }
 
+# Load my own SONAR ID/DIV summary data compiled across specimens for each
+# chain. If only one of heavy/light is found that one is included. If neither is
+# found, this returns NULL.
+load_island_summary <- function(lineage, metadata, root=ROOT) {
+  #lineage_attrs <- subset(metadata$antibody_lineages, AntibodyLineage == lineage)
+  chunks <- lapply(c("heavy", "light"), function(chain) {
+    chain_type <- chain_type_for(lineage, chain, metadata)
+    fp <- file.path(
+      root, "analysis/reporting/by-lineage",
+      lineage,
+      paste(chain, chain_type, sep = "."),
+      "island_stats_summary.csv")
+    if (file.exists(fp)) {
+      output <- read.csv(fp, stringsAsFactors = FALSE)
+      output$Chain <- chain
+      output
+    }
+  })
+  chunks <- chunks[! sapply(chunks, is.null)]
+  if (length(chunks)) {
+    result <- do.call(rbind, chunks)
+  } else {
+    result <- NULL
+  }
+  result
+}
+
 # Draw a pair (if both chains are given) of scatterplots summarizing
 # identity/divergence across timepoints.
 plot_island_stats <- function(island_stats) {
@@ -80,7 +112,7 @@ plot_island_stats <- function(island_stats) {
     island_stats,
     aes(
       x = germ_div,
-      y = ab_id_median,
+      y = ab_id_max,
       col = factor(timepoint),
       size = log10(cluster_count),
       alpha = 0.6)) +
@@ -93,7 +125,7 @@ plot_island_stats <- function(island_stats) {
   plt <- plt +
     coord_cartesian(
       xlim = c(0, max(island_stats$germ_div)),
-      ylim = c(min(island_stats$ab_id_median), 100)) +
+      ylim = c(min(island_stats$ab_id_max), 100)) +
     scale_size_area() +
     labs(x = "% Divergence from germline V", y = "Median % identity to all antibodies") +
     guides(
@@ -105,12 +137,21 @@ plot_island_stats <- function(island_stats) {
 
 ```
 
-```{r results="asis"}
+```{r results="asis", fig.width=8, fig.height=6}
 # TODO
 # make sections on a per-subject-and-lineage basis, summarizing all the
 # information we have from IgDiscover for germline and SONAR for longitudinal.
 # stack AA alignments annotated by framework/cdr across timepoints and including
 # mature and germline.
+# Idea from what I saw in Kevin Wiehe's slides at one point: use the key
+# mutations in the X###Y notation to present a condensed view of the changes
+# over time.  Kshitij used LASSIE-like logoplots, too; that's very well-packed
+# for the amount of information.
+
+island_summaries <- lapply(metadata$antibody_lineages$AntibodyLineage, load_island_summary, metadata=metadata)
+names(island_summaries) <- metadata$antibody_lineages$AntibodyLineage
+island_stats_set <- lapply(metadata$antibody_lineages$AntibodyLineage, load_island_stats, metadata=metadata)
+names(island_stats_set) <- metadata$antibody_lineages$AntibodyLineage
 
 for (idx in 1:nrow(metadata$antibody_lineages)) {
   subject <- metadata$antibody_lineages$Subject[idx]
@@ -121,16 +162,21 @@ for (idx in 1:nrow(metadata$antibody_lineages)) {
     cat(paste0("## ", subject, " - ", lineage, "\n\n"))
   }
   isolates <- subset(metadata$antibody_isolates, AntibodyLineage == lineage)
-  seqids <- with(metadata$antibody_lineages, list(
-    heavy = c(V=VH[idx], D=DH[idx], J=JH[idx]),
-    light = c(V=VL[idx], J=JL[idx])))
-  has_alleles <- all(unlist(seqids) != "")
+  #seqids <- with(metadata$antibody_lineages, list(
+  #  heavy = c(V=VH[idx], D=DH[idx], J=JH[idx]),
+  #  light = c(V=VL[idx], J=JL[idx])))
+  #has_alleles <- all(unlist(seqids) != "")
   # if (has_alleles) {
   #   seqs <- load_alleles_for_subject(seqids, subject)
   # }
-  island_stats <- load_island_stats(lineage, metadata)
+  island_summary <- island_summaries[[lineage]]
+  if (! is.null(island_summary)) {
+    drawtab(island_summary)
+  }
+  island_stats <- island_stats_set[[lineage]]
   if (! is.null(island_stats)) {
     plot(plot_island_stats(island_stats) + ggtitle(lineage))
   }
+  cat("\n\n")
 }
 ```
