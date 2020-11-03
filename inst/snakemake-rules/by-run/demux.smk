@@ -17,8 +17,14 @@ TARGET_DEMUX = expand(
     chunk=CHUNKS,
     rp=["R1", "R2", "I1"])
 
+TARGET_BARCODE_ANNOTATE= expand(
+    "analysis/demux/{run}/{chunk}.barcodes.csv", run=RUNS.keys(), chunk=CHUNKS)
+
 rule all_demux:
     input: TARGET_DEMUX
+
+rule all_barcode_annotate:
+    input: TARGET_BARCODE_ANNOTATE
 
 def gather_samples_for_demux(samples_all, runid):
     """Make dictionary of sample names to attrs for a given Run ID."""

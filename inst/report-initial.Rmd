@@ -62,6 +62,58 @@ so we expect to see 10 or more for the below ratios.
 drawtab(counts_stats$by_sample)
 ```
 
+## By Sequencing Sample - Barcode Matching
+
+```{r}
+load_barcode_summary <- function(csv_fp) {
+  # "BCFWD", "BCREV", "BCFWDName", "BCREVName", "Total", "Sample"
+  result <- read.csv(
+    csv_fp, header = TRUE, stringsAsFactors = FALSE, na.strings = "")
+  result$BCFWDName <- factor(
+    result$BCFWDName, levels = unique(result$BCFWDName))
+  result$BCREVName <- factor(
+    result$BCREVName, levels = unique(result$BCREVName))
+  ordering <- with(
+      result, order(is.na(BCFWDName), is.na(BCREVName), BCFWDName, BCREVName))
+  result <- result[ordering, ]
+  result
+}
+
+# Plot heatmap of read count per barcode combination.  See also
+# tabulate_barcodes.
+plot_barcodes <- function(barcodes_summary) {
+  barcodes_summary$Label <- factor(barcodes_summary$Sample, labels = "S")
+  ggplot(
+    barcodes_summary,
+    aes(x=BCFWDName, y=BCREVName, fill=log10(Total), label=Sample)) +
+    geom_tile() +
+    geom_label_repel(size = 3, na.rm = TRUE) +
+    viridis::scale_fill_viridis() +
+    labs(x = "BC Fwd Name", y = "BC Rev Name") +
+    theme(
+      axis.text.x = element_text(angle=45, hjust=1),
+      panel.background = element_blank())
+}
+
+dps <- list.files(file.path(ROOT, "analysis/reporting/by-run"), full.names = TRUE)
+runids <- basename(dps)
+barcodings <- mapply(function(runid, dir_path) {
+  csv_fp <- file.path(dir_path, "barcode_summary.csv")
+  if (file.exists(csv_fp)) {
+    load_barcode_summary(csv_fp)
+  }
+}, runids, dps, SIMPLIFY = FALSE)
+```
+
+```{r fig.width=7, fig.height=4.8}
+for(runid in names(barcodings)) {
+  if (! is.null(barcodings[[runid]])) {
+    plot(plot_barcodes(barcodings[[runid]]) + ggplot2::ggtitle(runid))
+    cat("\n\n")
+  }
+}
+```
+
 ## By Sequencing Sample - Adapter and Quality Trimming
 
 
