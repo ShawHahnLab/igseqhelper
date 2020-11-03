@@ -43,7 +43,7 @@ def load_runs(fp_in):
     """
     LOGGER.info("load_runs: fp_in %s", fp_in)
     runs = load_csv(fp_in, "Run")
-    runs = {k: v for k, v in runs.items() if v["Skip"] != "T"}
+    runs = {k: v for k, v in runs.items() if v["Skip"] != "TRUE"}
     return runs
 
 def load_specimens(fp_in):
