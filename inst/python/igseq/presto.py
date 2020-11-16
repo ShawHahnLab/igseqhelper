@@ -53,12 +53,24 @@ PRESTO_OPTS = {
     }
 }
 
-def prep_primers_fwd(fp_csv_in, fp_fwd_out, seqid="5PIIA"):
+def prep_primers_fwd(fp_csv_in, fp_fwd_out, custom=None, seqid="5PIIA"):
     """Take our primer CSV and create fwd FASTA for pRESTO."""
     LOGGER.info("prep_primers_fwd: fp_csv_in: %s", fp_csv_in)
     LOGGER.info("prep_primers_fwd: fp_fwd_out: %s", fp_fwd_out)
-    sequences = load_sequences(fp_csv_in)
-    fwd = sequences[seqid]["Seq"]
-    LOGGER.debug("prep_primers_fwd: fwd primer seq: %s", fwd)
-    fwd = SeqRecord(Seq(fwd), id="5PIIA", description="")
-    SeqIO.write(fwd, fp_fwd_out, "fasta")
+    # Actually we don't care which is which since we're doing this at the
+    # specimen level
+    if custom:
+        custom = set(custom.values())
+    else:
+        custom = {}
+    fwd = {"FwdPrimer"+str(idx+1): seq for idx, seq in enumerate(custom)}
+    if not all(fwd.values()):
+        fwd = {k: v for k, v in fwd.items() if v}
+        sequences = load_sequences(fp_csv_in)
+        extra = {seqid: sequences[seqid]["Seq"]}
+        fwd.update(extra)
+    LOGGER.debug("prep_primers_fwd: fwd primer seq(s): %s", fwd)
+    with open(fp_fwd_out, "wt") as f_out:
+        for primerid, seq in fwd.items():
+            rec = SeqRecord(Seq(seq), id=primerid, description="")
+            SeqIO.write(rec, f_out, "fasta")

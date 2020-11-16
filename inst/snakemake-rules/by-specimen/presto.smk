@@ -45,9 +45,12 @@ rule presto_data:
     shell: "zcat {input} > {output}"
 
 rule presto_primers:
-    output: fwd="analysis/presto/vprimers.fasta"
+    output: fwd="analysis/presto/qual/{chain}.{chain_type}/{specimen}.vprimers.fasta"
     input: sequences=ancient("metadata/sequences.csv")
-    run: prep_primers_fwd(input.sequences, output.fwd)
+    run:
+        # Get custom forward primers, if any, for samples for this specimen
+        custom = {k: v["FwdPrimer"] for k, v in SAMPLES.items() if v["Specimen"] == wildcards.specimen}
+        prep_primers_fwd(input.sequences, output.fwd, custom)
 
 ### Paired-end Assembly
 
@@ -93,7 +96,7 @@ rule presto_qual_fwd:
     output: "analysis/presto/qual/{chain}.{chain_type}/{specimen}-FWD_primers-pass.fastq"
     input:
         data="analysis/presto/qual/{chain}.{chain_type}/{specimen}_quality-pass.fastq",
-        primers="analysis/presto/vprimers.fasta"
+        primers="analysis/presto/qual/{chain}.{chain_type}/{specimen}.vprimers.fasta"
     log: "analysis/logs/presto/qual_fwd.{chain}.{chain_type}.{specimen}.log"
     params:
         start=PRESTO_OPTS["qc"]["fwd_start"],
