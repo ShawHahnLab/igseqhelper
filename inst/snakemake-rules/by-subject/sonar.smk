@@ -133,7 +133,7 @@ rule sonar_module_1:
             cd {params.wd_sonar}
             sonar blast_V --fasta {params.input_fastq} {params.libv_arg} --derep --threads {threads}
             sonar blast_J {params.libd_arg} {params.libj_arg} --noC --threads {threads}
-            sonar finalize --noclean --jmotif {params.jmotif} --threads {threads}
+            sonar finalize --noclean --jmotif '{params.jmotif}' --threads {threads}
             sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2}
         """
 
