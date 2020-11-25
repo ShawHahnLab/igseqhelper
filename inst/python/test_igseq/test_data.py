@@ -40,7 +40,7 @@ class TestMetadataBase(unittest.TestCase):
                     ["i7_%d" % val for val in range(1, 21)]
                 },
             "runs": {
-                "cols": ["Run", "ReverseComplement", "Comments",
+                "cols": ["Run", "ReverseComplement", "PhiX", "Skip", "Comments",
                          "URL", "URLR1", "URLR2", "URLI1",
                          "MD5R1", "MD5R2", "MD5I1"],
                 "rows": ["200000_M05588_0227_000000000-XYZ12", "200000_M00281_0522_000000000-ABC34"]
