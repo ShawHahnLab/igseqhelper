@@ -15,7 +15,7 @@ rule all_get_data:
     sequencing runs are before running the rule.
     """
     input:
-        rundir=expand("data/{run}", run = SAMPLES.keys()),
+        rundir=expand("data/{run}", run = [samp["Run"] for samp in SAMPLES.values() if samp["Run"]]),
         metadata=ancient(rules.get_metadata.output)
 
 rule get_data:
