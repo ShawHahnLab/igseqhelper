@@ -208,7 +208,9 @@ load_germline_alleles <- function(samples, dp=ROOT) {
       NULL
     }
   }))
-  data$Category <- factor(data$Category, levels = unique(data$Category))
+  if (! is.null(data)) {
+    data$Category <- factor(data$Category, levels = unique(data$Category))
+  }
   data
 }
 
@@ -216,28 +218,30 @@ germlines <- load_germline_alleles(metadata$samples)
 ```
 
 ```{r fig.width=8, fig.height=10, results="asis"}
-for (lineage in unique(subset(germlines, Category == "AntibodyLineage")$SeqName)) {
-  subject <- subset(germlines, SeqName == lineage)$Subject[1]
-  specimen <- subset(germlines, SeqName == lineage)$Specimen[1]
-  for (chain in c("heavy", "light")) {
-    chunk <- subset(germlines, Chain == chain & Specimen == specimen)
-    chain_types <- unique(chunk$Type)
-    for (chain_type in chain_types) {
-      cat(paste0("\n\n#### ", lineage, " - ", chain, "\n\n"))
-      cat("\n\n", chain_type, "\n\n", sep = "")
-      chunk_by_type <- subset(chunk, Type == chain_type)
-      chunk_by_type <- chunk_by_type[seq(nrow(chunk_by_type), 1, -1), ]
-      chunk_by_type$Category <- factor(chunk_by_type$Category, levels = rev(levels(chunk_by_type$Category)))
-      chunk_filt <- do.call(rbind, lapply(split(chunk_by_type, chunk_by_type$Category), function(data) {
-        if (data$Category[1] %in% c("AntibodyLineage", "AntibodyIsolate")) {
-          data
-        } else {
-          tail(data, n = 5)
-        }
-      }))
-      drawtab(chunk_filt)
-      par(mar = c(2,2,2,8))
-      dnaplotr::plotDNA(chunk_by_type$Seq, groups = chunk_by_type$Category)
+if (! is.null(germlines)) {
+  for (lineage in unique(subset(germlines, Category == "AntibodyLineage")$SeqName)) {
+    subject <- subset(germlines, SeqName == lineage)$Subject[1]
+    specimen <- subset(germlines, SeqName == lineage)$Specimen[1]
+    for (chain in c("heavy", "light")) {
+      chunk <- subset(germlines, Chain == chain & Specimen == specimen)
+      chain_types <- unique(chunk$Type)
+      for (chain_type in chain_types) {
+        cat(paste0("\n\n#### ", lineage, " - ", chain, "\n\n"))
+        cat("\n\n", chain_type, "\n\n", sep = "")
+        chunk_by_type <- subset(chunk, Type == chain_type)
+        chunk_by_type <- chunk_by_type[seq(nrow(chunk_by_type), 1, -1), ]
+        chunk_by_type$Category <- factor(chunk_by_type$Category, levels = rev(levels(chunk_by_type$Category)))
+        chunk_filt <- do.call(rbind, lapply(split(chunk_by_type, chunk_by_type$Category), function(data) {
+          if (data$Category[1] %in% c("AntibodyLineage", "AntibodyIsolate")) {
+            data
+          } else {
+            tail(data, n = 5)
+          }
+        }))
+        drawtab(chunk_filt)
+        par(mar = c(2,2,2,8))
+        dnaplotr::plotDNA(chunk_by_type$Seq, groups = chunk_by_type$Category)
+      }
     }
   }
 }
