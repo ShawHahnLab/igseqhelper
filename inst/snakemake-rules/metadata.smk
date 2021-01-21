@@ -54,10 +54,12 @@ rule get_metadata:
        antibody_isolates="metadata/antibody_isolates.csv"
     input: "metadata.yml"
     run:
-        R("""
-          devtools::load_all("igseq")
-          update_metadata_via_yaml("{input}", ".")
-          """)
+        # Previously used snakemake.utils.R but that broken for me recently.
+        # Snakmake docs now say "This is deprecated in favor of the script
+        # directive. This function executes the R code given as a string. The
+        # function requires rpy2 to be installed." ...so I'll just ditch it and
+        # build a shell command.
+        shell("""R -e 'devtools::load_all("igseq"); update_metadata_via_yaml("{input}", ".")' """)
         _setup_metadata(
             output.sequences,
             output.specimens,
