@@ -1,3 +1,13 @@
+# Some alignment finagling/plotting tools.
+# The basic idea is that alignments come from vectors/matrices and are
+# restructured into long-format (one row per position/sequence combo) data
+# frames that can be annotated ad-nauseam for further work or plotting.  The
+# plotting is split into two steps to permit maximum flexiblity in how the data
+# frame is handled.
+
+# I wrote this before I knew about formats like GFF3.  This should probably just
+# get re-written to avoid reinventing the wheel.
+#
 # make a data frame of factors, one for each list combination from the given
 # annotations, naming the regions within the alignment based off of the selected
 # sequences.
@@ -38,6 +48,17 @@ prep_seq_annotations <- function(alignment, annots) {
   }
   annots_grid <- do.call(cbind.data.frame, annots_grid)
   annots_grid
+}
+
+# very basic consensus maker from aln data frame
+# returns a vector of characters per position in the input data frame, for easy
+# assignment into a new column.
+make_consensus <- function(aln_df) {
+  unlist(lapply(split(aln_df, aln_df$Position), function(chunk) {
+    rep(
+      names(sort(table(chunk$Base), decreasing = TRUE))[1],
+      nrow(chunk))
+  }), use.names = FALSE)
 }
 
 #' Make matrix version of alignment
@@ -118,7 +139,17 @@ make_aln_df <- function(aln_vec, ref = 1, squeeze = NULL) {
   aln_df
 }
 
-# Take a general alignment data frame and style it up to be plotted.
+#' Add plotting attributes to alignment data frame
+#'
+#' Take a general alignment data frame and style it up to be plotted.
+#' The added columns start with "plot_".  Any existing columns with those names
+#' will be kept as-is.  These are intended for use in plot_aln via ggplot2 as
+#' literal values to use (stat="identity").
+#'
+#' @param aln_df data frame as produced by \code{make_aln_df}
+#' @param style keyword for plotting style to use.  One of: dnaplotr, vsref
+#'
+#' @return data frame with aditional \code{plot_...} columns
 prep_aln_df <- function(aln_df, style) {
   aln_df_for_plot <- aln_df
 
@@ -140,17 +171,36 @@ prep_aln_df <- function(aln_df, style) {
     )
   )
 
+  # TODO just define all the vars and then filter to the set to keep.
   if (style == "vsref") {
-    aln_df_for_plot$plot_fill <-
-      fill_colors[[style]][as.character(aln_df_for_plot$BaseMasked)]
-    aln_df_for_plot$plot_text <- aln_df_for_plot[["Base"]]
-    aln_df_for_plot$plot_text_alpha <- ifelse(
-      aln_df_for_plot$MatchesReference, 0.5, 1)
+    if (is.null(aln_df_for_plot$plot_fill)) {
+      aln_df_for_plot$plot_fill <-
+        fill_colors[[style]][as.character(aln_df_for_plot$BaseMasked)]  
+    }
+    if (is.null(aln_df_for_plot$plot_text)) {
+      aln_df_for_plot$plot_text <- aln_df_for_plot[["Base"]]
+    }
+    if (is.null(aln_df_for_plot$plot_text_alpha)) {
+      aln_df_for_plot$plot_text_alpha <- ifelse(
+        aln_df_for_plot$MatchesReference, 0.5, 1)
+    }
+    if (is.null(aln_df_for_plot$plot_text_col)) {
+      aln_df_for_plot$plot_text_col <- "black"
+    }
   } else if (style == "dnaplotr") {
-    aln_df_for_plot$plot_fill <- fill_colors[[style]][
-      as.character(aln_df_for_plot$Base)]
-    aln_df_for_plot$plot_text <- ""
-    aln_df_for_plot$plot_text_alpha <- 1
+    if (is.null(aln_df_for_plot$plot_fill)) {
+      aln_df_for_plot$plot_fill <- fill_colors[[style]][
+        as.character(aln_df_for_plot$Base)]
+    }
+    if (is.null(aln_df_for_plot$plot_text)) {
+      aln_df_for_plot$plot_text <- ""
+    }
+    if (is.null(aln_df_for_plot$plot_text_alpha)) {
+      aln_df_for_plot$plot_text_alpha <- 1
+    }
+    if (is.null(aln_df_for_plot$plot_text_col)) {
+      aln_df_for_plot$plot_text_col <- "black"
+    }
   } else {
     stop("style \"", style, "\" not recognized")
   }
@@ -181,11 +231,10 @@ prep_aln_df <- function(aln_df, style) {
 #' @param aln_vec character vector of already-aligned sequences
 #' @param ref index of reference within aln_vec
 #' @param aln_df insted of aln_vec, use this already-prepared data frame
-#' @param draw_text write text labels on plot?
 #' @param style keyword for plotting style to use.  One of: dnaplotr, vsref
 #'
 #' @return ggplot2 plot object
-plot_aln <- function(aln_vec, ref = 1, aln_df=NULL, draw_text=TRUE, style="vsref") {
+plot_aln <- function(aln_vec, ref = 1, aln_df=NULL, style="vsref") {
   if (is.null(aln_df)) {
     aln_df <- make_aln_df(aln_vec, ref)
   }
@@ -201,16 +250,16 @@ plot_aln <- function(aln_vec, ref = 1, aln_df=NULL, draw_text=TRUE, style="vsref
       labels = ylabels$Name,
       breaks = ylabels$plot_row_label)
   }
-  if (draw_text){
-    p <- p + ggplot2::geom_text(
-      ggplot2::aes(
-        x = Position,
-        y = plot_row_label,
-        label = plot_text,
-        alpha = plot_text_alpha),
-      size = 1.25,
-      show.legend = FALSE)
-  }
+  p <- p + ggplot2::geom_text(
+    ggplot2::aes(
+      x = Position,
+      y = plot_row_label,
+      label = plot_text,
+      col = plot_text_col,
+      alpha = plot_text_alpha),
+    size = 1.5,
+    show.legend = FALSE) +
+    scale_color_identity()
 
   fill_vec <- c(vsref="BaseMasked", dnaplotr="Base")[[style]]
   clrs <- unique(aln_df_for_plot[, c(fill_vec, "plot_fill")])
