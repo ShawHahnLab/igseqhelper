@@ -76,11 +76,14 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
         LOGGER.critical(msg)
         raise MetadataError(msg)
     for sample in samples.values():
-        if sequences:
-            _load_nested_items(sample, "Sample", sequences, "BarcodeFwd")
-            _load_nested_items(sample, "Sample", sequences, "BarcodeRev")
-        if runs:
-            _load_nested_items(sample, "Sample", runs, "Run")
+        # Missing all three of these is a special case where we have the
+        # preprocessed files but not the raw material
+        if sample["BarcodeFwd"] or sample["BarcodeRev"] or sample["Run"]:
+            if sequences:
+                _load_nested_items(sample, "Sample", sequences, "BarcodeFwd")
+                _load_nested_items(sample, "Sample", sequences, "BarcodeRev")
+            if runs:
+                _load_nested_items(sample, "Sample", runs, "Run")
         if specimens:
             _load_nested_items(sample, "Sample", specimens, "Specimen")
     return samples
