@@ -176,3 +176,65 @@ rule unassigned_fasta:
         with open(output.fasta, "wt") as f_out, gzip.open(input.fastq, "rt") as f_in:
             for record in SeqIO.parse(f_in, "fastq"):
                 SeqIO.write(record, f_out, "fasta")
+
+# PhiX Genome Mapping Approach
+
+# With this, if we ask for unassigned.phix.fastq.gz for a particular chunk it
+# should contain reads (either forward or reverse) mapping to the PhiX genome.
+# If we ask for unassigned.phix.I1.fastq.gz, it'll include every index read
+# where either forward or reverse mapped.  We can then use this alongside our
+# other I1-counts-based reporting.
+
+rule phix_fastq_to_index:
+    """Keep the I1 reads that had either R1 or R2 mapping to PhiX."""
+    output: "analysis/demux/{run}/{chunk}/unassigned.phix.I1.fastq.gz"
+    input:
+        mapped="analysis/demux/{run}/{chunk}/unassigned.phix.fastq.gz",
+        index="analysis/demux/{run}/{chunk}/unassigned.I1.fastq.gz"
+    run:
+        seqids = set()
+        with gzip.open(input.mapped, "rt") as f_in:
+            for record in SeqIO.parse(f_in, "fastq"):
+                seqids.add(record.id.split("/")[0])
+        with gzip.open(input.index, "rt") as index_in, gzip.open(output[0], "wt") as index_out:
+            for record in SeqIO.parse(index_in, "fastq"):
+                if record.id in seqids:
+                    SeqIO.write(record, index_out, "fastq")
+
+rule bam_to_fqgz:
+    """Generic rule to convert bam to fastq.gz."""
+    output: "analysis/demux/{run}/{chunk}/{prefix}.phix.fastq.gz"
+    input: "analysis/demux/{run}/{chunk}/{prefix}.phix.bam"
+    shell: "samtools fastq {input} | gzip > {output}"
+
+rule bam_to_bai:
+    """Generic rule to index a bam file."""
+    output: bai="analysis/demux/{run}/{chunk}/{prefix}.bam.bai"
+    input: bam="analysis/demux/{run}/{chunk}/{prefix}.bam"
+    threads: 4
+    shell: "samtools index -@ {threads} {input} {output}"
+
+rule phixmap_unassigned:
+    """Map unassigned reads to PhiX genome and keep those that map.
+
+    This will covert to BAM, filter to mapped reads, and sort.
+    """
+    output: bam="analysis/demux/{run}/{chunk}/unassigned.phix.bam"
+    input:
+        ref="analysis/demux/phix.ref.fasta.sa",
+        ref_fasta="analysis/demux/phix.ref.fasta",
+        query_r1="analysis/demux/{run}/{chunk}/unassigned.R1.fastq.gz",
+        query_r2="analysis/demux/{run}/{chunk}/unassigned.R2.fastq.gz"
+    threads: 4
+    shell:
+        """
+            bwa mem -t {threads} {input.ref_fasta} {input.query_r1} {input.query_r2} | \
+                samtools view -b -F 0x4 | \
+                samtools sort -@ {threads} > {output}
+        """
+
+rule bwa_ref:
+    """Index FASTA file for BWA."""
+    output: "analysis/demux/{genome}.ref.fasta.sa"
+    input: "analysis/demux/{genome}.ref.fasta"
+    shell: "bwa index {input}"

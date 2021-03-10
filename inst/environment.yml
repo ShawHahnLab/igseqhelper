@@ -14,6 +14,8 @@ dependencies:
   - rpy2
   - imagemagick
   - igblast
+  - bwa
+  - samtools
   # Utils
   - seqtk
   # For R package
