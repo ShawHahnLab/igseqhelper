@@ -72,6 +72,11 @@ TARGET_SONAR_RAREFACTION = expand(
         transpose_sample_md({key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}, "IgG+"),
         ANTIBODY_LINEAGES))
 
+TARGET_SONAR_ISLAND_STATS = expand(
+    "analysis/reporting/by-lineage/{antibody_lineage}/{specimen}.{chain}.{chain_type}/island_stats.csv",
+    zip, **igseq.sonar.setup_sonar_combos(
+        transpose_sample_md({key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}, "IgG+"),
+        ANTIBODY_LINEAGES))
 
 rule all_qualtrim_grid:
     input: TARGET_QUALTRIM_GRID
@@ -87,6 +92,9 @@ rule all_igdiscover_allele_alignments:
 
 rule all_sonar_rarefaction:
     input: TARGET_SONAR_RAREFACTION
+
+rule all_sonar_island_stats:
+    input: TARGET_SONAR_ISLAND_STATS
 
 TARGET_REPORT_ALL = [Path("analysis/report.pdf").resolve()]
 
