@@ -103,6 +103,7 @@ TARGET_REPORT_INPUTS = expand(
     thing=["by_sample", "by_run", "amplicon_summary",
            "assembly_summary", "presto_qual_summary", "sonar_module1_summary"]) + \
            TARGET_QUALTRIM_GRID + \
+           TARGET_BARCODE_SUMMARY + \
            TARGET_IGDISCOVER_CLUSTERPLOTS + \
            TARGET_SONAR_RAREFACTION + \
            TARGET_IGDISCOVER_ALLELE_ALIGNMENTS
@@ -181,6 +182,8 @@ rule rarefy_sonar_clusters:
     output: "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv"
     input: "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_by_read.csv"
     run: rarefy_sonar_clusters(input[0], output[0])
+
+# Summaries of SONAR's ID/DIV information for the selected "islands" of sequences
 
 def sonar_island_stats_input(w):
     subject = SPECIMENS[w.specimen]["Subject"]
