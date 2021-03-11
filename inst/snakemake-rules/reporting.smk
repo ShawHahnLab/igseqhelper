@@ -390,7 +390,7 @@ def lineage_gather_germline_input(w):
 from Bio import SeqIO
 
 rule lineage_gather_germline:
-    """Get the germline alleles (across segments) matched to a given linage.
+    """Get the germline alleles (across segments) matched to a given lineage.
 
     This will create a FASTA file with at most three (V/D/J, for heavy) or two
     (V/J, for light) sequences.
