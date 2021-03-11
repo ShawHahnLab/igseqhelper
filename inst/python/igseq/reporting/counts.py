@@ -10,32 +10,58 @@ from igseq.data import load_csv, get_samples_per_run, MetadataError
 
 LOGGER = logging.getLogger(__name__)
 
-def counts_sample_summary(
-        file_counts_in, counts_sample_summary_out, samples):
+def counts_sample_summary(inputs, csv_out, samples):
     """Take a list of sequence counts for fastq.gz files and summarize per-sample."""
-    samples_per_run = get_samples_per_run(samples)
-    counts = load_csv(file_counts_in)
+
     rows = []
-    for runid in samples_per_run:
-        for sample in samples_per_run[runid] + ["unassigned"]:
-            pattern = "analysis/counts/demux/{run}/[0-9]+/{sample}.I1.fastq.gz.counts".format(
-                run=runid,
-                sample=sample)
-            matches = [key for key in counts if re.match(pattern, key)]
-            cts = sum([int(counts[key]["NumSequences"]) for key in matches])
-            try:
-                cellcount = samples[sample]["SpecimenAttrs"]["CellCount"]
-                ratio = divide(cts, cellcount)
-            except KeyError:
-                cellcount = ""
-                ratio = ""
+    for samp in samples.values():
+        if not samp["Run"]:
+            continue
+        # Gather up the counts files for any one sample and sum the counts
+        pattern = "analysis/counts/demux/{run}/[0-9]+/{sample}.I1.fastq.gz.counts".format(
+            run=samp["Run"],
+            sample=samp["Sample"])
+        matched_paths = [path for path in inputs if re.match(pattern, path)]
+        cts = 0
+        for path in matched_paths:
+            with open(path, "rt") as f_in:
+                cts += int(f_in.read().strip())
+        # For samples where we know how many cells went in, enter the number of
+        # cells and the ratio of reads to cells.  If we don't know just leave
+        # it blank.
+        try:
+            cellcount = samp["SpecimenAttrs"]["CellCount"]
+            ratio = divide(cts, cellcount)
+        except KeyError:
+            cellcount = ""
+            ratio = ""
+        rows.append({
+            "Run": samp["Run"],
+            "Sample": samp["Sample"],
+            "CellCount": cellcount,
+            "NumSequences": cts,
+            "Ratio": ratio})
+
+    # Separately from the named samples, we have counts for how many read were
+    # not assigned to samples, and how many of those mapped to the PhiX genome,
+    # for each run associated with a sample.
+    for run in {samp["Run"] for samp in samples.values() if samp["Run"]}:
+        for sample in ["unassigned", "unassigned.phix"]:
+            pattern = f"analysis/counts/demux/{run}/[0-9]+/{sample}.I1.fastq.gz.counts"
+            matches = [path for path in inputs if re.match(pattern, path)]
+            cts = 0
+            for path in matches:
+                with open(path, "rt") as f_in:
+                    cts += int(f_in.read().strip())
             rows.append({
-                "Run": runid,
+                "Run": run,
                 "Sample": sample,
-                "CellCount": cellcount,
+                "CellCount": "",
                 "NumSequences": cts,
-                "Ratio": ratio})
-    with open(counts_sample_summary_out, "wt") as f_out:
+                "Ratio": ""})
+
+    rows = sorted(rows, key=lambda row: (row["Run"], row["Sample"], row["NumSequences"]))
+    with open(csv_out, "wt") as f_out:
         writer = csv.DictWriter(
             f_out,
             fieldnames=["Run", "Sample", "NumSequences", "CellCount", "Ratio"])
@@ -61,6 +87,9 @@ def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
 def _get_counts_by_run(counts_by_sample):
     counts_by_run = {}
     for row_in in counts_by_sample:
+        if row_in["Sample"] == "unassigned.phix":
+            # this case is a subset of unassigned, handled below
+            continue
         runid = row_in["Run"]
         try:
             cts = counts_by_run[runid]
