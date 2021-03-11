@@ -402,24 +402,6 @@ rule lineage_gather_germline:
 
 # Sample-based
 
-rule counts_table:
-    """Just a big ol' list of file paths and read counts.
-
-    I now think this was a bad idea and this should be phased out.
-    """
-    output: "analysis/reporting/counts/counts.csv"
-    input: TARGET_REPORT_COUNTS
-    run:
-        import csv
-        with open(output[0], "wt") as f_out:
-            writer = csv.DictWriter(
-                f_out, fieldnames=["Filename", "NumSequences"], lineterminator="\n")
-            writer.writeheader()
-            for countsfile in input:
-                with open(countsfile) as f_in:
-                    counts = f_in.read().strip()
-                writer.writerow({"Filename": countsfile, "NumSequences": counts})
-
 # All the different samples and runs for samples that list their runs,
 # AND the two unassigned count files for each define run,
 # AND expand it across all the chunked files.
