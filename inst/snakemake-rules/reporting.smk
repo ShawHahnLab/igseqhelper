@@ -7,6 +7,7 @@ analysis/report.pdf, with as much as possible handled in a modular fashion here
 before going in the Rmarkdown for the report.
 """
 
+from igseq.reporting.demux import make_barcode_summary
 from igseq.reporting.trim import make_qualtrim_csv
 from igseq.reporting.sonar import (
     get_rearr_centroids_by_raw_reads,
@@ -35,6 +36,9 @@ TARGET_QUALTRIM_GRID = expand(
         "analysis/reporting/by-run/{run}/qualtrim.{sample}.{{rp}}.csv",
         {key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}),
     rp=["R1", "R2", "I1"])
+
+TARGET_BARCODE_SUMMARY = expand(
+    "analysis/reporting/by-run/{run}/barcode_summary.csv", run=RUNS.keys())
 
 TARGET_IGDISCOVER_CLUSTERPLOTS = expand(
     "analysis/reporting/igdiscover/{chain}.{chain_type}/{specimen}/clusterplots.png",
@@ -71,6 +75,9 @@ TARGET_SONAR_RAREFACTION = expand(
 
 rule all_qualtrim_grid:
     input: TARGET_QUALTRIM_GRID
+
+rule all_barcode_summary:
+    input: TARGET_BARCODE_SUMMARY
 
 rule all_igdiscover_clusterplots:
     input: TARGET_IGDISCOVER_CLUSTERPLOTS
@@ -124,6 +131,14 @@ rule qualtrim_grid:
     output: "analysis/reporting/by-run/{run}/qualtrim.{sample}.{rp}.csv"
     input: expand("analysis/demux/{{run}}/{chunk}/{{sample}}.{{rp}}.fastq.gz", chunk=CHUNKS)
     run: make_qualtrim_csv(input, output[0])
+
+rule barcode_summary:
+    """Make a CSV table summarizing barcodes identified for one run."""
+    output: "analysis/reporting/by-run/{run}/barcode_summary.csv"
+    input: expand("analysis/demux/{{run}}/{chunk}.barcodes.csv", chunk=CHUNKS)
+    run:
+        samples = {k: v for k, v in SAMPLES.items() if v["Run"] == wildcards.run}
+        make_barcode_summary(output[0], input, SEQUENCES, samples)
 
 def input_sonar_clusters_by_read(w):
     targets = {}
