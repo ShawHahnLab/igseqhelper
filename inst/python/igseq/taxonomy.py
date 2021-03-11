@@ -12,7 +12,6 @@ from urllib.error import HTTPError
 import logging
 from Bio import Entrez
 
-Entrez.email = run(["git", "config", "user.email"], check=True, capture_output=True).stdout
 LINEAGE_FIELDNAMES = ["TaxId", "ScientificName", "Rank"]
 LOGGER = logging.getLogger(__name__)
 LINEAGE_LOCK = RLock()
@@ -23,6 +22,8 @@ def download_lineage(taxid):
 
     The list is ordered from highest to lowest (e.g. kingdom to species)
     """
+    if not Entrez.email:
+        Entrez.email = run(["git", "config", "user.email"], check=True, capture_output=True).stdout
     tries = 3
     delay = 5
     while tries:
