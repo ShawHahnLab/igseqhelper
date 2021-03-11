@@ -217,65 +217,6 @@ rule sonar_island_summary:
     input: sonar_island_summary_input
     run: sonar_island_summary(output[0], input)
 
-# Sample-based
-
-rule counts_table:
-    """Just a big ol' list of file paths and read counts."""
-    output: "analysis/reporting/counts/counts.csv"
-    input: TARGET_REPORT_COUNTS
-    run:
-        import csv
-        with open(output[0], "wt") as f_out:
-            writer = csv.DictWriter(
-                f_out, fieldnames=["Filename", "NumSequences"], lineterminator="\n")
-            writer.writeheader()
-            for countsfile in input:
-                with open(countsfile) as f_in:
-                    counts = f_in.read().strip()
-                writer.writerow({"Filename": countsfile, "NumSequences": counts})
-
-rule counts_sample_summary:
-    """A per-sample summary of raw read counts."""
-    output: "analysis/reporting/counts/counts_by_sample.csv"
-    input: "analysis/reporting/counts/counts.csv"
-    run: counts_sample_summary(input[0], output[0], SAMPLES)
-
-rule counts_run_summary:
-    """A per-run summary of raw read counts."""
-    output: "analysis/reporting/counts/counts_by_run.csv"
-    input: "analysis/reporting/counts/counts_by_sample.csv"
-    run: counts_run_summary(input[0], output[0])
-
-# Specimen+chain -based
-
-rule counts_presto_amplicon_summary:
-    """A per-amplicon summary of read counts."""
-    output: "analysis/reporting/counts/counts_amplicon_summary.csv"
-    input: TARGET_AMPLICON_COUNTS
-    run: counts_specimen_summary(input, output[0], SPECIMENS)
-
-rule counts_presto_assembly_summary:
-    """A per-specimen summary of paired read counts."""
-    output: "analysis/reporting/counts/counts_assembly_summary.csv"
-    input: TARGET_ASSEMBLY_COUNTS
-    run: counts_assembly_summary(input, output[0], SPECIMENS)
-
-rule counts_presto_qual_summary:
-    """A per-specimen summary of paired read counts."""
-    output: "analysis/reporting/counts/counts_presto_qual_summary.csv"
-    input: TARGET_PRESTO_QUAL_COUNTS
-    run: counts_presto_qual_summary(input, output[0], SPECIMENS)
-
-rule counts_sonar_module1_summary:
-    """A per-specimen summary of clustered and categorized read counts."""
-    output: "analysis/reporting/counts/counts_sonar_module1_summary.csv"
-    input: expand("analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/{specimen}_rearrangements.tsv", zip, **igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
-    run:
-        counts_sonar_module1_summary(
-            input,
-            output[0],
-            igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
-
 # TODO next: also tally after pRESTO's QC and primer checking.  Maybe do a
 # summary table in the report of counts following assembly, qc, and primer
 # checking showing attrition across steps.
@@ -458,3 +399,81 @@ rule lineage_gather_germline:
                         if record.id == seqid:
                             SeqIO.write(record, f_out, "fasta")
                             break
+
+# Sample-based
+
+rule counts_table:
+    """Just a big ol' list of file paths and read counts.
+
+    I now think this was a bad idea and this should be phased out.
+    """
+    output: "analysis/reporting/counts/counts.csv"
+    input: TARGET_REPORT_COUNTS
+    run:
+        import csv
+        with open(output[0], "wt") as f_out:
+            writer = csv.DictWriter(
+                f_out, fieldnames=["Filename", "NumSequences"], lineterminator="\n")
+            writer.writeheader()
+            for countsfile in input:
+                with open(countsfile) as f_in:
+                    counts = f_in.read().strip()
+                writer.writerow({"Filename": countsfile, "NumSequences": counts})
+
+# All the different samples and runs for samples that list their runs,
+# AND the two unassigned count files for each define run,
+# AND expand it across all the chunked files.
+# Whew.
+INPUT_COUNTS_SAMPLE_SUMMARY = expand(
+    expand(
+        "analysis/counts/demux/{run}/{{chunk}}/{item}.I1.fastq.gz.counts",
+        zip,
+        run=[s["Run"] for s in SAMPLES.values() if s["Run"]],
+        item=[s["Sample"] for s in SAMPLES.values() if s["Run"]]) +
+    expand(
+        "analysis/counts/demux/{run}/{{chunk}}/{item}.I1.fastq.gz.counts",
+        run={s["Run"] for s in SAMPLES.values() if s["Run"]},
+        item=["unassigned", "unassigned.phix"]),
+    chunk=CHUNKS)
+
+rule counts_sample_summary:
+    """A per-sample summary of raw read counts."""
+    output: "analysis/reporting/counts/counts_by_sample.csv"
+    input: INPUT_COUNTS_SAMPLE_SUMMARY
+    run: counts_sample_summary(input[0], output[0], SAMPLES)
+
+rule counts_run_summary:
+    """A per-run summary of raw read counts."""
+    output: "analysis/reporting/counts/counts_by_run.csv"
+    input: "analysis/reporting/counts/counts_by_sample.csv"
+    run: counts_run_summary(input[0], output[0])
+
+# Specimen+chain -based
+
+rule counts_presto_amplicon_summary:
+    """A per-amplicon summary of read counts."""
+    output: "analysis/reporting/counts/counts_amplicon_summary.csv"
+    input: TARGET_AMPLICON_COUNTS
+    run: counts_specimen_summary(input, output[0], SPECIMENS)
+
+rule counts_presto_assembly_summary:
+    """A per-specimen summary of paired read counts."""
+    output: "analysis/reporting/counts/counts_assembly_summary.csv"
+    input: TARGET_ASSEMBLY_COUNTS
+    run: counts_assembly_summary(input, output[0], SPECIMENS)
+
+rule counts_presto_qual_summary:
+    """A per-specimen summary of paired read counts."""
+    output: "analysis/reporting/counts/counts_presto_qual_summary.csv"
+    input: TARGET_PRESTO_QUAL_COUNTS
+    run: counts_presto_qual_summary(input, output[0], SPECIMENS)
+
+rule counts_sonar_module1_summary:
+    """A per-specimen summary of clustered and categorized read counts."""
+    output: "analysis/reporting/counts/counts_sonar_module1_summary.csv"
+    input: expand("analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/{specimen}_rearrangements.tsv", zip, **igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
+    run:
+        counts_sonar_module1_summary(
+            input,
+            output[0],
+            igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
