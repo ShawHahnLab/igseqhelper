@@ -433,7 +433,7 @@ rule counts_sample_summary:
     """A per-sample summary of raw read counts."""
     output: "analysis/reporting/counts/counts_by_sample.csv"
     input: INPUT_COUNTS_SAMPLE_SUMMARY
-    run: counts_sample_summary(input[0], output[0], SAMPLES)
+    run: counts_sample_summary(input, output[0], SAMPLES)
 
 rule counts_run_summary:
     """A per-run summary of raw read counts."""
