@@ -94,43 +94,43 @@ number of sequences occuring in that combination.
 ### Heavy Chain - Mu - V Segment
 
 ```{r fig.height=4}
-UpSetR::upset(overlaps$mu$V, order.by = "freq")
+UpSetR::upset(overlaps$mu$V, nsets = ncol(overlaps$mu$V), order.by = "freq")
 ```
 
 ### Heavy Chain - Mu - D Segment
 
 ```{r fig.height=4}
-UpSetR::upset(overlaps$mu$D, order.by = "freq")
+UpSetR::upset(overlaps$mu$D, nsets = ncol(overlaps$mu$D), order.by = "freq")
 ```
 
 ### Heavy Chain - Mu - J Segment
 
 ```{r fig.height=4}
-UpSetR::upset(overlaps$mu$J, order.by = "freq")
+UpSetR::upset(overlaps$mu$J, nsets = ncol(overlaps$mu$J), order.by = "freq")
 ```
 
 ### Light Chain - Kappa - V Segment
 
 ```{r fig.height=4}
-UpSetR::upset(overlaps$kappa$V, order.by = "freq")
+UpSetR::upset(overlaps$kappa$V, nsets = ncol(overlaps$kappa$V), order.by = "freq")
 ```
 
 ### Light Chain - Kappa - J Segment
 
 ```{r fig.height=4}
-UpSetR::upset(overlaps$kappa$J, order.by = "freq")
+UpSetR::upset(overlaps$kappa$J, nsets = ncol(overlaps$kappa$J), order.by = "freq")
 ```
 
 ### Light Chain - Lambda - V Segment
 
 ```{r fig.height=4}
-UpSetR::upset(overlaps$lambda$V, order.by = "freq")
+UpSetR::upset(overlaps$lambda$V, nsets = ncol(overlaps$lambda$V), order.by = "freq")
 ```
 
 ### Light Chain - Lambda - J Segment
 
 ```{r fig.height=4}
-UpSetR::upset(overlaps$lambda$J, order.by = "freq")
+UpSetR::upset(overlaps$lambda$J, nsets = ncol(overlaps$lambda$J), order.by = "freq")
 ```
 
 ## IgDiscover - Results by Specimen
