@@ -127,7 +127,7 @@ rule sonar_module_1:
         libv_arg=lambda w, input: "--lib " + str(Path(input.V).resolve()),
         libd_arg=lambda w, input: "D" in input and "--dlib " + str(Path(input.D).resolve()) or "--noD",
         libj_arg=lambda w, input: "--jlib " + str(Path(input.J).resolve()),
-        jmotif=lambda w: {"gamma": "TGGGG", "kappa": "TT[C|T][G|A]G", "lambda": "TT[C|T][G|A]G"}[w.chain_type]
+        jmotif=lambda w: {"heavy": "TGGGG", "light": "TT[C|T][G|A]G"}[w.chain]
     shell:
         """
             cd {params.wd_sonar}
