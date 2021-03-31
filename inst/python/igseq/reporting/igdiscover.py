@@ -161,27 +161,29 @@ def _write_alignment_csv(csv_out, rows, fields, categories):
         writer.writeheader()
         writer.writerows(rows)
 
-def gather_antibodies(lineage, chain, antibody_isolates, output_fasta):
+def gather_antibodies(lineage, chain, antibody_isolates, antibody_lineages, output_fasta):
     """Gather antibody sequences from metadata for use in alignments."""
-    LOGGER.info("gather_antibodies: lineage: %s", lineage)
-    LOGGER.info("gather_antibodies: chain: %s", chain)
-    LOGGER.info("gather_antibodies: antibody_isolates: %d", len(antibody_isolates))
-    LOGGER.info("gather_antibodies: output_fasta: %s", output_fasta)
-    is_lineage = lambda val: val["AntibodyLineageAttrs"]["AntibodyLineage"] == lineage
-    isolates = {k: val for k, val in antibody_isolates.items() if is_lineage(val)}
-    LOGGER.info("gather_antibodies: kept %d isolates matching lineage", len(isolates))
-    lineages = {val["AntibodyLineage"]: val["AntibodyLineageAttrs"] for val in isolates.values()}
-    LOGGER.info("gather_antibodies: kept %d entries matching lineage", len(lineages))
+    subject = antibody_lineages[lineage]["Subject"]
     if chain == "heavy":
-        seq_col = "HeavySeq"
-        cons_col = "HeavyConsensus"
+        key = "HeavySeq"
+        key_cons = "HeavyConsensus"
+    elif chain  == "light":
+        key = "LightSeq"
+        key_cons = "LightConsensus"
     else:
-        seq_col = "LightSeq"
-        cons_col = "LightConsensus"
+        raise ValueError
     with open(output_fasta, "wt") as f_out:
-        for lineage_name, lineage_attrs in lineages.items():
-            record = SeqRecord(Seq(lineage_attrs[cons_col]), id=lineage_name, description="")
-            SeqIO.write(record, f_out, "fasta")
-        for isolate_name, isolate_attrs in isolates.items():
-            record = SeqRecord(Seq(isolate_attrs[seq_col]), id=isolate_name, description="")
-            SeqIO.write(record, f_out, "fasta")
+        for mab_attrs in antibody_lineages.values():
+            if mab_attrs["Subject"] == subject:
+                SeqIO.write(SeqRecord(
+                        seq=Seq(mab_attrs[key_cons]),
+                        id=mab_attrs["AntibodyLineage"],
+                        description=""),
+                    f_out, "fasta-2line")
+        for mab_attrs in antibody_isolates.values():
+            if mab_attrs["AntibodyLineageAttrs"]["Subject"] == subject:
+                SeqIO.write(SeqRecord(
+                        seq=Seq(mab_attrs[key]),
+                        id=mab_attrs["AntibodyIsolate"],
+                        description=""),
+                    f_out, "fasta-2line")

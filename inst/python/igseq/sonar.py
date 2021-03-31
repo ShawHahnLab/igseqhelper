@@ -127,22 +127,25 @@ def get_antibody_allele(antibody_lineages, antibody_lineage, subject, chain, seg
 
 def igdiscover_final_db(samples, subject, chain, chain_type, segment):
     """Get an IgDiscover output DB FASTA for a single segment."""
-    if chain_type == "gamma":
+    if chain == "heavy":
         chain_type_naive = "mu"
-    elif chain_type == "lambda":
-        chain_type_naive = "lambda"
-    elif chain_type == "kappa":
-        chain_type_naive = "kappa"
+    elif chain == "light":
+        if chain_type == "lambda":
+            chain_type_naive = "lambda"
+        elif chain_type == "kappa":
+            chain_type_naive = "kappa"
+        else:
+            raise ValueError(
+                "chain type should be gamma or lambda or kappa, not \"%s\"" % chain_type)
     else:
-        raise ValueError(
-            "chain type should be gamma or lambda or kappa, not \"%s\"" % chain_type)
+        raise ValueError("chain should be heavy or light, not \"%s\"" % chain)
     # Again, here we want to refer to the naive specimens, not the IgG+ SONAR ones.
     specimen_match = lambda x: \
         x["Chain"] == chain and \
         x["Type"] == chain_type_naive and \
         "IgM+" in x["SpecimenAttrs"]["CellType"] and \
         x["SpecimenAttrs"]["Subject"] == subject
-    specimens = [x["Specimen"] for x in samples.values() if specimen_match(x)]
+    specimens = list({x["Specimen"] for x in samples.values() if specimen_match(x)})
     return expand(
         "analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/{segment}.fasta",
         chain=chain,
