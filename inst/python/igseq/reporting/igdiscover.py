@@ -51,7 +51,7 @@ def align_next_segment(target_fasta, aligned_fasta, alleles_fasta, output_fasta)
                 Seq("-" * maskpos + str(record.seq)[maskpos:]),
                 id=record.id,
                 description="")
-            SeqIO.write(record_masked, targets_masked, "fasta")
+            SeqIO.write(record_masked, targets_masked, "fasta-2line")
 
     # Align the new alleles to this modified version.
     aligned_masked = NamedTemporaryFile("rt", buffering=1)
@@ -86,16 +86,16 @@ def combine_aligned_segments(target_fasta, with_v, with_d, with_j, output_fasta)
     with open(output_fasta, "wt") as f_out:
         for record in aligned["v"]:
             record.seq = Seq(str(record.seq).ljust(max(lengths.values()), "-"))
-            SeqIO.write(record, f_out, "fasta")
+            SeqIO.write(record, f_out, "fasta-2line")
         if "d" in aligned:
             for record in aligned["d"]:
                 record.seq = Seq(str(record.seq).ljust(max(lengths.values()), "-"))
                 if record.id not in ab_ids:
-                    SeqIO.write(record, f_out, "fasta")
+                    SeqIO.write(record, f_out, "fasta-2line")
         for record in aligned["j"]:
             record.seq = Seq(str(record.seq).ljust(max(lengths.values()), "-"))
             if record.id not in ab_ids:
-                SeqIO.write(record, f_out, "fasta")
+                SeqIO.write(record, f_out, "fasta-2line")
 
 def convert_combined_alignment(fasta_in, csv_out, antibody_lineages, antibody_isolates, wildcards):
     """Convert VDJ+antibody alignment from FASTA into CSV form."""
@@ -118,7 +118,7 @@ def convert_combined_alignment(fasta_in, csv_out, antibody_lineages, antibody_is
             if match:
                 return match.group(1)
         return "???"
-    for record in SeqIO.parse(fasta_in, "fasta"):
+    for record in SeqIO.parse(fasta_in, "fasta-2line"):
         row = {}
         for key, val in wildcards.items():
             row[key] = val
