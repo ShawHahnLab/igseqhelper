@@ -215,7 +215,8 @@ rule sonar_module_2_id_div:
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_v=lambda w, input: Path(input.germline_v).resolve(),
-        input_mab=lambda w, input: Path(input.mab).resolve()
+        input_mab=lambda w, input: Path(input.mab).resolve(),
+        gap="ignore" # either "mismatch" (the default) or "ignore"
     singularity: "docker://scharch/sonar"
     threads: 4
     shell:
@@ -223,7 +224,7 @@ rule sonar_module_2_id_div:
             cd {params.wd_sonar}
             libv={params.input_v}
             mab={params.input_mab}
-            sonar id-div -g "$libv" -a "$mab" -t {threads}
+            sonar id-div -g "$libv" -a "$mab" -t {threads} --gap {params.gap}
         """
 
 # Part 2 of 3: Select specific clusters from id/div plots
