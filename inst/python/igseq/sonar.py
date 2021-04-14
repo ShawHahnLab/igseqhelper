@@ -102,9 +102,11 @@ def gather_mature(antibody_isolates, antibody_lineage, chain, output_fp):
         for isolate_name, isolate_attrs in antibody_isolates.items():
             if isolate_attrs["AntibodyLineage"] == antibody_lineage:
                 seq = isolate_attrs[col_key]
-                seqid = isolate_name + "_" + col_key
-                rec = SeqRecord(Seq(seq), id=seqid, description="")
-                SeqIO.write(rec, f_out, "fasta")
+                # Only write the record if the seq entry is not empty
+                if seq:
+                    seqid = isolate_name + "_" + col_key
+                    rec = SeqRecord(Seq(seq), id=seqid, description="")
+                    SeqIO.write(rec, f_out, "fasta")
 
 def get_antibody_allele(antibody_lineages, antibody_lineage, subject, chain, segment):
     """Get the antibody lineage germline allele ID for a given lineage/subject/chain/segment.
