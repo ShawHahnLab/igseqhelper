@@ -333,7 +333,7 @@ rule sonar_module_3_igphyml:
         collected=WD_SONAR / "output/sequences/nucleotide/longitudinal-collected.fa",
         germline_v=WD_SONAR.parent.parent / "germline.V.fasta",
         natives=WD_SONAR.parent / "mab.fasta"
-    #singularity: "docker://scharch/sonar"
+    singularity: "docker://scharch/sonar"
     threads: 4
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
@@ -344,11 +344,6 @@ rule sonar_module_3_igphyml:
     shell:
         """
             cd {params.wd_sonar}
-
-            set +e
-            set +u
-            source ~/miniconda3/bin/activate sonar
-
             sonar igphyml \
                 -v '{params.v_id}' \
                 --lib {params.input_germline_v} \
