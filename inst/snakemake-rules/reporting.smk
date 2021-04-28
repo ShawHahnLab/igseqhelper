@@ -202,6 +202,74 @@ rule sonar_island_summary:
     input: sonar_island_summary_input
     run: sonar_island_summary(output[0], input)
 
+def sonar_ancestors_table_input(w):
+    subject = ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"]
+    return expand(
+        "analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/longitudinal/output/sequences/nucleotide/longitudinal_inferredAncestors.fa",
+        subject=subject, chain=w.chain, chain_type=w.chain_type, antibody_lineage=w.antibody_lineage)
+
+# TODO clean up this mess
+rule sonar_ancestors_table:
+    """Convert inferred ancestor FASTA into a table with detected clade details.
+
+    This can be used as input to the Inferred sheet.
+    """
+    output: "analysis/reporting/by-lineage/{antibody_lineage}/{chain}.{chain_type}/ancestors.csv"
+    input: sonar_ancestors_table_input
+    run:
+        import csv
+        # names of the antibody isolates for this lineage, as ordered in the
+        # metadata.  There's a suffix on the isolate sequences depending on
+        # heavy or light chain (where does that get added, again?)
+        isolates = {key: val for key, val in ANTIBODY_ISOLATES.items() if val["AntibodyLineage"] == wildcards.antibody_lineage}
+        isolates_here = {key + "_" + wildcards.chain.upper() + "SEQ": val for key, val in isolates.items()}
+        with open(input[0]) as f_in, open(output[0], "wt") as f_out:
+            fields = ["AntibodyLineage", "TreeDepth", "Chain", "Locus", "IsolateSubsetID", "Timepoint", "OriginalID", "Sequence"]
+            writer = csv.DictWriter(f_out, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            for record in SeqIO.parse(f_in, "fasta"):
+
+                # For each inferred ancestor, we'll check which isolates are
+                # within the associated clade and generate an ID based on clade
+                # membership.
+                tree_index, clade_items, tree_suffix = record.id.split(";")
+                clade_items = clade_items.split(",")
+                mask = sum([(isolate not in clade_items)*2**(exp) for exp, isolate in enumerate(isolates_here.keys())])
+                # mask uses a 1 bit to mean NOT in the clade, so all 1 means no isolates are present.
+                maxmask = 2**len(isolates_here) - 1
+                if mask == maxmask:
+                    mask = None
+                else:
+                    mask = hex(mask)[2:].upper()
+
+                # Timepoint
+                timepoints_isolate = [isolates_here.get(item, {}).get("Timepoint") for item in clade_items]
+                timepoint_min = None
+                for item in clade_items:
+                    match = re.match("WK([0-9]+)-[0-9]+", item)
+                    if match:
+                        timepoint = int(match.group(1))
+                        if timepoint_min is None or timepoint < timepoint_min:
+                            timepoint_min = timepoint
+                    else:
+                        timepoint = isolates_here.get(item, {}).get("Timepoint")
+                        if timepoint:
+                            timepoint = int(timepoint)
+                            if timepoint_min is None or timepoint < timepoint_min:
+                                timepoint_min = timepoint
+
+                locus = {"gamma": "H", "lambda": "L", "kappa": "K", "mu": "H"}[wildcards.chain_type]
+
+                writer.writerow({
+                    "AntibodyLineage": wildcards.antibody_lineage,
+                    "TreeDepth": int(tree_index),
+                    "Chain": wildcards.chain,
+                    "Locus": locus,
+                    "IsolateSubsetID": mask,
+                    "Timepoint": timepoint_min,
+                    "OriginalID": record.id,
+                    "Sequence": str(record.seq)})
+
 # Alignments of antibody isolate sequences with the germline V(D)J alleles
 
 rule lineage_allele_alignments_table:
