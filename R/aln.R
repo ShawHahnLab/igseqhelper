@@ -153,44 +153,50 @@ make_aln_df <- function(aln_vec, ref = 1, squeeze = NULL) {
 prep_aln_df <- function(aln_df, style) {
   aln_df_for_plot <- aln_df
 
-  fill_colors <- list(
-    vsref = c(
-      "A" = "#88ff88",
-      "T" = "#ff8888",
-      "C" = "#8888ff",
-      "G" = "#ffff88",
-      "-" = "#CCCCCC",
-      " " = "#FFFFFF"
-    ),
-    dnaplotr = c(
-      "A" = "#00ff00",
-      "T" = "#ff0000",
-      "C" = "#0000ff",
-      "G" = "#ffff00",
-      "-" = "#BEBEBE"
-    )
-  )
+style_colors <-  read.csv(text = "Style,Char,BG,FG
+vsref,A,#88ff88,#000000
+vsref,T,#ff8888,#000000
+vsref,C,#8888ff,#000000
+vsref,G,#ffff88,#000000
+vsref,-,#CCCCCC,#000000
+vsref, ,#FFFFFF,#000000
+vsref,N,#FFFFFF,#000000
+dnaplotr,A,#00ff00,#000000
+dnaplotr,T,#ff0000,#000000
+dnaplotr,C,#0000ff,#000000
+dnaplotr,G,#ffff00,#000000
+dnaplotr,-,#BEBEBE,#000000
+dnaplotr, ,#FFFFFF,#000000
+dnaplotr,N,#FFFFFF,#000000
+geneious,A,#FF6D73,#000000
+geneious,T,#00FF00,#000000
+geneious,C,#7B74FF,#000000
+geneious,G,#C7B500,#000000
+geneious,-,#FFFFFF,#FFFFFF
+geneious, ,#FFFFFF,#000000
+geneious,N,#646464,#FFFFFF", stringsAsFactors = FALSE)
+rownames(style_colors) <- with(style_colors, paste(Style, Char))
 
   # TODO just define all the vars and then filter to the set to keep.
-  if (style == "vsref") {
+  if (style %in% c("vsref", "geneious")) {
+    key <- paste(style, as.character(aln_df_for_plot$BaseMasked))
     if (is.null(aln_df_for_plot$plot_fill)) {
-      aln_df_for_plot$plot_fill <-
-        fill_colors[[style]][as.character(aln_df_for_plot$BaseMasked)]  
+      aln_df_for_plot$plot_fill <- style_colors[key, "BG"]
     }
     if (is.null(aln_df_for_plot$plot_text)) {
       aln_df_for_plot$plot_text <- aln_df_for_plot[["Base"]]
     }
     if (is.null(aln_df_for_plot$plot_text_alpha)) {
       aln_df_for_plot$plot_text_alpha <- ifelse(
-        aln_df_for_plot$MatchesReference, 0.5, 1)
+        aln_df_for_plot$MatchesReference, 0.6, 1)
     }
     if (is.null(aln_df_for_plot$plot_text_col)) {
-      aln_df_for_plot$plot_text_col <- "black"
+      aln_df_for_plot$plot_text_col <- style_colors[key, "FG"]
     }
   } else if (style == "dnaplotr") {
+    key <- paste(style, as.character(aln_df_for_plot$Base))
     if (is.null(aln_df_for_plot$plot_fill)) {
-      aln_df_for_plot$plot_fill <- fill_colors[[style]][
-        as.character(aln_df_for_plot$Base)]
+      aln_df_for_plot$plot_fill <- style_colors[key, "BG"]
     }
     if (is.null(aln_df_for_plot$plot_text)) {
       aln_df_for_plot$plot_text <- ""
@@ -199,28 +205,36 @@ prep_aln_df <- function(aln_df, style) {
       aln_df_for_plot$plot_text_alpha <- 1
     }
     if (is.null(aln_df_for_plot$plot_text_col)) {
-      aln_df_for_plot$plot_text_col <- "black"
+      aln_df_for_plot$plot_text_col <- style_colors[key, "FG"]
     }
   } else {
     stop("style \"", style, "\" not recognized")
   }
 
   # Set up a vertical axis for sequence labels
-  if (! any(is.na(aln_df_for_plot$Name)) &&
-      sum(diag(table(aln_df_for_plot$SeqNum, aln_df_for_plot$Name))) ==
-      nrow(aln_df_for_plot)) {
-    # every SeqNum has a unique name
-    aln_df_for_plot$plot_row_label <- aln_df_for_plot$Name
-  } else {
-    # or, we'll make up a consistent label for each.  Important that it's a
-    # factor for any potential use of discrete scale re-labelling to work as
-    # expected.
-    txt <- as.character(aln_df_for_plot$Name)
-    txt <- ifelse(
-      is.na(txt),
-      aln_df_for_plot$SeqNum,
-      paste(aln_df_for_plot$SeqNum, txt))
-    aln_df_for_plot$plot_row_label <- factor(txt)
+  if (is.null(aln_df_for_plot$plot_row_label)) {
+    if (! any(is.na(aln_df_for_plot$Name)) &&
+        sum(diag(table(aln_df_for_plot$SeqNum, aln_df_for_plot$Name))) ==
+        nrow(aln_df_for_plot)) {
+      # every SeqNum has a unique name
+      aln_df_for_plot$plot_row_label <- aln_df_for_plot$Name
+    } else {
+      # or, we'll make up a consistent label for each.  Important that it's a
+      # factor for any potential use of discrete scale re-labelling to work as
+      # expected.
+      txt <- as.character(aln_df_for_plot$Name)
+      txt <- ifelse(
+        is.na(txt),
+        aln_df_for_plot$SeqNum,
+        paste(aln_df_for_plot$SeqNum, txt))
+      aln_df_for_plot$plot_row_label <- factor(txt)
+    }
+    if (style == "geneious") {
+      aln_df_for_plot$plot_row_label <- with(
+        aln_df_for_plot,
+        factor(plot_row_label, levels = rev(levels(plot_row_label))))
+      aln_df_for_plot <- aln_df_for_plot[with(aln_df_for_plot, order(plot_row_label, Position)), ]
+    }
   }
 
   aln_df_for_plot
@@ -243,7 +257,7 @@ plot_aln <- function(aln_vec, ref = 1, aln_df=NULL, style="vsref") {
   p <- ggplot2::ggplot(
     aln_df_for_plot,
     ggplot2::aes(x = Position, y = plot_row_label, fill = plot_fill)) +
-    ggplot2::geom_tile()
+    ggplot2::geom_tile(width = 1, height = 1)
   if (! any(is.na(aln_df_for_plot$Name))) {
     ylabels <- unique(subset(aln_df_for_plot, select = c(plot_row_label, Name)))
     p <- p + ggplot2::scale_y_discrete(
@@ -257,11 +271,14 @@ plot_aln <- function(aln_vec, ref = 1, aln_df=NULL, style="vsref") {
       label = plot_text,
       col = plot_text_col,
       alpha = plot_text_alpha),
-    size = 1.5,
+    family = "mono",
+    fontface = "plain",
+    size = 5,
     show.legend = FALSE) +
-    scale_color_identity()
+    scale_color_identity() +
+    scale_alpha_identity()
 
-  fill_vec <- c(vsref="BaseMasked", dnaplotr="Base")[[style]]
+  fill_vec <- c(vsref="BaseMasked", geneious="BaseMasked", dnaplotr="Base")[[style]]
   clrs <- unique(aln_df_for_plot[, c(fill_vec, "plot_fill")])
   clrs[, 1] <- factor(clrs[, 1])
   clrs <- clrs[order(clrs[, 1]), ]
@@ -272,15 +289,21 @@ plot_aln <- function(aln_vec, ref = 1, aln_df=NULL, style="vsref") {
       breaks = clrs[, 2],
       na.value = "white",
       name = "") +
-    ggplot2::coord_cartesian(
-      xlim = c(-1, max(aln_df_for_plot$Position) + 3), expand = FALSE) +
+    # breaks with facets
+    # ggplot2::coord_cartesian(
+    #   xlim = c(-1, max(aln_df_for_plot$Position) + 3), expand = FALSE) +
     ggplot2::labs(x = NULL, y = NULL) +
     ggplot2::theme_classic() +
-    ggplot2::theme(strip.text.y = ggplot2::element_text(angle = 0))
+    ggplot2::theme(
+      strip.text.y = ggplot2::element_text(angle = 0),
+      aspect.ratio = diff(range(aln_df$SeqNum))/diff(range(aln_df$Position)))
 
-  if ("Facet" %in% colnames(aln_df_for_plot)) {
+  # TODO support both facets and set limits per facet
+  # https://stackoverflow.com/questions/51735481/ggplot2-change-axis-limits-for-each-individual-facet-panel
+  # https://andburch.github.io/ggplot_facets/
+  if ("FacetSeqs" %in% colnames(aln_df_for_plot)) {
     p <- p + ggplot2::facet_grid(
-      rows = ggplot2::vars(Facet),
+      rows = ggplot2::vars(FacetSeqs),
       scales = "free",
       space = "free")
   }
