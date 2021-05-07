@@ -38,7 +38,7 @@ TARGET_QUALTRIM_GRID = expand(
     rp=["R1", "R2", "I1"])
 
 TARGET_BARCODE_SUMMARY = expand(
-    "analysis/reporting/by-run/{run}/barcode_summary.csv", run=RUNS.keys())
+    "analysis/reporting/by-run/{run}/barcode_summary.csv", run=[runattrs["Run"] for runattrs in RUNS.values() if runattrs["Protocol"] == "IgSeq"])
 
 TARGET_IGDISCOVER_CLUSTERPLOTS = expand(
     "analysis/reporting/igdiscover/{chain}.{chain_type}/{specimen}/clusterplots.png",
