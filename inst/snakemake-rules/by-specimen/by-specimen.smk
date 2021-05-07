@@ -26,6 +26,17 @@ def reads_by_specimen_input(wildcards):
             (wildcards.specimen, wildcards.chain, wildcards.chain_type))
     return filepaths
 
+TARGET_READS_BY_SPECIMEN = expand(
+        "analysis/reads-by-specimen/{chain}.{chain_type}/{specimen}.{rp}.fastq.gz",
+        zip,
+        chain=[samp["Chain"] for samp in SAMPLES.values()],
+        chain_type=[samp["Type"] for samp in SAMPLES.values()],
+        specimen=[samp["Specimen"] for samp in SAMPLES.values()],
+        rp=["R1", "R2"])
+
+rule all_reads_by_specimen:
+    input: TARGET_READS_BY_SPECIMEN
+
 rule reads_by_specimen:
     """Aggregate trimmed sequencer samples into per-specimen FASTQ files."""
     output: "analysis/reads-by-specimen/{chain}.{chain_type}/{specimen}.{rp}.fastq.gz"
