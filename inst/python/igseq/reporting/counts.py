@@ -40,7 +40,10 @@ def counts_sample_summary(inputs, csv_out, samples):
             "Sample": samp["Sample"],
             "CellCount": cellcount,
             "NumSequences": cts,
-            "Ratio": ratio})
+            "Ratio": ratio,
+            "Specimen": samp["Specimen"],
+            "Chain": samp["Chain"],
+            "Type": samp["Type"]})
 
     # Separately from the named samples, we have counts for how many read were
     # not assigned to samples, and how many of those mapped to the PhiX genome,
@@ -58,13 +61,16 @@ def counts_sample_summary(inputs, csv_out, samples):
                 "Sample": sample,
                 "CellCount": "",
                 "NumSequences": cts,
-                "Ratio": ""})
+                "Ratio": "",
+                "Specimen": "",
+                "Chain": "",
+                "Type": ""})
 
     rows = sorted(rows, key=lambda row: (row["Run"], row["Sample"], row["NumSequences"]))
     with open(csv_out, "wt") as f_out:
         writer = csv.DictWriter(
             f_out,
-            fieldnames=["Run", "Sample", "NumSequences", "CellCount", "Ratio"])
+            fieldnames=["Run", "Sample", "NumSequences", "CellCount", "Ratio", "Specimen", "Chain", "Type"])
         writer.writeheader()
         writer.writerows(rows)
 
