@@ -18,7 +18,8 @@ from igseq.reporting.counts import (
     counts_sample_summary,
     counts_run_summary,
     counts_specimen_summary,
-    counts_assembly_summary,
+    counts_presto_specimen_summary,
+    counts_presto_assembly_summary,
     counts_presto_qual_summary,
     counts_sonar_module1_summary)
 from igseq.reporting.igdiscover import (
@@ -393,19 +394,25 @@ rule counts_run_summary:
     input: "analysis/reporting/counts/counts_by_sample.csv"
     run: counts_run_summary(input[0], output[0])
 
+rule counts_specimen_summary:
+    """A per-specimen summary of raw read counts."""
+    output: "analysis/reporting/counts/counts_by_specimen.csv"
+    input: "analysis/reporting/counts/counts_by_sample.csv"
+    run: counts_specimen_summary(input[0], output[0])
+
 # Specimen+chain -based
 
 rule counts_presto_amplicon_summary:
     """A per-amplicon summary of read counts."""
     output: "analysis/reporting/counts/counts_amplicon_summary.csv"
     input: TARGET_AMPLICON_COUNTS
-    run: counts_specimen_summary(input, output[0], SPECIMENS)
+    run: counts_presto_specimen_summary(input, output[0], SPECIMENS)
 
 rule counts_presto_assembly_summary:
     """A per-specimen summary of paired read counts."""
     output: "analysis/reporting/counts/counts_assembly_summary.csv"
     input: TARGET_ASSEMBLY_COUNTS
-    run: counts_assembly_summary(input, output[0], SPECIMENS)
+    run: counts_presto_assembly_summary(input, output[0], SPECIMENS)
 
 rule counts_presto_qual_summary:
     """A per-specimen summary of paired read counts."""

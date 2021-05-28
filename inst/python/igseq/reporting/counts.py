@@ -90,6 +90,22 @@ def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
         writer.writerow(["Run", "UnassignedSeqs", "SampleSeqs", "TotalSeqs", "Ratio"])
         writer.writerows(rows)
 
+def counts_specimen_summary(counts_sample_summary_in, counts_specimen_summary_out):
+    """Take a per-sample summary of sequence counts and make a per-specimen/locus version.
+
+    counts_sample_summary_in: CSV file path, as from counts_sample_summary
+    counts_specimen_sumary_out: CSV file path for output
+    """
+    with open(counts_sample_summary_in) as f_in:
+        reader = csv.DictReader(f_in)
+        counts_by_sample = list(reader)
+    counts_by_specimen = _get_counts_by_specimen(counts_by_sample)
+    rows = _tally_counts_by_specimen(counts_by_specimen)
+    with open(counts_specimen_summary_out, "wt") as f_out:
+        writer = csv.writer(f_out)
+        writer.writerow(["Specimen", "Chain", "Type", "NumSequences", "CellCount", "Ratio"])
+        writer.writerows(rows)
+
 def _get_counts_by_run(counts_by_sample):
     counts_by_run = {}
     for row_in in counts_by_sample:
@@ -121,6 +137,45 @@ def _tally_counts_by_run(counts_by_run):
             run_attrs.get("unassigned", ""),
             run_attrs.get("samples", ""),
             run_attrs.get("unassigned", "") + run_attrs.get("samples", ""),
+            ratio])
+    return rows
+
+def _get_counts_by_specimen(counts_by_sample):
+    counts_by_specimen = {}
+    for row_in in counts_by_sample:
+        if row_in["Sample"] in ["unassigned.phix", "unassigned"]:
+            # skip these as they're not actually samples
+            continue
+        specimen = row_in["Specimen"]
+        chain = row_in["Chain"]
+        chain_type = row_in["Type"]
+        key = (specimen, chain, chain_type)
+        try:
+            cts = counts_by_specimen[key]
+        except KeyError:
+            counts_by_specimen[key] = {
+                "Specimen": specimen,
+                "Chain": chain,
+                "Type": chain_type,
+                "NumSequences": 0,
+                "CellCount": intif(row_in["CellCount"])}
+            cts = counts_by_specimen[key]
+        cts["NumSequences"] += int(row_in["NumSequences"])
+    return counts_by_specimen
+
+def _tally_counts_by_specimen(counts_by_specimen):
+    rows = []
+    for attrs in counts_by_specimen.values():
+        try:
+            ratio = divide(attrs["NumSequences"], attrs["CellCount"])
+        except KeyError:
+            ratio = ""
+        rows.append([
+            attrs["Specimen"],
+            attrs["Chain"],
+            attrs["Type"],
+            attrs["NumSequences"],
+            attrs["CellCount"],
             ratio])
     return rows
 
@@ -158,7 +213,7 @@ def amplicon_summary(input_fps, specimens, regex):
     counts = sorted(counts, key=lambda x: [x[key] for key in fieldnames])
     return counts, fieldnames
 
-def counts_specimen_summary(input_fps, output_fp, specimens):
+def counts_presto_specimen_summary(input_fps, output_fp, specimens):
     """Take a list of per-specimen-R1 read count files and make a summary table."""
     counts, fieldnames = amplicon_summary(
         input_fps,
@@ -174,7 +229,7 @@ def counts_specimen_summary(input_fps, output_fp, specimens):
         writer.writeheader()
         writer.writerows(counts)
 
-def counts_assembly_summary(input_fps, output_fp, specimens):
+def counts_presto_assembly_summary(input_fps, output_fp, specimens):
     """Take a list of per-specimen assembled sequence count files and make a summary table."""
     counts, fieldnames = amplicon_summary(
         input_fps,
@@ -214,11 +269,18 @@ def counts_sonar_module1_summary(input_fps, output_fp, attrs):
                 attrs_here[key] = cts[key]
             writer.writerow(attrs_here)
 
+def intif(val):
+    """Try to cast to int, but if that fails, return None."""
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return None
+
 def divide(val1, val2, fmt="{:.6f}"):
     """Divide val1 by val2 as floats and return formatted string."""
     try:
         num = float(val1)/float(val2)
-    except ValueError:
+    except (ValueError, TypeError):
         num = ""
     else:
         num = fmt.format(num)
