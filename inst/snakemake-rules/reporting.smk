@@ -223,7 +223,7 @@ rule sonar_ancestors_table:
         # metadata.  There's a suffix on the isolate sequences depending on
         # heavy or light chain (where does that get added, again?)
         isolates = {key: val for key, val in ANTIBODY_ISOLATES.items() if val["AntibodyLineage"] == wildcards.antibody_lineage}
-        isolates_here = {key + "_" + wildcards.chain.upper() + "SEQ": val for key, val in isolates.items()}
+        isolates_here = {(key + "_" + wildcards.chain + "SEQ").upper(): val for key, val in isolates.items()}
         with open(input[0]) as f_in, open(output[0], "wt") as f_out:
             fields = ["AntibodyLineage", "TreeDepth", "Chain", "Locus", "IsolateSubsetID", "Timepoint", "OriginalID", "Sequence"]
             writer = csv.DictWriter(f_out, fieldnames=fields, lineterminator="\n")
@@ -247,7 +247,7 @@ rule sonar_ancestors_table:
                 timepoints_isolate = [isolates_here.get(item, {}).get("Timepoint") for item in clade_items]
                 timepoint_min = None
                 for item in clade_items:
-                    match = re.match("WK([0-9]+)-[0-9]+", item)
+                    match = re.match(r"WK([0-9]+)(\.?[0-9]*)-[0-9]+", item)
                     if match:
                         timepoint = int(match.group(1))
                         if timepoint_min is None or timepoint < timepoint_min:
