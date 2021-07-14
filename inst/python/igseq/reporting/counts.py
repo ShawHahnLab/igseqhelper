@@ -130,7 +130,7 @@ def _tally_counts_by_run(counts_by_run):
     for run_name, run_attrs in counts_by_run.items():
         try:
             ratio = divide(run_attrs["unassigned"], run_attrs["samples"])
-        except KeyError:
+        except (KeyError, ZeroDivisionError):
             ratio = ""
         rows.append([
             run_name,
