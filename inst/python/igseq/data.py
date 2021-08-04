@@ -66,6 +66,7 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     LOGGER.info("load_samples: runs %s...", str(runs)[0:60])
     LOGGER.info("load_samples: sequences %s...", str(sequences)[0:60])
     samples = load_csv(fp_in, "Sample")
+    samples = {k: v for k, v in samples.items() if v["Skip"] != "TRUE"}
     noblanks = {k: v for k, v in samples.items() if \
             v["BarcodeFwd"] and v["BarcodeRev"] and v["Run"]}
     if len(noblanks) < len(samples):
