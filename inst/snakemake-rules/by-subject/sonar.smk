@@ -2,14 +2,11 @@
 SONAR processing across the three modules.
 
 There's one interactive step here, the island selection from the
-identity/divergence plots.  This requires X11 to show the interactive plot and
-uses a separate sonar conda environment so I could avoid having to figure out
-X11 over singularity/docker.  The others rules here require --use-singularity
-in snakemake.
+identity/divergence plots.  This requires X11 to show the interactive plot.
+Most rules here require --use-singularity in snakemake.
 
-This whole setup is very brittle (depends on the extra conda environment,
-singularity, and specific relative paths) and would probably take some work to
-run successfully anywhere else.
+This whole setup is pretty brittle and would probably take some work to run
+successfully anywhere else.
 """
 
 import igseq.sonar
@@ -229,23 +226,19 @@ rule sonar_module_2_id_div:
 
 # Part 2 of 3: Select specific clusters from id/div plots
 # NOTE this step is interactive over X11
-# haven't been able to get this part working with snakemake's
-# singularity/docker stuff
 rule sonar_module_2_id_div_island:
     """SONAR 2: Select "island" of interest from ID/DIV plots."""
     output:
         seqids=WD_SONAR / "output/tables/islandSeqs.txt"
     input:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab"
+    singularity: "docker://scharch/sonar"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_iddiv=lambda w, input: Path(input.iddiv).resolve(),
         mab="=a", # =a means use all antibodies in mab input file
     shell:
         """
-            set +e
-            set +u
-            source ~/miniconda3/bin/activate sonar
             cd {params.wd_sonar}
             sonar get_island {params.input_iddiv} --mab "{params.mab}"
         """
@@ -357,6 +350,13 @@ rule sonar_module_3_igphyml:
         args="-f"
     shell:
         """
+            # Singularity passes through environment variables by default,
+            # which in my setup includes LANG=en_US.UTF-8 which is unrecognized
+            # by the container, which then causes a few warnings to be written
+            # to stderr by a perl script called by SONAR, which then triggers
+            # SONAR to crash when it sees the non-empty stderr.
+            # So yeah let's just unset the LANG.
+            unset LANG
             cd {params.wd_sonar}
             sonar igphyml \
                 -v '{params.v_id}' \
