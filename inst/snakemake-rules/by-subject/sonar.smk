@@ -281,7 +281,8 @@ def sonar_module_3_collect_inputs(wildcards):
 
     This gives a dictionary of timepoint -> islandSeqs.fa pairs.  We need to
     include all other specimens that include samples for the same chain type as
-    specified here.
+    specified here, so this searches for samples and then works backwards to
+    specimens.
     """
 
     pattern = str(WD_SONAR.parent /
@@ -298,8 +299,21 @@ def sonar_module_3_collect_inputs(wildcards):
         chain_type=wildcards.chain_type,
         antibody_lineage=wildcards.antibody_lineage,
         other_specimen=specimens)
-    timepoints = ["wk" + txt for txt in timepoints]
-    targets = dict(zip(timepoints, targets))
+    # What I've done so far will give repeated entries, so we'll get just
+    # unique ones now.
+    pairs = list(set(zip(timepoints, targets)))
+    pairs = sorted(pairs)
+    # Allow for repeated timepoints (for the rare case of multiple specimens
+    # per timepoint) by appending .2, .3, etc.
+    # (note to self: be careful with this mutable default argument.)
+    def tally_tp(tp, seen={}):
+        if tp in seen:
+            seen[tp] += 1
+            out = tp + "." + str(seen[tp])
+            return out
+        seen[tp] = 1
+        return tp
+    targets = {"wk" + tally_tp(tp): target for tp, target in pairs}
     return targets
 
 def sonar_module_3_collect_seqs(wildcards, input):
