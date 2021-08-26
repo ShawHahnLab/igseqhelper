@@ -2,3 +2,4 @@
 .Rhistory
 .RData
 __pycache__
+inst/report.pdf
