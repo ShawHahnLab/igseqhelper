@@ -190,14 +190,18 @@ def sonar_island_summary(fp_output_csv, fps_input_csv):
 
 def _sonar_island_summary_row(fp_in):
     germ_divs = []
-    ab_ids = []
+    ab_ids_meds = []
+    ab_ids_mins = []
+    ab_ids_maxes = []
     specimen = ""
     timepoint = ""
     with open(fp_in) as f_in:
         reader = csv.DictReader(f_in)
         for row in reader:
             germ_divs.append(float(row["germ_div"]))
-            ab_ids.append(float(row["ab_id_median"]))
+            ab_ids_meds.append(float(row["ab_id_median"]))
+            ab_ids_mins.append(float(row["ab_id_min"]))
+            ab_ids_maxes.append(float(row["ab_id_max"]))
             # just take the last specimen and timepoint given (if any) since
             # they should be constant per file
             specimen = row.get("specimen", "")
@@ -210,9 +214,9 @@ def _sonar_island_summary_row(fp_in):
             "germ_div_min": round(min(germ_divs), 4),
             "germ_div_max": round(max(germ_divs), 4),
             "germ_div_median": round(median(germ_divs), 4),
-            "ab_id_min": round(min(ab_ids), 4),
-            "ab_id_max": round(max(ab_ids), 4),
-            "ab_id_median": round(median(ab_ids), 4)}
+            "ab_id_min": round(min(ab_ids_mins), 4),
+            "ab_id_max": round(max(ab_ids_maxes), 4),
+            "ab_id_median": round(median(ab_ids_meds), 4)}
     else:
         row_out = {
             "specimen": specimen,
