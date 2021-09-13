@@ -213,7 +213,13 @@ rule sonar_module_2_id_div:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_v=lambda w, input: Path(input.germline_v).resolve(),
         input_mab=lambda w, input: Path(input.mab).resolve(),
-        gap="ignore" # either "mismatch" (the default) or "ignore"
+        # either "mismatch" (the default) or "ignore".  Note that this is used
+        # for both identity and divergence calculations, and while ignoring
+        # gaps can help with occasional mis-alignments with the V genes that
+        # result in inflated divergence values, it also obscures key
+        # differences in identity calculations (like for example with big gaps
+        # in CDR3 alignments) that I think make gap=ignore infeasible to use.
+        gap="mismatch"
     singularity: "docker://scharch/sonar"
     threads: 4
     shell:
