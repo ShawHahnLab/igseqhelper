@@ -103,7 +103,10 @@ rule igdiscover_igblast_query_antibodies:
             raise ValueError
         with open(output.query, "wt") as f_out:
             for mab_attrs in ANTIBODY_ISOLATES.values():
-                if mab_attrs["AntibodyLineageAttrs"]["Subject"] == subject:
+                # include any that match this subject and have a non-empty
+                # sequence (sometimes we might only have one chain or the other
+                # for any particular isolate)
+                if mab_attrs["AntibodyLineageAttrs"]["Subject"] == subject and mab_attrs[key]:
                     SeqIO.write(SeqRecord(
                             seq=Seq(mab_attrs[key]),
                             id=mab_attrs["AntibodyIsolate"],
