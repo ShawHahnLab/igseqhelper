@@ -104,6 +104,9 @@ rule sonar_module_1:
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_fastq=lambda w, input: Path(input.fastq).resolve(),
+        # 97% similarity was used in the SONAR vignette and Chaim says was more
+        # appropriate back in the days of 454 sequencing, but they typically
+        # use 99% now with the higher-quality Illumina sequencing.
         cluster_id_fract=.97,
         cluster_min2=2,
         # What we give for the V(D)J command-line argments and the J motif
