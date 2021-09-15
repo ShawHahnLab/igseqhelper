@@ -11,7 +11,16 @@ from igseq.data import load_csv, get_samples_per_run, MetadataError
 LOGGER = logging.getLogger(__name__)
 
 def counts_sample_summary(inputs, csv_out, samples):
-    """Take a list of sequence counts for fastq.gz files and summarize per-sample."""
+    """Take a list of sequence counts for fastq.gz files and summarize per-sample.
+
+    inputs: list of files containing read counts per sample (each file containing the number of reads)
+    csv_out: path to output to write to
+    samples: dictionary of sample metadata including nested specimen information
+
+    The table includes per-sample information (run, sample name, read counts)
+    plus per-specimen information (cell type, cell count, chain, chain type)
+    for the specimen each sample is from.
+    """
 
     rows = []
     for samp in samples.values():
@@ -42,6 +51,7 @@ def counts_sample_summary(inputs, csv_out, samples):
             "NumSequences": cts,
             "Ratio": ratio,
             "Specimen": samp["Specimen"],
+            "CellType": samp["SpecimenAttrs"]["CellType"],
             "Chain": samp["Chain"],
             "Type": samp["Type"]})
 
@@ -63,6 +73,7 @@ def counts_sample_summary(inputs, csv_out, samples):
                 "NumSequences": cts,
                 "Ratio": "",
                 "Specimen": "",
+                "CellType": "",
                 "Chain": "",
                 "Type": ""})
 
@@ -70,7 +81,10 @@ def counts_sample_summary(inputs, csv_out, samples):
     with open(csv_out, "wt") as f_out:
         writer = csv.DictWriter(
             f_out,
-            fieldnames=["Run", "Sample", "NumSequences", "CellCount", "Ratio", "Specimen", "Chain", "Type"])
+            fieldnames=[
+                "Run", "Sample", "NumSequences", "CellCount", "Ratio",
+                "Specimen", "CellType", "Chain", "Type"],
+            lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -79,6 +93,8 @@ def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
 
     counts_sample_summary_in: CSV file path, as from counts_sample_summary
     counts_run_sumary_out: CSV file path for output
+
+    This sums the per-sample counts in the input table on a per-run basis.
     """
     with open(counts_sample_summary_in) as f_in:
         reader = csv.DictReader(f_in)
@@ -86,7 +102,7 @@ def counts_run_summary(counts_sample_summary_in, counts_run_summary_out):
     counts_by_run = _get_counts_by_run(counts_by_sample)
     rows = _tally_counts_by_run(counts_by_run)
     with open(counts_run_summary_out, "wt") as f_out:
-        writer = csv.writer(f_out)
+        writer = csv.writer(f_out, lineterminator="\n")
         writer.writerow(["Run", "UnassignedSeqs", "SampleSeqs", "TotalSeqs", "Ratio"])
         writer.writerows(rows)
 
@@ -95,6 +111,9 @@ def counts_specimen_summary(counts_sample_summary_in, counts_specimen_summary_ou
 
     counts_sample_summary_in: CSV file path, as from counts_sample_summary
     counts_specimen_sumary_out: CSV file path for output
+
+    This relies on the per-sample and per-specimen information already present
+    in the per-sample table.
     """
     with open(counts_sample_summary_in) as f_in:
         reader = csv.DictReader(f_in)
@@ -102,8 +121,11 @@ def counts_specimen_summary(counts_sample_summary_in, counts_specimen_summary_ou
     counts_by_specimen = _get_counts_by_specimen(counts_by_sample)
     rows = _tally_counts_by_specimen(counts_by_specimen)
     with open(counts_specimen_summary_out, "wt") as f_out:
-        writer = csv.writer(f_out)
-        writer.writerow(["Specimen", "Chain", "Type", "NumSequences", "CellCount", "Ratio"])
+        writer = csv.DictWriter(
+            f_out,
+            fieldnames = ["Specimen", "CellType", "Chain", "Type", "NumSequences", "CellCount", "Ratio"],
+            lineterminator="\n")
+        writer.writeheader()
         writer.writerows(rows)
 
 def _get_counts_by_run(counts_by_sample):
@@ -147,6 +169,7 @@ def _get_counts_by_specimen(counts_by_sample):
             # skip these as they're not actually samples
             continue
         specimen = row_in["Specimen"]
+        cell_type = row_in["CellType"]
         chain = row_in["Chain"]
         chain_type = row_in["Type"]
         key = (specimen, chain, chain_type)
@@ -155,6 +178,7 @@ def _get_counts_by_specimen(counts_by_sample):
         except KeyError:
             counts_by_specimen[key] = {
                 "Specimen": specimen,
+                "CellType": cell_type,
                 "Chain": chain,
                 "Type": chain_type,
                 "NumSequences": 0,
@@ -166,17 +190,12 @@ def _get_counts_by_specimen(counts_by_sample):
 def _tally_counts_by_specimen(counts_by_specimen):
     rows = []
     for attrs in counts_by_specimen.values():
+        out = attrs.copy()
         try:
-            ratio = divide(attrs["NumSequences"], attrs["CellCount"])
+            out["Ratio"] = divide(attrs["NumSequences"], attrs["CellCount"])
         except KeyError:
-            ratio = ""
-        rows.append([
-            attrs["Specimen"],
-            attrs["Chain"],
-            attrs["Type"],
-            attrs["NumSequences"],
-            attrs["CellCount"],
-            ratio])
+            out["Ratio"] = ""
+        rows.append(out)
     return rows
 
 def amplicon_summary(input_fps, specimens, regex):
