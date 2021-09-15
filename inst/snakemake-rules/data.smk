@@ -32,7 +32,7 @@ rule get_data:
     have no use for the distinctions between the separate files (except for
     what's R1, R2, and I1).
     """
-    output: protected(directory("data/{run}"))
+    output: directory("data/{run}")
     input: ancient(rules.get_metadata.output)
     params: runpath="/seq/runs"
     threads: 8
