@@ -116,10 +116,10 @@ rule qualtrim_grid:
     input: expand("analysis/demux/{{run}}/{chunk}/{{sample}}.{{rp}}.fastq.gz", chunk=CHUNKS)
     run: make_qualtrim_csv(input, output[0])
 
-rule barcode_summary:
+rule run_barcode_summary:
     """Make a CSV table summarizing barcodes identified for one run."""
     output: "analysis/reporting/by-run/{run}/barcode_summary.csv"
-    input: expand("analysis/demux/{{run}}/{chunk}.barcodes.csv", chunk=CHUNKS)
+    input: expand("analysis/demux/{{run}}/{chunk}.barcodes.csv.gz", chunk=CHUNKS)
     run:
         samples = {k: v for k, v in SAMPLES.items() if v["Run"] == wildcards.run}
         make_barcode_summary(output[0], input, SEQUENCES, samples)

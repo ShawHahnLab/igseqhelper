@@ -79,7 +79,7 @@ for runid in RUNS.keys():
 
 rule barcode_annotate:
     """Create a table of all recognized barcodes by read ID for one chunk."""
-    output: "analysis/demux/{run}/{chunk}.barcodes.csv"
+    output: "analysis/demux/{run}/{chunk}.barcodes.csv.gz"
     input:
         R1="analysis/data/{run}/chunk_{chunk}_R1.fastq.gz",
         R2="analysis/data/{run}/chunk_{chunk}_R2.fastq.gz",

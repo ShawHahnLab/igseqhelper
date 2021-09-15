@@ -124,7 +124,7 @@ def annotate(bcs_fwd, bcs_rev, fps, fp_out, dorevcmp=False):
     bcs_rev: list of strings for all possible reverse barcodes
     fps: dict of "R1", "R2", and "I1" keys pointing to file paths to
          fastq.gz
-    fp_out: path to write CSV to
+    fp_out: path to write csv.gz to
     dorevcmp: reverse-complement R1 and R2 for barcode-matching?
 
     Note that none of this considers sample assignment or any naming for
@@ -139,8 +139,8 @@ def annotate(bcs_fwd, bcs_rev, fps, fp_out, dorevcmp=False):
     for key, val in fps.items():
         LOGGER.debug("%d annotate: %s input file: %s", PID, key, val)
     LOGGER.debug("%d annotate: fp_out: %s", PID, fp_out)
-    fieldnames = ["SeqID", "BCFWD", "BCREV"]
-    with _open_gzips(fps, "rt") as hndls_in, open(fp_out, "wt") as f_out:
+    fieldnames = ["SeqID", "BCFWD", "BCREV", "BCFWDQualMin", "BCREVQualMin"]
+    with _open_gzips(fps, "rt") as hndls_in, gzip.open(fp_out, "wt") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for trio in zip(
@@ -155,11 +155,16 @@ def annotate(bcs_fwd, bcs_rev, fps, fp_out, dorevcmp=False):
             assigned = (
                 assign_barcode_fwd(trio[0], bcs_fwd, send_stats=None),
                 assign_barcode_rev(trio[2], bcs_rev, send_stats=None))
-            #annot = " BCFWD=%s BCREV=%s" % assigned
+            # 16 will cover all possible forward barcode lengths.  The reverse,
+            # from I1, is always the same (8 NT).
+            fwd_quals = trio[0].letter_annotations["phred_quality"][0:16]
+            rev_quals = trio[2].letter_annotations["phred_quality"]
             writer.writerow({
                 "SeqID": trio[0].id,
                 "BCFWD": assigned[0],
-                "BCREV": assigned[1]})
+                "BCREV": assigned[1],
+                "BCFWDQualMin": min(fwd_quals),
+                "BCREVQualMin": min(rev_quals)})
 
 def _fqparse(f_in):
     """Convenience wrapper for FASTQ parser."""

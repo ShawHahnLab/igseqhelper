@@ -3,13 +3,14 @@ Summarizing and reporting helper functions - demultiplexing.
 """
 
 import csv
+import gzip
 from collections import defaultdict
 
 def make_barcode_summary(csv_out, csvs_in, sequences, samples):
     """Combine chunked Seq ID/Fwd Barcode/Rev Barcode tables in one summary.
 
     csv_out: path to write summary CSV
-    csvs_in: list of paths for CSV files created by demux.annotate
+    csvs_in: list of paths for csv.gz files created by demux.annotate
     sequences: list of dicts of sequence attributes
     samples: list of dicts of sample attributes for this run
 
@@ -39,7 +40,7 @@ def make_barcode_summary(csv_out, csvs_in, sequences, samples):
 def _load_barcode_totals(csvs_in):
     totals = defaultdict(int)
     for csv_in in csvs_in:
-        with open(csv_in) as f_in:
+        with gzip.open(csv_in, "rt") as f_in:
             reader = csv.DictReader(f_in)
             for row in reader:
                 totals[(row["BCFWD"], row["BCREV"])] += 1
