@@ -140,7 +140,6 @@ def annotate(bcs_fwd, bcs_rev, fps, fp_out, dorevcmp=False):
         LOGGER.debug("%d annotate: %s input file: %s", PID, key, val)
     LOGGER.debug("%d annotate: fp_out: %s", PID, fp_out)
     fieldnames = ["SeqID", "BCFWD", "BCREV"]
-    log = open("/home/jesse/foo", "wt")
     with _open_gzips(fps, "rt") as hndls_in, open(fp_out, "wt") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
