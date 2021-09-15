@@ -301,6 +301,10 @@ def sonar_module_3_collect_inputs(wildcards):
         chain_type=wildcards.chain_type,
         antibody_lineage=wildcards.antibody_lineage,
         other_specimen=specimens)
+    # zero-pad the timepoints, so for example we end up with ["08", "12", ...
+    # instead of ["12", "8", ...
+    padlen = max([len(txt) for txt in timepoints])
+    timepoints = [txt.zfill(padlen) for txt in timepoints]
     # What I've done so far will give repeated entries, so we'll get just
     # unique ones now.
     pairs = list(set(zip(timepoints, targets)))
