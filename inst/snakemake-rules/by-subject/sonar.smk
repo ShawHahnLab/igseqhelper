@@ -377,3 +377,29 @@ rule sonar_module_3_igphyml:
                 --natives {params.input_natives} \
                 {params.args}
         """
+
+rule sonar_module_3_draw_tree:
+    """SONAR 3: Render a tree visualization from the IgPhyML results.
+
+    natives.tab is a tab-separated table of metadata described in SONAR's
+    display_tree.py.  Currently this has to be supplied manually.
+    """
+    output:
+        tree_img=WD_SONAR / "output/longitudinal_igphyml.tree.pdf"
+    input:
+        tree=WD_SONAR / "output/longitudinal_igphyml.tree",
+        natives_tab=WD_SONAR / "natives.tab"
+    singularity: "docker://scharch/sonar"
+    params:
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
+        input_tree=lambda w, input: Path(input.tree).resolve(),
+        input_natives_tab=lambda w, input: Path(input.natives_tab).resolve(),
+        output_tree_img=lambda w, input, output: Path(output.tree_img).resolve()
+    shell:
+        """
+            sonar display_tree \
+                -t {params.input_tree} \
+                -n {params.input_natives_tab} \
+                --showAll \
+                -o {params.output_tree_img}
+        """
