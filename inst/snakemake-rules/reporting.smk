@@ -7,7 +7,7 @@ analysis/report.pdf, with as much as possible handled in a modular fashion here
 before going in the Rmarkdown for the report.
 """
 
-from igseq.reporting.demux import make_barcode_summary
+from igseq.reporting.demux import make_barcode_summary, make_quality_summary, make_quality_summary_combo
 from igseq.reporting.trim import make_qualtrim_csv
 from igseq.reporting.sonar import (
     get_rearr_centroids_by_raw_reads,
@@ -123,6 +123,20 @@ rule run_barcode_summary:
     run:
         samples = {k: v for k, v in SAMPLES.items() if v["Run"] == wildcards.run}
         make_barcode_summary(output[0], input, SEQUENCES, samples)
+
+rule run_quality_summary_combo:
+    """Make a CSV table summarizing base quality scores across all runs."""
+    output: "analysis/reporting/by-run/quality.csv"
+    input: expand("analysis/reporting/by-run/{run}/quality.csv", run=[runattrs["Run"] for runattrs in RUNS.values() if runattrs["Protocol"] == "IgSeq"])
+    run:
+        make_quality_summary_combo(output[0], input)
+
+rule run_quality_summary:
+    """Make a CSV table summarizing base quality scores."""
+    output: "analysis/reporting/by-run/{run}/quality.csv"
+    input: expand("analysis/demux/{{run}}/{chunk}.barcodes.csv.gz", chunk=CHUNKS)
+    run:
+        make_quality_summary(output[0], input, wildcards.run)
 
 def input_sonar_clusters_by_read(w):
     targets = {}

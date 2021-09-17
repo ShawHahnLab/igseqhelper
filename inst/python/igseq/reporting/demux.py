@@ -5,6 +5,7 @@ Summarizing and reporting helper functions - demultiplexing.
 import csv
 import gzip
 from collections import defaultdict
+import numpy
 
 def make_barcode_summary(csv_out, csvs_in, sequences, samples):
     """Combine chunked Seq ID/Fwd Barcode/Rev Barcode tables in one summary.
@@ -36,6 +37,59 @@ def make_barcode_summary(csv_out, csvs_in, sequences, samples):
         writer = csv.DictWriter(f_out, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(output)
+
+def make_quality_summary_combo(csv_out, csvs_in):
+    """Merge individual per-run quality summaries into one CSV."""
+    with open(csv_out, "wt") as f_out:
+        writer = csv.DictWriter(
+            f_out,
+            fieldnames=["Run", "BCFWDMQ25", "BCFWDMQ50", "BCFWDMQ75", "BCREVMQ25", "BCREVMQ50", "BCREVMQ75"],
+            lineterminator="\n")
+        writer.writeheader()
+        for csv_in in csvs_in:
+            with open(csv_in) as f_in:
+                reader = csv.DictReader(f_in)
+                for row in reader:
+                    writer.writerow(row)
+
+def make_quality_summary(csv_out, csvs_in, runid):
+    """Combine chunked Barcode tables in one-row quality score summary.
+
+    csv_out: path to write summary CSV
+    csvs_in: list of paths for csv.gz files created by demux.annotate
+
+    The output CSV has these columns, with all the quality columns giving
+    quartiles of minimum quality scores over each barcode region for each read:
+
+      * Run: Run ID (included for easy merging with other tables)
+      * BCFWDMQ25: First quartile, forward barcode
+      * BCFWDMQ50: Second quartile (median), forward barcode
+      * BCFWDMQ75: Third quartile, forward barcode
+      * BCREVMQ25: First quartile, reverse barcode
+      * BCREVMQ50: Second quartile (median), reverse barcode
+      * BCREVMQ75: Third quartile, reverse barcode
+    """
+    with open(csv_out, "wt") as f_out:
+        writer = csv.DictWriter(
+            f_out,
+            fieldnames=["Run", "BCFWDMQ25", "BCFWDMQ50", "BCFWDMQ75", "BCREVMQ25", "BCREVMQ50", "BCREVMQ75"],
+            lineterminator="\n")
+        writer.writeheader()
+        fwd = []
+        rev = []
+        for csv_path in csvs_in:
+            with gzip.open(csv_path, "rt") as f_in:
+                reader = csv.DictReader(f_in)
+                for row in reader:
+                    fwd.append(row["BCFWDQualMin"])
+                    rev.append(row["BCREVQualMin"])
+        # Python 3.8 has its own statics.quantiles we could use, too
+        fwd_quants = numpy.quantile(numpy.asarray(fwd, dtype=int), [0.25, 0.5, 0.75])
+        rev_quants = numpy.quantile(numpy.asarray(rev, dtype=int), [0.25, 0.5, 0.75])
+        row_out = {"Run": runid}
+        row_out.update(dict(zip(["BCFWDMQ25", "BCFWDMQ50", "BCFWDMQ75"], fwd_quants)))
+        row_out.update(dict(zip(["BCREVMQ25", "BCREVMQ50", "BCREVMQ75"], rev_quants)))
+        writer.writerow(row_out)
 
 def _load_barcode_totals(csvs_in):
     totals = defaultdict(int)
