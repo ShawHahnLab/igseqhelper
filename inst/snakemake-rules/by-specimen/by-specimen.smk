@@ -50,4 +50,3 @@ rule reads_by_specimen:
 
 include: "presto.smk"
 include: "igdiscover.smk"
-include: "igdiscover-igblast.smk"

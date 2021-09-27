@@ -39,6 +39,7 @@ include: "snakemake-rules/data.smk"
 include: "snakemake-rules/by-run/by-run.smk"
 include: "snakemake-rules/by-specimen/by-specimen.smk"
 include: "snakemake-rules/by-subject/by-subject.smk"
+include: "snakemake-rules/igblast.smk"
 include: "snakemake-rules/reporting.smk"
 
 # TODO this should be the final sonar output, once up to date, and should
