@@ -10,7 +10,7 @@ import gzip
 from pathlib import Path
 from Bio import SeqIO
 from snakemake.shell import shell
-from igseq.util import RoundRobinWriter
+from igseqhelper.util import RoundRobinWriter
 
 LOGGER = logging.getLogger(__name__)
 

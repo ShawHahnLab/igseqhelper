@@ -9,8 +9,8 @@ This whole setup is pretty brittle and would probably take some work to run
 successfully anywhere else.
 """
 
-import igseq.sonar
-from igseq.data import MetadataError, transpose_sample_md
+import igseqhelper.sonar
+from igseqhelper.data import MetadataError, transpose_sample_md
 
 SAMPLE_MD_IGG = transpose_sample_md(SAMPLES, "IgG+")
 
@@ -27,7 +27,7 @@ def setup_sonar_targets(sample_md_igg, antibody_lineages):
     here, so I'm hiding the complexity in this setup fuction and storing the
     targets in a single unified dictionary based on SONAR module.
     """
-    sonar_combos = igseq.sonar.setup_sonar_combos(sample_md_igg, antibody_lineages)
+    sonar_combos = igseqhelper.sonar.setup_sonar_combos(sample_md_igg, antibody_lineages)
     pattern_root = "analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}"
     patterns = {
         "prep": pattern_root + "/{specimen}/{specimen}.fastq",
@@ -62,7 +62,7 @@ rule all_sonar_module_3:
 def sonar_gather_germline_inputs(wildcards):
     """Get IgDiscover per-specimen paths for a given per-subject output."""
     # IgG+ will have gamma for heavy, but the germline will have come from mu.
-    return igseq.sonar.igdiscover_final_db(
+    return igseqhelper.sonar.igdiscover_final_db(
         SAMPLES, wildcards.subject, wildcards.chain, wildcards.chain_type, wildcards.segment)
 
 rule sonar_prep_input_from_presto:
@@ -91,7 +91,7 @@ rule sonar_gather_germline:
     params:
         output=lambda w, input, output: Path(output[0]).resolve()
     run:
-        igseq.sonar.gather_germline(input, params.output)
+        igseqhelper.sonar.gather_germline(input, params.output)
 
 rule sonar_module_1:
     """SONAR 1: Collect good sequences and tabulate AIRR info from raw input."""
@@ -141,7 +141,7 @@ rule sonar_gather_mature:
     """Get heavy or light chain mature antibody sequences for a lineage."""
     output: WD_SONAR.parent / "mab.fasta"
     run:
-        igseq.sonar.gather_mature(
+        igseqhelper.sonar.gather_mature(
             ANTIBODY_ISOLATES,
             wildcards.antibody_lineage,
             wildcards.chain, 
@@ -151,13 +151,13 @@ rule sonar_gather_mature:
 
 def sonar_allele_v(wildcards):
     """Get the sequence ID for the expected germline V allele"""
-    seqid = igseq.sonar.get_antibody_allele(
+    seqid = igseqhelper.sonar.get_antibody_allele(
         ANTIBODY_LINEAGES, wildcards.antibody_lineage, wildcards.subject, wildcards.chain, "V")
     return seqid
 
 def sonar_allele_j(wildcards):
     """Get the sequence ID for the expected germline J allele"""
-    seqid = igseq.sonar.get_antibody_allele(
+    seqid = igseqhelper.sonar.get_antibody_allele(
         ANTIBODY_LINEAGES, wildcards.antibody_lineage, wildcards.subject, wildcards.chain, "J")
     return seqid
 
@@ -168,7 +168,7 @@ rule sonar_module_2:
     We're not using this currently; see id_div rules below.
     """ 
     output: str(WD_SONAR / "output/tables/{specimen}_lineages.txt")
-    input: unpack(igseq.sonar.sonar_module_2_inputs)
+    input: unpack(igseqhelper.sonar.sonar_module_2_inputs)
     singularity: "docker://scharch/sonar"
     threads: 4
     params:

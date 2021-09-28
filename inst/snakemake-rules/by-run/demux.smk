@@ -8,9 +8,9 @@ categorize what wasn't assigned to samples.
 from pathlib import Path
 import gzip
 from Bio import SeqIO
-from igseq.demux import demux, annotate
-from igseq.util import normalize_read_files
-from igseq.blast import blast, group_blast_results, BLAST_TAX_GROUPS
+from igseqhelper.demux import demux, annotate
+from igseqhelper.util import normalize_read_files
+from igseqhelper.blast import blast, group_blast_results, BLAST_TAX_GROUPS
 
 TARGET_DEMUX = expand(
     outputs_per_run("analysis/demux/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz", SAMPLES),

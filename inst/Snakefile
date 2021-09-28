@@ -8,8 +8,8 @@ import sys
 # (could be anywhere) and __file__ is set to one of the Snakemake python source
 # files.  This method will only work if our Snakefile in alongside the igseq
 # directory.
-sys.path.append("igseq/inst/python")
-import igseq
+sys.path.append("igseqhelper/inst/python")
+import igseqhelper as igseq
 import logging
 from snakemake.utils import R
 RINST = igseq.R_PKG_INST

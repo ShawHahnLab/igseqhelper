@@ -19,8 +19,8 @@ from pathlib import Path
 from collections import defaultdict
 from Bio import SeqIO
 from Bio.Align import PairwiseAligner
-from igseq.util import revcmp, normalize_read_files
-from igseq.data import MetadataError
+from igseqhelper.util import revcmp, normalize_read_files
+from igseqhelper.data import MetadataError
 
 LOGGER = logging.getLogger(__name__)
 PID = os.getpid()

@@ -9,7 +9,7 @@ import logging
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from igseq.data import load_sequences
+from igseqhelper.data import load_sequences
 
 LOGGER = logging.getLogger(__name__)
 

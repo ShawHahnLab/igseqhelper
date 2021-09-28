@@ -13,8 +13,8 @@ See also:
  * https://presto.readthedocs.io/en/stable/workflows/Greiff2014_Workflow.html
 """
 
-from igseq.data import amplicon_files
-from igseq.presto import (PRESTO_OPTS, prep_primers_fwd)
+from igseqhelper.data import amplicon_files
+from igseqhelper.presto import (PRESTO_OPTS, prep_primers_fwd)
 
 TARGET_PRESTO_DATA = expand(amplicon_files("analysis/presto/data/{chain}.{chain_type}/{specimen}.{{rp}}.fastq", SAMPLES, "IgG+"), rp=["R1", "R2"])
 TARGET_PRESTO_ASSEMBLY = amplicon_files("analysis/presto/assemble/{chain}.{chain_type}/{specimen}_assemble-pass.fastq", SAMPLES, "IgG+")

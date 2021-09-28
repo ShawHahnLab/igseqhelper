@@ -10,7 +10,7 @@ from snakemake.shell import shell
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
-from igseq.util import strdist_iupac_squeezed
+from igseqhelper.util import strdist_iupac_squeezed
 
 LOGGER = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ database (https://doi.org/10.3389/fimmu.2017.01407).  This requires the SONAR
 repository in the working directory.
 """
 
-from igseq.igdiscover import CHAINS, CHAIN_TYPES, SEGMENTS
+from igseqhelper.igdiscover import CHAINS, CHAIN_TYPES, SEGMENTS
 
 # We'll run IgDiscover on all IgM+ specimens, so, some combination of heavy.mu,
 # light.lambda, light.kappa.

@@ -7,14 +7,14 @@ analysis/report.pdf, with as much as possible handled in a modular fashion here
 before going in the Rmarkdown for the report.
 """
 
-from igseq.reporting.demux import make_barcode_summary, make_quality_summary, make_quality_summary_combo
-from igseq.reporting.trim import make_qualtrim_csv
-from igseq.reporting.sonar import (
+from igseqhelper.reporting.demux import make_barcode_summary, make_quality_summary, make_quality_summary_combo
+from igseqhelper.reporting.trim import make_qualtrim_csv
+from igseqhelper.reporting.sonar import (
     get_rearr_centroids_by_raw_reads,
     rarefy_sonar_clusters,
     sonar_island_summary,
     sonar_island_stats)
-from igseq.reporting.counts import (
+from igseqhelper.reporting.counts import (
     counts_sample_summary,
     counts_run_summary,
     counts_specimen_summary,
@@ -22,12 +22,12 @@ from igseq.reporting.counts import (
     counts_presto_assembly_summary,
     counts_presto_qual_summary,
     counts_sonar_module1_summary)
-from igseq.reporting.igdiscover import (
+from igseqhelper.reporting.igdiscover import (
     convert_combined_alignment,
     combine_aligned_segments,
     align_next_segment,
     gather_antibodies)
-from igseq.data import amplicon_files, transpose_sample_md
+from igseqhelper.data import amplicon_files, transpose_sample_md
 
 SAMPLE_MD_IGM = transpose_sample_md(SAMPLES, "IgM+")
 
@@ -47,13 +47,13 @@ TARGET_IGDISCOVER_CLUSTERPLOTS = expand(
 
 TARGET_SONAR_RAREFACTION = expand(
     "analysis/reporting/by-specimen/{specimen}.{antibody_lineage}.{chain}.{chain_type}/sonar_clusters_rarefaction.csv",
-    zip, **igseq.sonar.setup_sonar_combos(
+    zip, **igseqhelper.sonar.setup_sonar_combos(
         transpose_sample_md({key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}, "IgG+"),
         ANTIBODY_LINEAGES))
 
 TARGET_SONAR_ISLAND_STATS = expand(
     "analysis/reporting/by-lineage/{antibody_lineage}/{specimen}.{chain}.{chain_type}/island_stats.csv",
-    zip, **igseq.sonar.setup_sonar_combos(
+    zip, **igseqhelper.sonar.setup_sonar_combos(
         transpose_sample_md({key: SAMPLES[key] for key in SAMPLES if SAMPLES[key]["Run"]}, "IgG+"),
         ANTIBODY_LINEAGES))
 
@@ -437,12 +437,12 @@ rule counts_presto_qual_summary:
 rule counts_sonar_module1_summary:
     """A per-specimen summary of clustered and categorized read counts."""
     output: "analysis/reporting/counts/counts_sonar_module1_summary.csv"
-    input: expand("analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/{specimen}_rearrangements.tsv", zip, **igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
+    input: expand("analysis/sonar/{subject}/{chain}.{chain_type}/{antibody_lineage}/{specimen}/output/tables/{specimen}_rearrangements.tsv", zip, **igseqhelper.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
     run:
         counts_sonar_module1_summary(
             input,
             output[0],
-            igseq.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
+            igseqhelper.sonar.setup_sonar_combos(SAMPLE_MD_IGG, ANTIBODY_LINEAGES))
 
 # TODO next: also tally after pRESTO's QC and primer checking.  Maybe do a
 # summary table in the report of counts following assembly, qc, and primer

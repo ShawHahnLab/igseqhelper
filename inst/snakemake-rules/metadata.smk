@@ -2,7 +2,7 @@
 Handlers for metadata.
 """
 
-import igseq.data
+import igseqhelper.data
 
 rule all_get_metadata:
     input:
@@ -15,16 +15,16 @@ rule all_get_metadata:
 
 def _setup_metadata(fp_sequences, fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates):
     global SEQUENCES, SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES
-    SEQUENCES = igseq.data.load_sequences(fp_sequences)
-    SPECIMENS = igseq.data.load_specimens(fp_specimens)
-    RUNS = igseq.data.load_runs(fp_runs)
-    SAMPLES = igseq.data.load_samples(
+    SEQUENCES = igseqhelper.data.load_sequences(fp_sequences)
+    SPECIMENS = igseqhelper.data.load_specimens(fp_specimens)
+    RUNS = igseqhelper.data.load_runs(fp_runs)
+    SAMPLES = igseqhelper.data.load_samples(
         fp_samples,
         specimens=SPECIMENS,
         runs=RUNS,
         sequences=SEQUENCES)
-    ANTIBODY_LINEAGES = igseq.data.load_antibody_lineages(fp_antibody_lineages)
-    ANTIBODY_ISOLATES = igseq.data.load_antibody_isolates(fp_antibody_isolates, ANTIBODY_LINEAGES)
+    ANTIBODY_LINEAGES = igseqhelper.data.load_antibody_lineages(fp_antibody_lineages)
+    ANTIBODY_ISOLATES = igseqhelper.data.load_antibody_isolates(fp_antibody_isolates, ANTIBODY_LINEAGES)
 
 try:
     _setup_metadata(
@@ -59,7 +59,7 @@ rule get_metadata:
         # directive. This function executes the R code given as a string. The
         # function requires rpy2 to be installed." ...so I'll just ditch it and
         # build a shell command.
-        shell("""R -e 'devtools::load_all("igseq"); update_metadata_via_yaml("{input}", ".")' """)
+        shell("""R -e 'devtools::load_all("igseqhelper"); update_metadata_via_yaml("{input}", ".")' """)
         _setup_metadata(
             output.sequences,
             output.specimens,

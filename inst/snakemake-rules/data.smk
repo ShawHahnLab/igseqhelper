@@ -6,7 +6,7 @@ done in analysis/data/{run}/.
 """
 
 from pathlib import Path
-import igseq.data
+import igseqhelper.data
 
 rule all_get_data:
     """Get data files for all sequencing runs.
@@ -36,7 +36,7 @@ rule get_data:
     input: ancient(rules.get_metadata.output)
     params: runpath="/seq/runs"
     threads: 8
-    run: igseq.data.get_data(wildcards.run, output[0], RUNS, params.runpath, threads)
+    run: igseqhelper.data.get_data(wildcards.run, output[0], RUNS, params.runpath, threads)
 
 #############
 
@@ -47,7 +47,7 @@ def outputs_per_run(pattern, samples):
     information and the right run/sample combinations will be filled in.  Be
     sure to escape any other template variables like {{rp}}.
     """
-    samples_per_run = igseq.data.get_samples_per_run(samples)
+    samples_per_run = igseqhelper.data.get_samples_per_run(samples)
     target = []
     for runid in samples_per_run.keys():
         target.extend(expand(

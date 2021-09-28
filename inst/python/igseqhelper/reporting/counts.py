@@ -6,7 +6,7 @@ import csv
 import re
 import logging
 from collections import defaultdict
-from igseq.data import load_csv, get_samples_per_run, MetadataError
+from igseqhelper.data import load_csv, get_samples_per_run, MetadataError
 
 LOGGER = logging.getLogger(__name__)
 

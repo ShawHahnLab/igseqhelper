@@ -3,8 +3,8 @@ Helpers for trimming raw reads.
 """
 
 import logging
-from igseq.util import revcmp
-from igseq.data import MetadataError
+from igseqhelper.util import revcmp
+from igseqhelper.data import MetadataError
 
 LOGGER = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ Our barcodes vary in length, so we'll call cutadapt with sample-specific
 barcode arguments.
 """
 
-from igseq.trim import (adapter_fwd, adapter_rev)
+from igseqhelper.trim import (adapter_fwd, adapter_rev)
 
 TARGET_TRIMMED = expand(
     outputs_per_run("analysis/trim/{run}/{{chunk}}/{sample}.{{rp}}.fastq.gz", SAMPLES),

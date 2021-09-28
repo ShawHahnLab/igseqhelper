@@ -3,7 +3,7 @@ Rules for dealing with data aggregated at most by a single run.
 
 This includes demultiplexing and adapter trimming.
 """
-from igseq.util import make_chunk_str
+from igseqhelper.util import make_chunk_str
 CHUNKS = make_chunk_str(20)
 include: "demux.smk"
 include: "trim.smk"
