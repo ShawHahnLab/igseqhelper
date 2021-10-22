@@ -1,0 +1,7 @@
+name: igdiscover
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - igdiscover>=0.12.3

@@ -2,19 +2,16 @@
 Processing steps from raw read data to finalized antibody results.
 """
 
+BASEDIR = Path(workflow.current_basedir)
 import sys
-# TODO how to reliably find the python module relative to this Snakefile?
-# The working directory will be wherever the original Snakefile is stored
-# (could be anywhere) and __file__ is set to one of the Snakemake python source
-# files.  This method will only work if our Snakefile in alongside the igseq
-# directory.
-sys.path.append("igseqhelper/inst/python")
+sys.path.append(str(BASEDIR/"python"))
 import igseqhelper as igseq
 import logging
 from snakemake.utils import R
 RINST = igseq.R_PKG_INST
 
 LOGGER = logging.getLogger(__name__)
+
 
 wildcard_constraints:
     # project metadata
@@ -33,17 +30,17 @@ wildcard_constraints:
     chunk="[0-9]+",
     rp="(R1|R2|I1|I2)"
 
-include: "snakemake-rules/counts.smk"
 include: "snakemake-rules/metadata.smk"
-include: "snakemake-rules/data.smk"
-include: "snakemake-rules/by-run/by-run.smk"
-include: "snakemake-rules/by-specimen/by-specimen.smk"
-include: "snakemake-rules/by-subject/by-subject.smk"
+include: "snakemake-rules/by-run.smk"
+#include: "snakemake-rules/by-specimen/by-specimen.smk"
+include: "snakemake-rules/igdiscover.smk"
+include: "snakemake-rules/sonar-new.smk"
+#include: "snakemake-rules/by-subject/by-subject.smk"
 include: "snakemake-rules/igblast.smk"
-include: "snakemake-rules/reporting.smk"
+#include: "snakemake-rules/reporting.smk"
 
-# TODO this should be the final sonar output, once up to date, and should
-# automatically pull in igdiscover.
-TARGET_ALL = TARGET_IGDISCOVER_ALL + TARGETS_SONAR["module_1"] + TARGET_REPORT_ALL
-rule all:
-    input: TARGET_ALL
+## TODO this should be the final sonar output, once up to date, and should
+## automatically pull in igdiscover.
+#TARGET_ALL = TARGET_IGDISCOVER_ALL + TARGETS_SONAR["module_1"] + TARGET_REPORT_ALL
+#rule all:
+#    input: TARGET_ALL

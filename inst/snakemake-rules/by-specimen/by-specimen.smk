@@ -49,4 +49,3 @@ rule reads_by_specimen:
             shell("cat {input} > {output}")
 
 include: "presto.smk"
-include: "igdiscover.smk"
