@@ -15,6 +15,7 @@ dependencies:
   - bwa>=0.7.17
   - samtools>=1.13
   - cutadapt>=3.5
+  - pear>=0.9.6
   - pip
   - pip:
     - git+https://github.com/ShawHahnLab/igseq.git
