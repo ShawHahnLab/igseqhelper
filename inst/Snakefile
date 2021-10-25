@@ -37,6 +37,7 @@ include: "snakemake-rules/igdiscover-new.smk"
 include: "snakemake-rules/sonar-new.smk"
 #include: "snakemake-rules/by-subject/by-subject.smk"
 include: "snakemake-rules/igblast.smk"
+include: "snakemake-rules/reporting-new.smk"
 #include: "snakemake-rules/reporting.smk"
 
 ## TODO this should be the final sonar output, once up to date, and should
