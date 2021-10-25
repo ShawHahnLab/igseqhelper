@@ -2,7 +2,7 @@
 Processing steps from raw read data to finalized antibody results.
 """
 
-BASEDIR = Path(workflow.current_basedir)
+BASEDIR = Path(str(workflow.current_basedir))
 import sys
 sys.path.append(str(BASEDIR/"python"))
 import igseqhelper as igseq
@@ -33,7 +33,7 @@ wildcard_constraints:
 include: "snakemake-rules/metadata.smk"
 include: "snakemake-rules/by-run.smk"
 #include: "snakemake-rules/by-specimen/by-specimen.smk"
-include: "snakemake-rules/igdiscover.smk"
+include: "snakemake-rules/igdiscover-new.smk"
 include: "snakemake-rules/sonar-new.smk"
 #include: "snakemake-rules/by-subject/by-subject.smk"
 include: "snakemake-rules/igblast.smk"
