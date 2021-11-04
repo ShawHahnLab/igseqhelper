@@ -50,12 +50,15 @@ rule sonar_germline:
     input: lambda w: expand("analysis/igdiscover/SONARRamesh/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type])
     shell: "cp {input} {output}"
 
-rule sonar_mature:
+rule sonar_gather_mature:
     """Get heavy or light chain mature antibody sequences.
 
-    This includes all lineages for the subject, if applicable.
+    This includes all lineages for the subject, if applicable.  This is stored
+    in each project directory for a given subject so that you can optionally
+    add custom sequences for a given timepoint.  (But, not at the top of the
+    proejct directory, or SONAR will use it as input.)
     """
-    output: WD_SONAR.parent/"mab.fasta"
+    output: WD_SONAR/"mab/mab.fasta"
     run:
         if wildcards.chain_type in ["kappa", "lambda"]:
             seq_col = "LightSeq"
@@ -142,7 +145,7 @@ rule sonar_module_2_id_div:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab"
     input:
         fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        mab=WD_SONAR.parent / "mab.fasta",
+        mab=WD_SONAR / "mab/mab.fasta",
         germline_v=WD_SONAR.parent / "germline.V.fasta"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
@@ -165,20 +168,37 @@ rule sonar_module_2_id_div:
             sonar id-div -g "$libv" -a "$mab" -t {threads} --gap {params.gap}
         """
 
+rule sonar_list_members_for_lineage:
+    # gets all the seq IDs as in the input mab antibody FASTA and save in a
+    # text file, so they can be given to sonar get_island like "--mab ID1 --mab
+    # ID2 ..." (as opposed to "--mab =a" for all of them from the ID/DIV table)
+    output: WD_SONAR / "mab/mab.{antibody_lineage}.txt"
+    run:
+        if wildcards.chain_type in ["kappa", "lambda"]:
+            seq_col = "LightSeq"
+        else:
+            seq_col = "HeavySeq"
+        with open(output[0], "wt") as f_out:
+            for seqid, attrs in ANTIBODY_ISOLATES.items():
+                if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject \
+                    and attrs[seq_col] and \
+                    attrs["AntibodyLineage"] == wildcards.antibody_lineage:
+                        f_out.write(f"{seqid}\n")
+
 # NOTE this step is interactive over X11
 rule sonar_module_2_id_div_island:
     output:
-        seqids=WD_SONAR / "output/tables/islandSeqs.txt"
+        seqids=WD_SONAR / "output/tables/islandSeqs_{antibody_lineage}.txt"
     input:
-        iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab"
+        iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab",
+        mab=WD_SONAR / "mab/mab.{antibody_lineage}.txt"
     singularity: "docker://scharch/sonar"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
-        input_iddiv=lambda w, input: Path(input.iddiv).resolve(),
-        mab="=a", # =a means use all antibodies in mab input file
+        input_iddiv=lambda w, input: Path(input.iddiv).resolve()
     shell:
         """
+            mabargs=$(sed 's/^/--mab /' {input.mbargs})
             cd {params.wd_sonar}
-            TODO split output by lineage
-            sonar get_island {params.input_iddiv} --mab "{params.mab}"
+            sonar get_island {params.input_iddiv} $mbargs
         """
