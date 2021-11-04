@@ -121,8 +121,8 @@ rule sonar_module_1:
         jmotif=lambda w: JMOTIF[w.chain_type]
     shell:
         """
-            for fqgz in {input}/*.fastq.gz; do
-                zcat $fqgz > {params.wd_sonar}/${{fqgz%.gz}}
+            for fqgz in {input.reads}/*.fastq.gz; do
+                zcat $fqgz > {params.wd_sonar}/$(basename ${{fqgz%.gz}})
             done
             cd {params.wd_sonar}
             sonar blast_V {params.libv_arg} --derep --threads {threads}
