@@ -5,13 +5,6 @@ Processing steps from raw read data to finalized antibody results.
 BASEDIR = Path(str(workflow.current_basedir))
 import sys
 sys.path.append(str(BASEDIR/"python"))
-import igseqhelper as igseq
-import logging
-from snakemake.utils import R
-RINST = igseq.R_PKG_INST
-
-LOGGER = logging.getLogger(__name__)
-
 
 wildcard_constraints:
     # project metadata
@@ -32,13 +25,7 @@ wildcard_constraints:
 
 include: "snakemake-rules/metadata.smk"
 include: "snakemake-rules/by-run.smk"
-include: "snakemake-rules/igdiscover-new.smk"
-include: "snakemake-rules/sonar-new.smk"
+include: "snakemake-rules/igdiscover.smk"
+include: "snakemake-rules/sonar.smk"
 include: "snakemake-rules/igblast.smk"
-include: "snakemake-rules/reporting-new.smk"
-
-## TODO this should be the final sonar output, once up to date, and should
-## automatically pull in igdiscover.
-#TARGET_ALL = TARGET_IGDISCOVER_ALL + TARGETS_SONAR["module_1"] + TARGET_REPORT_ALL
-#rule all:
-#    input: TARGET_ALL
+include: "snakemake-rules/reporting.smk"
