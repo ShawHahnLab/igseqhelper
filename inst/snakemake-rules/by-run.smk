@@ -1,17 +1,25 @@
+# demux any run that gets a mention in the samples table
+# (not using the simpler RUNS.keys because some runs we have an entry for
+# aren't used in the demux step)
+RUNS_FOR_SAMPLES = set([attrs["Run"] for attrs in SAMPLES.values() if attrs["Run"]])
+
+# do early steps on any run that's labeled IgSeq
+RUNS_FOR_IGSEQ = [runid for runid in RUNS if "IgSeq" in RUNS[runid]["Protocol"]]
+
 rule all_merge:
-    input: expand("analysis/merge/{run}.done", run=RUNS.keys())
+    input: expand("analysis/merge/{run}.done", run=RUNS_FOR_SAMPLES)
 
 rule all_trim:
-    input: expand("analysis/trim/{run}.done", run=RUNS.keys())
-
-rule all_phix:
-    input: expand("analysis/phix/{run}/phix.bam", run=RUNS.keys())
+    input: expand("analysis/trim/{run}.done", run=RUNS_FOR_SAMPLES)
 
 rule all_demux:
-    input: expand("analysis/demux/{run}", run=RUNS.keys())
+    input: expand("analysis/demux/{run}", run=RUNS_FOR_SAMPLES)
+
+rule all_phix:
+    input: expand("analysis/phix/{run}/phix.bam", run=RUNS_FOR_IGSEQ)
 
 rule all_getreads:
-    input: expand("analysis/reads/{run}", run=RUNS.keys())
+    input: expand("analysis/reads/{run}", run=RUNS_FOR_IGSEQ)
 
 ### By-pair rules grouped by run
 
@@ -53,7 +61,6 @@ rule pair_merge:
     input:
         r1="analysis/trim/{run}/{sample}.R1.fastq.gz",
         r2="analysis/trim/{run}/{sample}.R2.fastq.gz"
-    conda: str(BASEDIR/"igseq.yml")
     threads: 4
     shell:
         """
@@ -80,7 +87,6 @@ rule pair_trim:
         report2="analysis/trim/{run}/{sample}.cutadapt2.json",
         counts="analysis/trim/{run}/{sample}.trim.counts.csv"
     input: unpack(pair_trim_input)
-    conda: str(BASEDIR/"igseq.yml")
     threads: 4
     shell:
         """
@@ -96,7 +102,6 @@ rule pair_phix:
         counts="analysis/phix/{run}/phix.counts.csv"
     input:
         demux="analysis/demux/{run}"
-    conda: str(BASEDIR/"igseq.yml")
     threads: 4
     shell:
         """
@@ -110,13 +115,11 @@ rule demux:
     input:
         reads="analysis/reads/{run}",
         samples=ancient("metadata/samples.csv")
-    conda: str(BASEDIR/"igseq.yml")
     shell: "igseq demux --samples {input.samples} --details {output}/details.csv.gz {input.reads}"
 
 rule getreads:
     output: directory("analysis/reads/{run}")
     input: "/seq/runs/{run}"
-    conda: str(BASEDIR/"igseq.yml")
     threads: 28
     shell: "igseq getreads -t {threads} --threads-load $(({threads}<4 ? {threads} : 4)) {input}"
 
