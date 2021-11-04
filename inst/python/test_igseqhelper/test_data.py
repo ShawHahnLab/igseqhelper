@@ -8,9 +8,9 @@ import builtins
 import gzip
 import logging
 from tempfile import NamedTemporaryFile
-import igseq.data
-from igseq.data import MetadataError
-from test_igseq.util import ROOT
+import igseqhelper.data
+from igseqhelper.data import MetadataError
+from test_igseqhelper.util import ROOT
 
 
 def cat(file_path, opener=builtins.open, **kwargs):
@@ -51,7 +51,7 @@ class TestMetadataBase(unittest.TestCase):
                 },
             "samples": {
                 "cols": ["Sample", "Run", "Specimen",
-                         "BarcodeFwd", "BarcodeRev", "Replicate", "Chain", "Type", "Comments"],
+                         "BarcodeFwd", "BarcodeRev", "Replicate", "Chain", "Type", "Skip", "Comments"],
                 "rows": ["sample%d" % num for num in range(1, 7)]
                 },
             "antibody_isolates": {
@@ -68,27 +68,27 @@ class TestMetadataBase(unittest.TestCase):
 
     def test_load_sequences(self):
         """Test loading sequences CSV."""
-        sequences = igseq.data.load_sequences(self.path / "sequences.csv")
+        sequences = igseqhelper.data.load_sequences(self.path / "sequences.csv")
         self.check_metadata(sequences, self.expected["sequences"], "Name")
 
     def test_load_runs(self):
         """Test loading runs CSV."""
-        runs = igseq.data.load_runs(self.path / "runs.csv")
+        runs = igseqhelper.data.load_runs(self.path / "runs.csv")
         self.check_metadata(runs, self.expected["runs"], "Run")
 
     def test_load_specimens(self):
         """Test loading specimens CSV."""
-        specimens = igseq.data.load_specimens(self.path / "specimens.csv")
+        specimens = igseqhelper.data.load_specimens(self.path / "specimens.csv")
         self.check_metadata(specimens, self.expected["specimens"], "Specimen")
 
     def test_load_antibody_lineages(self):
         """Test loading antibody lineages CSV."""
-        lineages = igseq.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
+        lineages = igseqhelper.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
         self.check_metadata(lineages, self.expected["antibody_lineages"], "AntibodyLineage")
 
     def test_load_antibody_isolates_basic(self):
         """Test loading antibody isolates CSV, by itself."""
-        isolates = igseq.data.load_antibody_isolates(self.path / "antibody_isolates.csv")
+        isolates = igseqhelper.data.load_antibody_isolates(self.path / "antibody_isolates.csv")
         self.check_metadata(isolates, self.expected["antibody_isolates"], "AntibodyIsolate")
 
     def test_load_antibody_isolates_joined(self):
@@ -96,8 +96,8 @@ class TestMetadataBase(unittest.TestCase):
 
         See a similar test (just more intricate) in test_load_samples_joined.
         """
-        lineages = igseq.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
-        isolates = igseq.data.load_antibody_isolates(self.path / "antibody_isolates.csv", lineages)
+        lineages = igseqhelper.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
+        isolates = igseqhelper.data.load_antibody_isolates(self.path / "antibody_isolates.csv", lineages)
         nested_items = {"AntibodyLineageAttrs": "antibody_lineages"}
         self.assertEqual(list(isolates.keys()), self.expected["antibody_isolates"]["rows"])
         for name, attrs in isolates.items():
@@ -111,7 +111,7 @@ class TestMetadataBase(unittest.TestCase):
 
     def test_load_samples_basic(self):
         """Test loading samples CSV, by itself."""
-        samples = igseq.data.load_samples(self.path / "samples.csv")
+        samples = igseqhelper.data.load_samples(self.path / "samples.csv")
         self.check_metadata(samples, self.expected["samples"], "Sample")
 
     def test_load_samples_joined(self):
@@ -121,10 +121,10 @@ class TestMetadataBase(unittest.TestCase):
         metadata plus additional nested dictionaries filled in from the other
         CSV files.
         """
-        specimens = igseq.data.load_specimens(self.path / "specimens.csv")
-        runs = igseq.data.load_runs(self.path / "runs.csv")
-        sequences = igseq.data.load_sequences(self.path / "sequences.csv")
-        samples = igseq.data.load_samples(self.path / "samples.csv", specimens, runs, sequences)
+        specimens = igseqhelper.data.load_specimens(self.path / "specimens.csv")
+        runs = igseqhelper.data.load_runs(self.path / "runs.csv")
+        sequences = igseqhelper.data.load_sequences(self.path / "sequences.csv")
+        samples = igseqhelper.data.load_samples(self.path / "samples.csv", specimens, runs, sequences)
         # Check the same sort of rows/columns things as above, but also the nested metadata
         nested_items = {
             "SpecimenAttrs": "specimens",
@@ -149,16 +149,16 @@ class TestMetadataBase(unittest.TestCase):
         """Test generic CSV loading."""
         # This should behave similarly to the load_sequences wrapper, except
         # for the extra sequence content processing.
-        sequences = igseq.data.load_csv(self.path / "sequences.csv")
+        sequences = igseqhelper.data.load_csv(self.path / "sequences.csv")
         for _, seq_data in sequences.items():
             seq_data["Seq"] = re.sub(" ", "", seq_data["Seq"])
         self.check_metadata(sequences, self.expected["sequences"], "Name")
         # Or, we can use a different key, so long as it's unique.
-        sequences = igseq.data.load_csv(self.path / "sequences.csv", "Seq")
+        sequences = igseqhelper.data.load_csv(self.path / "sequences.csv", "Seq")
         # Non-unique should give an error.
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_csv(self.path / "sequences.csv", "Use")
+                igseqhelper.data.load_csv(self.path / "sequences.csv", "Use")
 
     def test_get_data(self):
         """Test getting data from local disk or URLs."""
@@ -188,8 +188,8 @@ class TestMetadata(TestMetadataBase):
 
     def test_get_samples_per_run(self):
         """Test making a dictionary of run IDs to sample names."""
-        samples = igseq.data.load_samples(self.path / "samples.csv")
-        samples_per_run = igseq.data.get_samples_per_run(samples)
+        samples = igseqhelper.data.load_samples(self.path / "samples.csv")
+        samples_per_run = igseqhelper.data.get_samples_per_run(samples)
         # If we tally up pairs of run Id and sample name we should get the same
         # list either way
         pairs_exp = [(entry["Run"], entry["Sample"]) for entry in samples.values()]
@@ -217,31 +217,31 @@ class TestMetadataDuplicates(TestMetadataBase):
     def test_load_sequences(self):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_sequences(self.path / "sequences.csv")
+                igseqhelper.data.load_sequences(self.path / "sequences.csv")
         # But also, we shouldn't have any duplicated sequences.
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_sequences(self.path / "sequences_dup_seq.csv")
+                igseqhelper.data.load_sequences(self.path / "sequences_dup_seq.csv")
 
     def test_load_runs(self):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_runs(self.path / "runs.csv")
+                igseqhelper.data.load_runs(self.path / "runs.csv")
 
     def test_load_specimens(self):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_specimens(self.path / "specimens.csv")
+                igseqhelper.data.load_specimens(self.path / "specimens.csv")
 
     def test_load_antibody_lineages(self):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
+                igseqhelper.data.load_antibody_lineages(self.path / "antibody_lineages.csv")
 
     def test_load_antibody_isolates_basic(self):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_antibody_isolates(self.path / "antibody_isolates.csv")
+                igseqhelper.data.load_antibody_isolates(self.path / "antibody_isolates.csv")
 
     def test_load_antibody_isolates_joined(self):
         self.skipTest("not yet implemented")
@@ -249,14 +249,14 @@ class TestMetadataDuplicates(TestMetadataBase):
     def test_load_samples_basic(self):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_samples(self.path / "samples.csv")
+                igseqhelper.data.load_samples(self.path / "samples.csv")
         # But also, we shouldn't have any duplicated combinations of
         # BarcodeFwd, BarcodeRev, and Run.  In this case the supposed sample7
         # is indistinguishable from sample1 because  it's in the same run with
         # the same barcodes.
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_samples(self.path / "samples_dup_barcodes.csv")
+                igseqhelper.data.load_samples(self.path / "samples_dup_barcodes.csv")
 
     def test_load_samples_joined(self):
         self.skipTest("not yet implemented")
@@ -264,7 +264,7 @@ class TestMetadataDuplicates(TestMetadataBase):
     def test_load_csv(self):
         with self.assertLogs(level=logging.CRITICAL):
             with self.assertRaises(MetadataError):
-                igseq.data.load_csv(self.path / "sequences.csv")
+                igseqhelper.data.load_csv(self.path / "sequences.csv")
 
 
 class TestData(unittest.TestCase):
@@ -281,7 +281,7 @@ class TestData(unittest.TestCase):
         """Test MD5 checksum on a file."""
         # /dev/null is an empty file when reading.
         self.assertEqual(
-            igseq.data.md5("/dev/null"),
+            igseqhelper.data.md5("/dev/null"),
             "d41d8cd98f00b204e9800998ecf8427e")
 
     def test_chunk_fqgz(self):
@@ -290,11 +290,11 @@ class TestData(unittest.TestCase):
         path_in = self.path / "stub.fastq.gz"
         # With 1:1 you get the same thing out as you put in
         with NamedTemporaryFile() as path_out:
-            igseq.data.chunk_fqgz([path_in], [path_out.name])
+            igseqhelper.data.chunk_fqgz([path_in], [path_out.name])
             self.assertEqual(zcat(path_in), zcat(path_out.name))
         # With 1:N it's split up and will leave empty files for any extras
         paths_out = [NamedTemporaryFile() for _ in range(6)]
-        igseq.data.chunk_fqgz([path_in], paths_out)
+        igseqhelper.data.chunk_fqgz([path_in], paths_out)
         for path_out in paths_out:
             path_out.flush()
         self.assertEqual(
