@@ -45,6 +45,7 @@ def counts_by_sample(csv_out):
         "CountsDemux", "CountsTrim", "CountsMerge",
         "CellCount", "RatioDemux", "RatioMerge"]
     demux = {}
+    phix = {}
     rows_out = []
     with open(csv_out, "wt") as f_out:
         writer = DictWriter(
@@ -54,6 +55,7 @@ def counts_by_sample(csv_out):
         writer.writeheader()
         for samp, attrs in SAMPLES.items():
             path_demux = Path("analysis/demux")/attrs["Run"]/"demux.counts.csv"
+            path_phix = Path("analysis/phix")/attrs["Run"]/"phix.counts.csv"
             samp_demux = ""
             if path_demux.exists():
                 if attrs["Run"] not in demux:
@@ -63,6 +65,11 @@ def counts_by_sample(csv_out):
                 for row in demux[attrs["Run"]]:
                     if row.get("Sample") == samp:
                         samp_demux = row["NumSeqs"]
+            if path_phix.exists():
+                if attrs["Run"] not in phix:
+                    with open(path_phix) as f_in:
+                        rows = list(DictReader(f_in))
+                    phix[attrs["Run"]] = rows
             samp_trim = counts_for(samp, attrs["Run"], "trim")
             samp_merge = counts_for(samp, attrs["Run"], "merge")
             row = {
@@ -84,6 +91,10 @@ def counts_by_sample(csv_out):
             for row in rows:
                 if row.get("Item") == "unassigned":
                     rows_out.append({"Run": runid, "Sample": "unassigned", "CountsDemux": row["NumSeqs"]})
+        for runid, rows in phix.items():
+            for row in rows:
+                if row.get("Item") == "mapped":
+                    rows_out.append({"Run": runid, "Sample": "unassigned.phix", "CountsDemux": row["NumSeqs"]})
         # TODO phix
         rows_out = sorted(rows_out, key=lambda r: (str(r.get("Run")), str(r.get("Sample"))))
         writer.writerows(rows_out)
@@ -98,17 +109,30 @@ def counts_by_run(input_csv, output_csv):
                     run_info[row["Run"]] = {
                         "Run": row["Run"],
                         "UnassignedSeqs": "",
+                        "PhixSeqs": "",
                         "SampleSeqs": []}
+                path_run_counts = Path("analysis/reads")/row["Run"]/"getreads.counts.csv"
+                if path_run_counts.exists():
+                    with open(path_run_counts) as f_in:
+                        for countrow in DictReader(f_in):
+                            if countrow["Item"] == "unassigned-raw":
+                                run_info[row["Run"]]["RawReads"] = countrow["NumSeqs"]
+                            elif countrow["Item"] == "unassigned-pf":
+                                run_info[row["Run"]]["PassingFilter"] = countrow["NumSeqs"]
                 if row["Sample"] == "unassigned":
                     if row["CountsDemux"]:
                         run_info[row["Run"]]["UnassignedSeqs"] = int(row["CountsDemux"])
                 elif row["Sample"] == "unassigned.phix":
-                    pass
+                    if row["CountsDemux"]:
+                        run_info[row["Run"]]["PhixSeqs"] = int(row["CountsDemux"])
                 else:
                     if row["CountsDemux"]:
                         run_info[row["Run"]]["SampleSeqs"].append(int(row["CountsDemux"]))
     with open(output_csv, "wt") as f_out:
-        writer = DictWriter(f_out, fieldnames=["Run", "UnassignedSeqs", "SampleSeqs", "TotalSeqs", "Ratio"], lineterminator="\n")
+        writer = DictWriter(
+            f_out,
+            fieldnames=["Run", "RawReads", "PassingFilter", "UnassignedSeqs", "PhixSeqs", "SampleSeqs", "UnassignedFraction", "PhixFraction"],
+            lineterminator="\n")
         writer.writeheader()
         for row in run_info.values():
             row["SampleSeqs"] = sum(row["SampleSeqs"]) if row["SampleSeqs"] else ""
@@ -116,7 +140,9 @@ def counts_by_run(input_csv, output_csv):
             parts = [p for p in parts if p]
             if parts:
                 row["TotalSeqs"] = sum(parts)
-            row["Ratio"] = divide(row["UnassignedSeqs"], row["SampleSeqs"])
+            row["UnassignedFraction"] = divide(row["UnassignedSeqs"], row["TotalSeqs"])
+            row["PhixFraction"] = divide(row["PhixSeqs"], row["TotalSeqs"])
+            del row["TotalSeqs"]
             writer.writerow(row)
 
 def counts_by_specimen(input_csv, output_csv):
