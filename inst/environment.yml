@@ -8,7 +8,6 @@ dependencies:
   # general
   - snakemake>=6.8.0
   - seqmagick>=0.8.4
-  - igblast>=1.17.1
   # igseq
   - biopython>=1.79
   - python>=3.9.7
