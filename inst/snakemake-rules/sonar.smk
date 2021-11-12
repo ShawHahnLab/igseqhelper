@@ -1,5 +1,13 @@
-# The working directory (as a format string) for a single SONAR analysis.
+# A single SONAR project directory, as a format string.
+# In general these are organized by specimen and equivalently timepoint but the
+# longitudinal step gets its own project directory per-lineage.
 WD_SONAR = Path("analysis/sonar/{subject}.{chain_type}/{specimen}")
+WD_SONAR_LONG = Path("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}")
+
+import csv
+
+# if we have a custom version of the ID/DIV table, use that
+ruleorder: sonar_module_2_id_div_island_alternate > sonar_module_2_id_div_island
 
 def input_helper_sonar(w, pattern):
     # Take all specimens for this subject and the corresponding amplicons.
@@ -11,6 +19,14 @@ def input_helper_sonar(w, pattern):
             samp["SpecimenAttrs"]["Subject"] == w.subject and \
             "IgG" in samp["SpecimenAttrs"]["CellType"]:
             specimens.add(samp["Specimen"])
+    # could I just do expand(pattern, **vars(w)) actually?
+    if "antibody_lineage" in vars(w):
+        return expand(
+            pattern,
+            subject=w.subject,
+            chain_type=w.chain_type,
+            specimen=specimens,
+            antibody_lineage=w.antibody_lineage)
     return expand(
         pattern,
         subject=w.subject,
@@ -29,8 +45,13 @@ rule helper_sonar_module_2_by_lineage:
 
 # For one lineage and amplicon, make all the island FASTAs via the plots and lists
 rule helper_sonar_module_2_island_by_lineage:
-    output: touch("analysis/sonar/{subject}.{chain_type}/module2island.done")
-    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_islandSeqs.fa")
+    output: touch("analysis/sonar/{subject}.{chain_type}/module2island.{antibody_lineage}.done")
+    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
+
+# For one lienage and amplicon, make the IgPhyML tree and related outputs
+rule helper_sonar_module_3_igphyml:
+    output: touch("analysis/sonar/{subject}.{chain_type}/module3tree.{antibody_lineage}.done")
+    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree")
 
 # just a default setup using SONARRamesh -> IgDiscover results
 # D will be ignored for light chian but is always there (which makes the
@@ -58,7 +79,7 @@ rule sonar_gather_mature:
     add custom sequences for a given timepoint.  (But, not at the top of the
     proejct directory, or SONAR will use it as input.)
     """
-    output: WD_SONAR/"mab/mab.fasta"
+    output: "analysis/sonar/{subject}.{chain_type}/{projdir}/mab/mab.fasta"
     run:
         if wildcards.chain_type in ["kappa", "lambda"]:
             seq_col = "LightSeq"
@@ -68,7 +89,20 @@ rule sonar_gather_mature:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
                 if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject and attrs[seq_col]:
                     f_out.write(f">{seqid}\n")
-                    f_out.write(attrs[seq_col])
+                    f_out.write(attrs[seq_col]+"\n")
+
+rule sonar_gather_mature_by_lineage:
+    output: "analysis/sonar/{subject}.{chain_type}/{projdir}/mab/mab.{antibody_lineage}.fasta"
+    run:
+        if wildcards.chain_type in ["kappa", "lambda"]:
+            seq_col = "LightSeq"
+        else:
+            seq_col = "HeavySeq"
+        with open(output[0], "wt") as f_out:
+            for seqid, attrs in ANTIBODY_ISOLATES.items():
+                if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col]:
+                    f_out.write(f">{seqid}\n")
+                    f_out.write(attrs[seq_col]+"\n")
 
 # Any heavy chain will use a simple constant j motif, but light chains have a
 # variety of possible sequences.
@@ -134,6 +168,46 @@ rule sonar_module_1:
             sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2}
         """
 
+rule igblast_sonar:
+    # custom igblast with one of SONAR's FASTA files, giving AIRR-format TSV
+    # output.
+    output: WD_SONAR/"output/tables/{thing}.igblast.tsv"
+    input:
+        fasta=WD_SONAR/"output/sequences/nucleotide/{thing}.fa",
+        germline=expand("{prefix}/germline.{segment}.fasta", prefix=WD_SONAR.parent, segment=["V", "D", "J"])
+    threads: 8
+    shell:
+        """
+            igseq igblast -t {threads} -S rhesus -r {input.germline} -Q {input.fasta} -outfmt 19 -out {output}
+        """
+
+rule alternate_iddiv_with_igblast:
+    # use IgBLAST results to supply the germline divergence values, rather than
+    # SONAR's MUSCLE-derived values.
+    output: iddiv=WD_SONAR/"output/tables/{specimen}_goodVJ_unique_id-div.alt.tab"
+    input:
+        iddiv=WD_SONAR/"output/tables/{specimen}_goodVJ_unique_id-div.tab",
+        airr=WD_SONAR/"output/tables/{specimen}_goodVJ_unique.igblast.tsv"
+    run:
+        pass
+        with open(input.iddiv) as f_in, open(input.airr) as f_in_airr, open(output.iddiv, "wt") as f_out:
+            iddiv = csv.DictReader(f_in, delimiter="\t")
+            airr = csv.DictReader(f_in_airr, delimiter="\t")
+            writer = csv.DictWriter(f_out, fieldnames=iddiv.fieldnames, delimiter="\t", lineterminator="\n")
+            writer.writeheader()
+            for iddiv_row, airr_row in zip(iddiv, airr):
+                iddiv_id = iddiv_row["sequence_id"]
+                airr_id = airr_row["sequence_id"]
+                if iddiv_id != airr_id:
+                    raise ValueError(
+                        "row mismatch between ID-DIV table and AIRR: %s vs %s", iddiv_id, airr_id)
+                sonar_gene = iddiv_row["v_gene"]
+                sonar_div = float(iddiv_row["germ_div"])
+                airr_gene = airr_row["v_call"].split("*")[0]
+                airr_div = 100 - float(airr_row["v_identity"])
+                iddiv_row["germ_div"] = f"{airr_div:.2f}"
+                writer.writerow(iddiv_row)
+
 ### Manually-guided aspect of Module 2
 # Identity/Divergence plots and island identification
 # The first part-- calculating the identity/divergence coordinates-- is
@@ -186,6 +260,16 @@ rule sonar_list_members_for_lineage:
                         f_out.write(f"{seqid}\n")
 
 # NOTE this step is interactive over X11
+##
+# To get X working with Snakemake + singularity I had to append both of these
+# arguments to the snakemake call:
+#
+#     --use-singularity --singularity-args "-B /home -B /data/home -H /home/$USER"
+#
+# I think these home directory options are needed so that the Xauthority stuff
+# works but I'm not totally sure.   Using a regular Singularity image doesn't
+# need this so I think it must be something about how Snakemake calls
+# singularity.
 rule sonar_module_2_id_div_island:
     output:
         seqids=WD_SONAR / "output/tables/islandSeqs_{antibody_lineage}.txt"
@@ -195,10 +279,206 @@ rule sonar_module_2_id_div_island:
     singularity: "docker://scharch/sonar"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
-        input_iddiv=lambda w, input: Path(input.iddiv).resolve()
+        input_iddiv=lambda w, input: Path(input.iddiv).resolve(),
+        outprefix=lambda w, output: Path(output.seqids).stem
     shell:
         """
-            mabargs=$(sed 's/^/--mab /' {input.mbargs})
+            mabargs=$(sed 's/^/--mab /' {input.mab})
             cd {params.wd_sonar}
-            sonar get_island {params.input_iddiv} $mbargs
+            sonar get_island {params.input_iddiv} $mabargs --output {params.outprefix}
+        """
+
+rule sonar_module_2_id_div_island_alternate:
+    output:
+        seqids=WD_SONAR / "output/tables/islandSeqs_{antibody_lineage}.txt"
+    input:
+        iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.alt.tab",
+        mab=WD_SONAR / "mab/mab.{antibody_lineage}.txt"
+    singularity: "docker://scharch/sonar"
+    params:
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
+        input_iddiv=lambda w, input: Path(input.iddiv).resolve(),
+        outprefix=lambda w, output: Path(output.seqids).stem
+    shell:
+        """
+            mabargs=$(sed 's/^/--mab /' {input.mab})
+            cd {params.wd_sonar}
+            sonar get_island {params.input_iddiv} $mabargs --output {params.outprefix}
+        """
+
+rule sonar_module_2_id_div_getfasta:
+    """SONAR 2: Extract FASTA matching selected island's seq IDs."""
+    output:
+        fasta=WD_SONAR / "output/sequences/nucleotide/islandSeqs_{txt}.fa"
+    input:
+        fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        seqids=WD_SONAR / "output/tables/islandSeqs_{txt}.txt"
+    singularity: "docker://scharch/sonar"
+    params:
+        wd_sonar=lambda w: expand(str(WD_SONAR), **w),
+        input_fasta=lambda w, input: Path(input.fasta).resolve(),
+        input_seqids=lambda w, input: Path(input.seqids).resolve(),
+        output_fasta=lambda w, input, output: Path(output.fasta).resolve()
+    shell:
+        """
+            cd {params.wd_sonar}
+            # Pull out sequences using our selected island from the above
+            # id-div step.  I think this is essentially "seqmagick convert
+            # --include-from-file ..."
+            sonar getFastaFromList \
+                -l {params.input_seqids} \
+                -f {params.input_fasta} \
+                -o {params.output_fasta}
+        """
+
+def sonar_module_3_collect_inputs(w):
+    """List the inputs needed for SONAR module 3's collection step.
+
+    This gives a dictionary of timepoint -> islandSeqs.fa pairs.
+    """
+
+    # first gather all relevant specimens.  This is the same logic as the
+    # module 2 helper above, searching via samples to select specimens that
+    # have amplicons for the right chain type.
+    specimens = set()
+    for samp in SAMPLES.values():
+        if samp["Type"] == w.chain_type and \
+            samp["SpecimenAttrs"]["Subject"] == w.subject and \
+            "IgG" in samp["SpecimenAttrs"]["CellType"]:
+            specimens.add(samp["Specimen"])
+    specimens = list(specimens)
+    # infer input FASTAs from those specimens
+    targets = expand(
+        "analysis/sonar/{subject}.{chain_type}/{other_specimen}/"
+        "output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa",
+        subject=w.subject,
+        chain_type=w.chain_type,
+        other_specimen=specimens,
+        antibody_lineage=w.antibody_lineage)
+    # get timepoints and zero-pad, so for example we end up with ["08", "12",
+    # ...  instead of ["12", "8", ...
+    timepoints = [SPECIMENS[spec]["Timepoint"] for spec in specimens]
+    padlen = max([len(txt) for txt in timepoints])
+    timepoints = [txt.zfill(padlen) for txt in timepoints]
+    # Pair up timepoints and target FASTAs and sort by timepoint
+    pairs = sorted(zip(timepoints, targets))
+    # Allow for repeated timepoints (for the rare case of multiple specimens
+    # per timepoint) by appending .2, .3, etc.
+    # (note to self: be careful with this mutable default argument.)
+    def tally_tp(tp, seen={}):
+        if tp in seen:
+            seen[tp] += 1
+            out = tp + "." + str(seen[tp])
+            return out
+        seen[tp] = 1
+        return tp
+    targets = {"wk" + tally_tp(tp): target for tp, target in pairs}
+    return targets
+
+def sonar_module_3_collect_param_seqs(_, input):
+    args = [" --labels {key} --seqs {val}".format(key=key, val=Path(val).resolve()) for key, val in input.items()]
+    return " ".join(args)
+
+# analysis/sonar/T681.gamma/longitudinal-T681/output/sequences/nucleotide/longitudinal-T681-collected.fa
+rule sonar_module_3_collect:
+    output:
+        collected=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa"
+    input: unpack(sonar_module_3_collect_inputs)
+    singularity: "docker://scharch/sonar"
+    threads: 4
+    params:
+        wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
+        seqs=sonar_module_3_collect_param_seqs
+    shell:
+        """
+            cd {params.wd_sonar}
+            sonar merge_time {params.seqs}
+        """
+
+def sonar_module_3_igphyml_param_v_id(wildcards):
+    if wildcards.chain_type in ["kappa", "lambda"]:
+        return ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VL"]
+    return ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VH"]
+
+rule sonar_module_3_igphyml:
+    """SONAR 3: Run phylogenetic analysis and generate tree across specimens."""
+    output:
+        tree=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree",
+        inferred_nucl=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa",
+        inferred_prot=WD_SONAR_LONG / "output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa",
+        stats=WD_SONAR_LONG / "output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt"
+    input:
+        collected=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
+        germline_v=WD_SONAR_LONG.parent / "germline.V.fasta",
+        natives=WD_SONAR_LONG / "mab/mab.{antibody_lineage}.fasta"
+    singularity: "docker://scharch/sonar"
+    threads: 4
+    params:
+        wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
+        input_germline_v=lambda w, input: Path(input.germline_v).resolve(),
+        input_natives=lambda w, input: Path(input.natives).resolve(),
+        v_id=sonar_module_3_igphyml_param_v_id,
+        args="-f"
+    shell:
+        """
+            # Singularity passes through environment variables by default,
+            # which in my setup includes LANG=en_US.UTF-8 which is unrecognized
+            # by the container, which then causes a few warnings to be written
+            # to stderr by a perl script called by SONAR, which then triggers
+            # SONAR to crash when it sees the non-empty stderr.
+            # So yeah let's just unset the LANG.
+            unset LANG
+            cd {params.wd_sonar}
+            sonar igphyml \
+                -v '{params.v_id}' \
+                --lib {params.input_germline_v} \
+                --natives {params.input_natives} \
+                {params.args}
+        """
+
+rule sonar_make_natives_table:
+    output:
+        table=WD_SONAR_LONG/"natives.tab"
+    # we don't actually need the files here but this has the logic to name the
+    # timepoints
+    input: unpack(sonar_module_3_collect_inputs)
+    run:
+        keys = list(dict(input).keys())
+        mabs = {}
+        if wildcards.chain_type in ["kappa", "lambda"]:
+            seq_col = "LightSeq"
+        else:
+            seq_col = "HeavySeq"
+        for seqid, attrs in ANTIBODY_ISOLATES.items():
+            if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col]:
+                tp = "wk" + attrs["Timepoint"]
+                if tp not in mabs:
+                    mabs[tp] = []
+                if tp not in keys:
+                    keys.append(tp)
+                mabs[tp].append(seqid)
+        with open(output.table, "wt") as f_out:
+            for key in keys:
+                if key in mabs:
+                    for mab in mabs[key]:
+                        f_out.write(f"{key}\t{mab}\t{mab}\n")
+                else:
+                    f_out.write(f"{key}\t\t\n")
+
+rule sonar_module_3_draw_tree:
+    output:
+        tree_img=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree.pdf"
+    input:
+        tree=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree",
+        natives_tab=WD_SONAR_LONG / "natives.tab"
+    singularity: "docker://scharch/sonar"
+    # Running via xvfb-run since the ETE toolkit requires X11 to render for
+    # some reason
+    shell:
+        """
+            xvfb-run sonar display_tree \
+                -t {input.tree} \
+                -n {input.natives_tab} \
+                --showAll \
+                -o {output.tree_img}
         """
