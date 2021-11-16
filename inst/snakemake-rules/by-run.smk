@@ -92,6 +92,7 @@ rule pair_trim:
         """
             igseq trim -t {threads} \
                 --samples {input.samples} \
+                --species rhesus \
                 {input.demux}/{wildcards.sample}.R1.fastq.gz \
                 {input.demux}/{wildcards.sample}.R2.fastq.gz
         """
