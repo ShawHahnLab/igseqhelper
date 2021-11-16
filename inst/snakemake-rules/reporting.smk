@@ -1,4 +1,6 @@
+from collections import defaultdict
 from csv import DictWriter, DictReader
+from Bio import SeqIO
 
 rule all_counts:
     input: expand("analysis/reporting/counts/counts_by_{thing}.csv", thing=["sample", "run", "specimen"])
@@ -178,3 +180,119 @@ def counts_by_specimen(input_csv, output_csv):
             row["RatioDemux"] = divide(row["DemuxSeqs"], row["CellCount"])
             row["RatioMerge"] = divide(row["MergeSeqs"], row["CellCount"])
             writer.writerow(row)
+
+### SONAR Members and Ancestors
+
+rule sonar_members_table:
+    output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/members.csv"
+    input:
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
+    run:
+        rows = []
+        for fasta in input:
+            parts = Path(fasta).parts
+            specimen = SPECIMENS[parts[3]]
+            chain_type = wildcards.chain_type
+            chain = "light" if chain_type in ["kappa", "lambda"] else "heavy"
+            locus = {"gamma": "H", "lambda": "L", "kappa": "K", "mu": "H"}[chain_type]
+            timepoint = specimen["Timepoint"]
+            with open(fasta) as f_in:
+                for record in SeqIO.parse(f_in, "fasta"):
+                    orig_id = f"wk{timepoint}-{record.id}"
+                    rows.append({
+                        "LineageMember": f"{wildcards.antibody_lineage}-{locus}-{orig_id}",
+                        "AntibodyLineage": wildcards.antibody_lineage,
+                        "OriginalID": orig_id,
+                        "FirstOccurrence": "",
+                        "Chain": chain,
+                        "Timepoint": int(timepoint),
+                        "Member": "T",
+                        "Sequence": str(record.seq)})
+        seqmap = defaultdict(list)
+        for row in rows:
+            seqmap[row["Sequence"]].append((row["Timepoint"], row["LineageMember"]))
+        for row in rows:
+            matches = seqmap[row["Sequence"]]
+            if len(matches) > 1:
+                matches = sorted(matches)
+                row["FirstOccurrence"] = matches[0][1]
+        rows = sorted(rows, key=lambda row: (row["AntibodyLineage"], row["Chain"], row["Timepoint"], row["LineageMember"]))
+        with open(output[0], "wt") as f_out:
+            writer = DictWriter(f_out, fieldnames=rows[0].keys(), lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+
+
+rule sonar_ancestors_table:
+    """Convert inferred ancestor FASTA into a table with detected clade details.
+
+    This can be used as input to the Inferred sheet.
+    """
+    output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/ancestors.csv"
+    input: lambda w: expand(\
+        "analysis/sonar/{subject}.{{chain_type}}/longitudinal-{{antibody_lineage}}/output/sequences/nucleotide/longitudinal-{{antibody_lineage}}_inferredAncestors.fa", \
+        subject=ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"])
+    run:
+        locus = {"gamma": "H", "lambda": "L", "kappa": "K", "mu": "H"}[wildcards.chain_type]
+        chain = "heavy" if locus == "H" else "light"
+        # names of the antibody isolates for this lineage, as ordered in the
+        # metadata.   The IgPhyML output uses all caps.
+        isolates = {k.upper(): v for k, v in ANTIBODY_ISOLATES.items() if v["AntibodyLineage"] == wildcards.antibody_lineage}
+        rows = []
+        with open(input[0]) as f_in:
+            for record in SeqIO.parse(f_in, "fasta"):
+                if re.match(r"1;IG[^;]+;", record.id):
+                    continue
+                # For each inferred ancestor, we'll check which isolates are
+                # within the associated clade and generate an ID based on clade
+                # membership.
+                tree_index, clade_items, tree_suffix = record.id.split(";")
+                clade_items = clade_items.split(",")
+                mask = sum([(iso not in clade_items)*2**(exp) for exp, iso in enumerate(isolates.keys())])
+                # mask uses a 1 bit to mean NOT in the clade, so all 1 means no
+                # isolates are present.
+                maxmask = 2**len(isolates) - 1
+                if mask == maxmask:
+                    mask = ""
+                else:
+                    mask = hex(mask)[2:].upper()
+                # Timepoint
+                timepoints_isolate = [isolates.get(item, {}).get("Timepoint") for item in clade_items]
+                timepoint_min = None
+                for item in clade_items:
+                    match = re.match(r"WK([0-9]+)(\.?[0-9]*)-[0-9]+", item)
+                    if match:
+                        timepoint = int(match.group(1))
+                        if timepoint_min is None or timepoint < timepoint_min:
+                            timepoint_min = timepoint
+                    else:
+                        timepoint = isolates.get(item, {}).get("Timepoint")
+                        if timepoint:
+                            timepoint = int(timepoint)
+                            if timepoint_min is None or timepoint < timepoint_min:
+                                timepoint_min = timepoint
+                # Name, for ancestors that lead to any of the isolates
+                name = ""
+                if mask != "":
+                    name_fields = [wildcards.antibody_lineage, locus, tree_index]
+                    if mask != "0":
+                        name_fields.append(mask)
+                    name = "-".join(name_fields)
+                # Append to one big list so we can sort it before writing
+                rows.append({
+                    "InferredAncestor": name,
+                    "AntibodyLineage": wildcards.antibody_lineage,
+                    "TreeDepth": int(tree_index),
+                    "Chain": chain,
+                    "IsolateSubsetID": mask,
+                    "Timepoint": int(timepoint_min),
+                    "OriginalID": record.id,
+                    "Sequence": str(record.seq)})
+        rows = sorted(rows, key=lambda r: (r["Timepoint"], r["TreeDepth"], r["IsolateSubsetID"]))
+        with open(output[0], "wt") as f_out:
+            fields = [
+                "InferredAncestor", "AntibodyLineage", "TreeDepth", "Chain",
+                "IsolateSubsetID", "Timepoint", "OriginalID", "Sequence"]
+            writer = DictWriter(f_out, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
