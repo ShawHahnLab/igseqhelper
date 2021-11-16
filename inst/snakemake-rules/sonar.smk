@@ -13,25 +13,21 @@ def input_helper_sonar(w, pattern):
     # Take all specimens for this subject and the corresponding amplicons.
     # IgG+ is implicit in these rules but other types can be requested
     # manually.
+    parts = vars(w)
     specimens = set()
+    subject = parts.get("subject")
+    if not subject and "antibody_lineage" in parts:
+        subject = ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"]
+    if not subject:
+        raise ValueError
     for samp in SAMPLES.values():
         if samp["Type"] == w.chain_type and \
-            samp["SpecimenAttrs"]["Subject"] == w.subject and \
             "IgG" in samp["SpecimenAttrs"]["CellType"]:
-            specimens.add(samp["Specimen"])
-    # could I just do expand(pattern, **vars(w)) actually?
-    if "antibody_lineage" in vars(w):
-        return expand(
-            pattern,
-            subject=w.subject,
-            chain_type=w.chain_type,
-            specimen=specimens,
-            antibody_lineage=w.antibody_lineage)
-    return expand(
-        pattern,
-        subject=w.subject,
-        chain_type=w.chain_type,
-        specimen=specimens)
+            if samp["SpecimenAttrs"]["Subject"] == subject:
+                specimens.add(samp["Specimen"])
+    parts["subject"] = subject
+    parts["specimen"] = specimens
+    return expand(pattern, **parts)
 
 # For one subject and amplicon, process all specimens for module 1
 rule helper_sonar_module_1_by_subject:
