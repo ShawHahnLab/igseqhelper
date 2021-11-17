@@ -34,8 +34,8 @@ rule helper_sonar_module_1_by_subject:
     output: touch("analysis/sonar/{subject}.{chain_type}/module1.done")
     input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv")
 
-# For one lineage and amplicon, process all specimens for module 2 (just ID/DIV)
-rule helper_sonar_module_2_by_lineage:
+# For one amplicon, process all specimens for module 2 (just ID/DIV, for members of all lineages)
+rule helper_sonar_module_2:
     output: touch("analysis/sonar/{subject}.{chain_type}/module2.done")
     input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab")
 
