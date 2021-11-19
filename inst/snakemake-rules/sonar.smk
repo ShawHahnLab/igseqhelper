@@ -49,7 +49,7 @@ rule helper_sonar_module_3_igphyml:
     output: touch("analysis/sonar/{subject}.{chain_type}/module3tree.{antibody_lineage}.done")
     input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree")
 
-# just a default setup using SONARRamesh -> IgDiscover results
+# just a default setup using sonarramesh -> IgDiscover results
 # D will be ignored for light chian but is always there (which makes the
 # snakemake rules easy)
 # for light chain we want the corresponding light chain from the IgDiscover
@@ -64,7 +64,7 @@ IGG_IGM = {
     "lambda": "lambda"}
 rule sonar_germline:
     output: WD_SONAR.parent/"germline.{segment}.fasta"
-    input: lambda w: expand("analysis/igdiscover/SONARRamesh/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type])
+    input: lambda w: expand("analysis/igdiscover/sonarramesh/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type])
     shell: "cp {input} {output}"
 
 rule sonar_gather_mature:

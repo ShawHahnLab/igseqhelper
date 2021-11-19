@@ -5,41 +5,25 @@ merged IgM+ reads on a per-subject per-amplicon-type basis.
 These rules are configured to allow different reference databases.
 
 The default targets here will use SONAR's local copy of the Ramesh et al.
-database (https://doi.org/10.3389/fimmu.2017.01407).  This requires the SONAR
-repository in the working directory.
+database (https://doi.org/10.3389/fimmu.2017.01407) from within our igseq
+package.
 """
-
-def input_igdiscover_db_sonar(w):
-    """Gather VDJ germline DB from SONAR's BU_DD files.
-
-    As per the IgDiscover manual: "The directory must contain the three files
-    V.fasta, D.fasta, J.fasta. These files contain the V, D, J gene sequences,
-    respectively. Even if you have only light chains in your data, a D.fasta
-    file needs to be provided; just use one with the heavy chain D gene
-    sequences."
-    """
-    # Mapping of chain types to heavy/light short specifiers per locus.
-    chain_types = {
-        "alpha": "H",
-        "delta": "H",
-        "gamma": "H",
-        "mu": "H",
-        "epsilon": "H",
-        "kappa": "K",
-        "lambda": "L"}
-    # special case: IgDiscover wants a dummy D for a light chain so we'll use
-    # H's D.
-    chain_type = chain_types[w.chain_type]
-    if chain_types[w.chain_type] != "H" and w.segment == "D":
-        chain_type = "H"
-    return expand("SONAR/germDB/Ig{x}{z}_BU_DD.fasta", x=chain_type, z=w.segment)
-
 rule igdiscover_db_sonarramesh:
-    output: "analysis/igdiscover/SONARRamesh/{chain_type}/{segment}.fasta"
-    input: input_igdiscover_db_sonar
+    # As per the IgDiscover manual: "The directory must contain the three files
+    # V.fasta, D.fasta, J.fasta. These files contain the V, D, J gene sequences,
+    # respectively. Even if you have only light chains in your data, a D.fasta
+    # file needs to be provided; just use one with the heavy chain D gene
+    # sequences."
+    # So, we'll always include the IGHD sequences, plus whatever locus we're
+    # working with here.  (And if that's IGH, it'll still just write the D
+    # sequences once.)
+    output: expand("analysis/igdiscover/sonarramesh/{{chain_type}}/{segment}.fasta", segment=["V", "D", "J"])
+    params:
+        outdir="analysis/igdiscover/sonarramesh/{chain_type}",
+        locus=lambda w: {"gamma": "IGH", "kappa": "IGK", "lambda": "IGL"}[w.chain_type]
     shell:
         """
-            cp {input} {output}
+            igseq vdj-gather sonarramesh/IGH/IGHD sonarramesh/{params.locus} -o {params.outdir}
         """
 
 rule catsubjects:
