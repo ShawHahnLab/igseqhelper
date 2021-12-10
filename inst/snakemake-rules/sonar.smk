@@ -20,11 +20,15 @@ def input_helper_sonar(w, pattern):
         subject = ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"]
     if not subject:
         raise ValueError
-    for samp in SAMPLES.values():
-        if samp["Type"] == w.chain_type and \
-            "IgG" in samp["SpecimenAttrs"]["CellType"]:
-            if samp["SpecimenAttrs"]["Subject"] == subject:
-                specimens.add(samp["Specimen"])
+    if "specimen" in parts:
+        specimens = parts["specimen"]
+    else:
+        for samp in SAMPLES.values():
+            if samp["Type"] == w.chain_type and \
+                "IgG" in samp["SpecimenAttrs"]["CellType"]:
+                if samp["SpecimenAttrs"]["Subject"] == subject:
+                    specimens.add(samp["Specimen"])
+
     parts["subject"] = subject
     parts["specimen"] = specimens
     return expand(pattern, **parts)
@@ -44,10 +48,14 @@ rule helper_sonar_module_2_island_by_lineage:
     output: touch("analysis/sonar/{subject}.{chain_type}/module2island.{antibody_lineage}.done")
     input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
 
-# For one lienage and amplicon, make the IgPhyML tree and related outputs
+# For one lineage and amplicon, make the IgPhyML tree and related outputs
 rule helper_sonar_module_3_igphyml:
     output: touch("analysis/sonar/{subject}.{chain_type}/module3tree.{antibody_lineage}.done")
     input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree")
+
+rule helper_sonar_module_3_tree_pdf:
+    output: touch("analysis/sonar/{subject}.{chain_type}/module3treepdf.{antibody_lineage}.done")
+    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree.pdf")
 
 # just a default setup using sonarramesh -> IgDiscover results
 # D will be ignored for light chian but is always there (which makes the
