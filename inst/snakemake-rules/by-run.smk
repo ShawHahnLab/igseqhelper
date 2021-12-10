@@ -120,7 +120,7 @@ rule demux:
 
 rule getreads:
     output: directory("analysis/reads/{run}")
-    input: "/seq/runs/{run}"
+    input: ancient("/seq/runs/{run}")
     threads: 28
     shell: "igseq getreads -t {threads} --threads-load $(({threads}<4 ? {threads} : 4)) {input}"
 
