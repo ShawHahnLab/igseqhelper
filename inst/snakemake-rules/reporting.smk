@@ -189,18 +189,17 @@ rule sonar_island_stats:
     """Condense the full ID/DIV stats to just those for one island and sumamrize across antibodies."""
     output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv"
     input:
-        island=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/islandSeqs_{antibody_lineage}.txt"),
         iddiv=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"),
         fasta=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
     run:
+        # just calculate relative to the members of this lineage (for cases
+        # where there's more than one)
+        mabs = [attrs["AntibodyIsolate"] for attrs in ANTIBODY_ISOLATES.values() if attrs["AntibodyLineage"] == wildcards.antibody_lineage]
         fp_output = output[0]
-        fp_input_island = input.island[0]
         fp_input_iddiv = input.iddiv[0]
         fp_input_fasta = input.fasta[0]
         timepoint = [attrs["Timepoint"] for spec, attrs in SPECIMENS.items() if spec == wildcards.specimen][0]
         fieldnames = ["specimen", "timepoint", "sequence_id", "v_gene", "germ_div", "ab_id_min", "ab_id_median", "ab_id_max"]
-        with open(fp_input_island) as f_in:
-            ids = [line.strip() for line in f_in]
         # outer dict: seq ID to attributes
         # each inner dict: key/val pairs from sequence descriptions
         with open(fp_input_fasta) as f_in:
@@ -213,10 +212,9 @@ rule sonar_island_stats:
             writer = csv.DictWriter(f_out, fieldnames=fieldnames, lineterminator="\n")
             writer.writeheader()
             for row in reader:
-                if row["sequence_id"] not in ids:
+                if row["sequence_id"] not in descs.keys():
                     continue
-                keep = lambda key: key not in ["sequence_id", "v_gene", "germ_div"]
-                vals = [float(val) for key, val in row.items() if keep(key)]
+                vals = [float(val) for key, val in row.items() if key in mabs]
                 if vals:
                     ab_min = min(vals)
                     ab_med = round(median(vals), 4)
