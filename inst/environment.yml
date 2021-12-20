@@ -1,6 +1,7 @@
 # conda environment YAML for igseqhelper
 name: igseqhelper
 channels:
+  - ShawHahnLab
   - conda-forge
   - bioconda
   - defaults
@@ -8,14 +9,6 @@ dependencies:
   # general
   - snakemake>=6.8.0
   - seqmagick>=0.8.4
+  - fastqc>=0.11.9
   # igseq
-  - biopython>=1.79
-  - python>=3.9.7
-  - bwa>=0.7.17
-  - samtools>=1.13
-  - cutadapt>=3.5
-  - pear>=0.9.6
-  - igblast>=1.17.1
-  - pip
-  - pip:
-    - git+https://github.com/ShawHahnLab/igseq.git
+  - igseq>=0.1.1
