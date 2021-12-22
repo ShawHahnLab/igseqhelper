@@ -183,6 +183,21 @@ def counts_by_specimen(input_csv, output_csv):
             row["RatioMerge"] = divide(row["MergeSeqs"], row["CellCount"])
             writer.writerow(row)
 
+
+### FastQC
+
+rule fastqc_merge:
+    input: expand("analysis/reporting/fastqc/merge/{run}/{sample}_fastqc.html", zip, run=[attrs["Run"] for attrs in SAMPLES.values() if attrs["Run"]], sample=[attrs["Sample"] for attrs in SAMPLES.values() if attrs["Run"]])
+
+rule fastqc_reads:
+    input: expand("analysis/reporting/fastqc/reads/{run}/Undetermined_S0_L001_{rp}_001_fastqc.html", run=RUNS_FOR_IGSEQ, rp=["I1", "R1", "R2"])
+
+rule fastqc:
+    output: "analysis/reporting/fastqc/{path}_fastqc.html"
+    input: "analysis/{path}.fastq.gz"
+    threads: 8
+    shell: "fastqc -t {threads} {input} -o $(dirname {output})"
+
 ### SONAR Members and Ancestors
 
 rule sonar_island_stats:
@@ -199,11 +214,15 @@ rule sonar_island_stats:
         fp_input_iddiv = input.iddiv[0]
         fp_input_fasta = input.fasta[0]
         timepoint = [attrs["Timepoint"] for spec, attrs in SPECIMENS.items() if spec == wildcards.specimen][0]
-        fieldnames = ["specimen", "timepoint", "sequence_id", "v_gene", "germ_div", "ab_id_min", "ab_id_median", "ab_id_max"]
+        fieldnames = ["specimen", "timepoint", "sequence_id", "length", "v_gene", "germ_div", "ab_id_min", "ab_id_median", "ab_id_max"]
         # outer dict: seq ID to attributes
         # each inner dict: key/val pairs from sequence descriptions
+        descs = {}
+        seqs = {}
         with open(fp_input_fasta) as f_in:
-            descs = {rec.id: igseqhelper.util.parse_seq_desc(rec.description) for rec in SeqIO.parse(f_in, "fasta")}
+            for record in SeqIO.parse(f_in, "fasta"):
+                descs[record.id] = igseqhelper.util.parse_seq_desc(record.description)
+                seqs[record.id] = str(record.seq)
         desc_keys = [val.keys() for val in descs.values()]
         desc_keys = sorted(list(set(itertools.chain(*desc_keys))))
         fieldnames += desc_keys
@@ -227,6 +246,7 @@ rule sonar_island_stats:
                     "specimen": wildcards.specimen,
                     "timepoint": timepoint,
                     "sequence_id": row["sequence_id"],
+                    "length": len(seqs[row["sequence_id"]]),
                     "v_gene": row["v_gene"],
                     "germ_div": row["germ_div"],
                     "ab_id_min": ab_min,
@@ -318,28 +338,38 @@ rule sonar_members_table:
             chain_type = wildcards.chain_type
             chain = "light" if chain_type in ["kappa", "lambda"] else "heavy"
             locus = {"gamma": "H", "lambda": "L", "kappa": "K", "mu": "H"}[chain_type]
-            timepoint = specimen["Timepoint"]
             with open(fasta) as f_in:
                 for record in SeqIO.parse(f_in, "fasta"):
-                    orig_id = f"wk{timepoint}-{record.id}"
                     rows.append({
-                        "LineageMember": f"{wildcards.antibody_lineage}-{locus}-{orig_id}",
+                        "LineageMember": "",
                         "AntibodyLineage": wildcards.antibody_lineage,
-                        "OriginalID": orig_id,
+                        "OriginalID": record.id,
                         "FirstOccurrence": "",
                         "Chain": chain,
-                        "Timepoint": int(timepoint),
+                        "Timepoint": int(specimen["Timepoint"]),
+                        "TimepointLabel": "",
+                        "Specimen": specimen["Specimen"],
                         "Member": "T",
                         "Sequence": str(record.seq)})
+
+        timepoints, labels, rows = format_timepoints(rows)
+        for label, row in zip(labels, rows):
+            orig_id = f"{label}-{row['OriginalID']}"
+            member_name = f"{wildcards.antibody_lineage}-{locus}-{orig_id}"
+            row["LineageMember"] = member_name
+            row["OriginalID"] = orig_id
+            row["TimepointLabel"] = label
+
         seqmap = defaultdict(list)
         for row in rows:
-            seqmap[row["Sequence"]].append((row["Timepoint"], row["LineageMember"]))
+            seqmap[row["Sequence"]].append((row["TimepointLabel"], row["OriginalID"]))
         for row in rows:
             matches = seqmap[row["Sequence"]]
             if len(matches) > 1:
                 matches = sorted(matches)
-                row["FirstOccurrence"] = matches[0][1]
-        rows = sorted(rows, key=lambda row: (row["AntibodyLineage"], row["Chain"], row["Timepoint"], row["LineageMember"]))
+                if matches[0][1] != row["OriginalID"]:
+                    row["FirstOccurrence"] = matches[0][1]
+        rows = sorted(rows, key=lambda row: (row["AntibodyLineage"], row["Chain"], row["Timepoint"], row["TimepointLabel"], row["LineageMember"]))
         with open(output[0], "wt") as f_out:
             writer = DictWriter(f_out, fieldnames=rows[0].keys(), lineterminator="\n")
             writer.writeheader()
