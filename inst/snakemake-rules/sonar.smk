@@ -4,6 +4,7 @@
 WD_SONAR = Path("analysis/sonar/{subject}.{chain_type}/{specimen}")
 WD_SONAR_LONG = Path("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}")
 
+import math
 import csv
 
 # if we have a custom version of the ID/DIV table, use that
@@ -132,7 +133,7 @@ rule sonar_module_1:
         V="analysis/sonar/{subject}.{chain_type}/germline.V.fasta",
         D="analysis/sonar/{subject}.{chain_type}/germline.D.fasta",
         J="analysis/sonar/{subject}.{chain_type}/germline.J.fasta"
-    singularity: "docker://scharch/sonar"
+    singularity: "docker://jesse08/sonar"
     threads: 4
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
@@ -236,7 +237,7 @@ rule sonar_module_2_id_div:
         # differences in identity calculations (like for example with big gaps
         # in CDR3 alignments) that I think make gap=ignore infeasible to use.
         gap="mismatch"
-    singularity: "docker://scharch/sonar"
+    singularity: "docker://jesse08/sonar"
     threads: 4
     shell:
         """
@@ -280,7 +281,7 @@ rule sonar_module_2_id_div_island:
     input:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab",
         mab=WD_SONAR / "mab/mab.{antibody_lineage}.txt"
-    singularity: "docker://scharch/sonar"
+    singularity: "docker://jesse08/sonar"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_iddiv=lambda w, input: Path(input.iddiv).resolve(),
@@ -289,7 +290,7 @@ rule sonar_module_2_id_div_island:
         """
             mabargs=$(sed 's/^/--mab /' {input.mab})
             cd {params.wd_sonar}
-            sonar get_island {params.input_iddiv} $mabargs --output {params.outprefix}
+            sonar get_island {params.input_iddiv} $mabargs --output {params.outprefix} --plotmethod binned
         """
 
 rule sonar_module_2_id_div_island_alternate:
@@ -298,7 +299,7 @@ rule sonar_module_2_id_div_island_alternate:
     input:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.alt.tab",
         mab=WD_SONAR / "mab/mab.{antibody_lineage}.txt"
-    singularity: "docker://scharch/sonar"
+    singularity: "docker://jesse08/sonar"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_iddiv=lambda w, input: Path(input.iddiv).resolve(),
@@ -307,7 +308,7 @@ rule sonar_module_2_id_div_island_alternate:
         """
             mabargs=$(sed 's/^/--mab /' {input.mab})
             cd {params.wd_sonar}
-            sonar get_island {params.input_iddiv} $mabargs --output {params.outprefix}
+            sonar get_island {params.input_iddiv} $mabargs --output {params.outprefix} --plotmethod binned
         """
 
 rule sonar_module_2_id_div_getfasta:
@@ -317,7 +318,7 @@ rule sonar_module_2_id_div_getfasta:
     input:
         fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
         seqids=WD_SONAR / "output/tables/islandSeqs_{txt}.txt"
-    singularity: "docker://scharch/sonar"
+    singularity: "docker://jesse08/sonar"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         input_fasta=lambda w, input: Path(input.fasta).resolve(),
@@ -335,6 +336,36 @@ rule sonar_module_2_id_div_getfasta:
                 -o {params.output_fasta}
         """
 
+def format_timepoints(specimens):
+    # e.g.:
+    # -12   "wkN12"
+    #  -7   "wkN07"
+    #   0   "wk000"
+    #   4   "wk004"
+    #   4   "wk004.2"
+    #   8   "wk008"
+    #  12   "wk012"
+    try:
+        # dict
+        specs = specimens.values()
+    except AttributeError:
+        # list
+        specs = specimens
+    timepoints = [int(attrs["Timepoint"]) for attrs in specs]
+    pads = [(tp<0) + math.floor(math.log10(max(1, abs(tp))) + 1) for tp in timepoints]
+    padlen = max(pads)
+    labels = ["wk" + str(num).replace("-", "N").zfill(padlen) for num in timepoints]
+    trios = sorted(zip(timepoints, labels, specs), key=lambda trio: (trio[0], trio[1]))
+    def tally_tp_label(label, specname, seen={}):
+        if label in seen and specname not in seen[label]:
+            seen[label].add(specname)
+            out = label + "." + str(len(seen[label]))
+            return out
+        seen[label] = {specname}
+        return label
+    trios = [[tp, tally_tp_label(label, spec["Specimen"]), spec] for tp, label, spec in trios]
+    return list(zip(*trios))
+
 def sonar_module_3_collect_inputs(w):
     """List the inputs needed for SONAR module 3's collection step.
 
@@ -351,32 +382,17 @@ def sonar_module_3_collect_inputs(w):
             "IgG" in samp["SpecimenAttrs"]["CellType"]:
             specimens.add(samp["Specimen"])
     specimens = list(specimens)
-    # infer input FASTAs from those specimens
+    # sort specimens by timepoint and generate timepoints (integers) and
+    # timepoint labels (strings)
+    timepoints, labels, specimens = format_timepoints([SPECIMENS[spec] for spec in specimens])
     targets = expand(
         "analysis/sonar/{subject}.{chain_type}/{other_specimen}/"
         "output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa",
         subject=w.subject,
         chain_type=w.chain_type,
-        other_specimen=specimens,
+        other_specimen=[attrs["Specimen"] for attrs in specimens],
         antibody_lineage=w.antibody_lineage)
-    # get timepoints and zero-pad, so for example we end up with ["08", "12",
-    # ...  instead of ["12", "8", ...
-    timepoints = [SPECIMENS[spec]["Timepoint"] for spec in specimens]
-    padlen = max([len(txt) for txt in timepoints])
-    timepoints = [txt.zfill(padlen) for txt in timepoints]
-    # Pair up timepoints and target FASTAs and sort by timepoint
-    pairs = sorted(zip(timepoints, targets))
-    # Allow for repeated timepoints (for the rare case of multiple specimens
-    # per timepoint) by appending .2, .3, etc.
-    # (note to self: be careful with this mutable default argument.)
-    def tally_tp(tp, seen={}):
-        if tp in seen:
-            seen[tp] += 1
-            out = tp + "." + str(seen[tp])
-            return out
-        seen[tp] = 1
-        return tp
-    targets = {"wk" + tally_tp(tp): target for tp, target in pairs}
+    targets = {label: target for label, target in zip(labels, targets)}
     return targets
 
 def sonar_module_3_collect_param_seqs(_, input):
@@ -388,7 +404,7 @@ rule sonar_module_3_collect:
     output:
         collected=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa"
     input: unpack(sonar_module_3_collect_inputs)
-    singularity: "docker://scharch/sonar"
+    singularity: "docker://jesse08/sonar"
     threads: 4
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
@@ -415,7 +431,7 @@ rule sonar_module_3_igphyml:
         collected=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
         germline_v=WD_SONAR_LONG.parent / "germline.V.fasta",
         natives=WD_SONAR_LONG / "mab/mab.{antibody_lineage}.fasta"
-    singularity: "docker://scharch/sonar"
+    singularity: "docker://jesse08/sonar"
     threads: 4
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
@@ -475,7 +491,7 @@ rule sonar_module_3_draw_tree:
     input:
         tree=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree",
         natives_tab=WD_SONAR_LONG / "natives.tab"
-    singularity: "docker://scharch/sonar"
+    singularity: "docker://jesse08/sonar"
     # Running via xvfb-run since the ETE toolkit requires X11 to render for
     # some reason
     shell:
