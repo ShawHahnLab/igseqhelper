@@ -487,10 +487,10 @@ rule sonar_make_natives_table:
 
 rule sonar_module_3_draw_tree:
     output:
-        tree_img=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree.pdf"
+        tree_img=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree{suffix,.*}.pdf"
     input:
         tree=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree",
-        natives_tab=WD_SONAR_LONG / "natives.tab"
+        natives_tab=WD_SONAR_LONG / "natives{suffix}.tab"
     singularity: "docker://jesse08/sonar"
     # Running via xvfb-run since the ETE toolkit requires X11 to render for
     # some reason
