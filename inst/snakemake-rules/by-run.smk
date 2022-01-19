@@ -6,6 +6,9 @@ RUNS_FOR_SAMPLES = set([attrs["Run"] for attrs in SAMPLES.values() if attrs["Run
 # do early steps on any run that's labeled IgSeq
 RUNS_FOR_IGSEQ = [runid for runid in RUNS if "IgSeq" in RUNS[runid]["Protocol"]]
 
+rule all_igblast:
+    input: expand("analysis/igblast/{run}.done", run=RUNS_FOR_SAMPLES)
+
 rule all_merge:
     input: expand("analysis/merge/{run}.done", run=RUNS_FOR_SAMPLES)
 
@@ -22,6 +25,18 @@ rule all_getreads:
     input: expand("analysis/reads/{run}", run=RUNS_FOR_IGSEQ)
 
 ### By-pair rules grouped by run
+
+def run_igblast_input(w):
+    targets = []
+    for sample, attrs in SAMPLES.items():
+        if attrs["Run"] == w.run:
+            targets.append(f"analysis/igblast/{{run}}/{sample}.tsv.gz")
+    return targets
+
+rule run_igblast:
+    output: "analysis/igblast/{run}.done"
+    input: run_igblast_input
+    shell: "touch {output}"
 
 def run_merge_input(w):
     targets = []
@@ -52,6 +67,17 @@ rule run_trim:
     shell: "touch {output}"
 
 ### By-pair rules
+
+rule merged_igblast:
+    output:
+        tsv="analysis/igblast/{run}/{sample}.tsv.gz"
+    input:
+        fqgz="analysis/merge/{run}/{sample}.fastq.gz"
+    threads: 4
+    shell:
+        """
+            igseq igblast -r rhesus/imgt -t {threads} -Q {input.fqgz} --outfmt 19 | gzip > {output}
+        """
 
 rule pair_merge:
     output:
@@ -128,7 +154,7 @@ rule getreads:
 # Each directory will contain a set of symbolic links pointing to the
 # individual merged sample files
 
-def grouped_samples_input(w):
+def grouped_samples_input(w, pattern="analysis/merge/{runid}/{samp}.fastq.gz"):
     targets = []
     # clumsy way of matching e.g. "igg" to "IgG+CD20+"
     def cellmatch(ct_query, ct_ref):
@@ -144,13 +170,13 @@ def grouped_samples_input(w):
                     raise ValueError("cell type needed if grouping by subject")
                 if cellmatch(w.celltype, attrs["SpecimenAttrs"]["CellType"]):
                     runid = attrs["Run"]
-                    targets.append(f"analysis/merge/{runid}/{samp}.fastq.gz")
+                    targets.extend(expand(pattern, runid=runid, samp=samp))
     elif w.thing == "specimen":
         for samp, attrs in SAMPLES.items():
             if attrs["Specimen"] == w.name and attrs["Type"] == w.type:
                 if not celltype or cellmatch(w.celltype, attrs["SpecimenAttrs"]["CellType"]):
                     runid = attrs["Run"]
-                    targets.append(f"analysis/merge/{runid}/{samp}.fastq.gz")
+                    targets.extend(expand(pattern, runid=runid, samp=samp))
     else:
         raise ValueError("unrecognized wildcards for rule grouped_samples_input")
     if not targets:
@@ -169,14 +195,14 @@ def symlink_in(path_real, link_dir):
 
 rule grouped_samples_by_celltype:
     output: directory("analysis/samples-by-{thing}/{celltype}/{name}.{type}")
-    input: grouped_samples_input
+    input: lambda w: grouped_samples_input(w)
     run:
         for path in input:
             symlink_in(path, output[0])
 
 rule grouped_samples:
     output: directory("analysis/samples-by-{thing}/{name}.{type}")
-    input: grouped_samples_input
+    input: lambda w: grouped_samples_input(w)
     run:
         for path in input:
             symlink_in(path, output[0])

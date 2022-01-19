@@ -25,6 +25,7 @@ wildcard_constraints:
 
 include: "snakemake-rules/metadata.smk"
 include: "snakemake-rules/by-run.smk"
+include: "snakemake-rules/mining-d.smk"
 include: "snakemake-rules/igdiscover.smk"
 include: "snakemake-rules/sonar.smk"
 include: "snakemake-rules/igblast.smk"
