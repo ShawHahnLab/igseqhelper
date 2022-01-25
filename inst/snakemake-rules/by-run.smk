@@ -6,8 +6,8 @@ RUNS_FOR_SAMPLES = set([attrs["Run"] for attrs in SAMPLES.values() if attrs["Run
 # do early steps on any run that's labeled IgSeq
 RUNS_FOR_IGSEQ = [runid for runid in RUNS if "IgSeq" in RUNS[runid]["Protocol"]]
 
-rule all_igblast:
-    input: expand("analysis/igblast/{run}.done", run=RUNS_FOR_SAMPLES)
+rule all_igblast_merge:
+    input: expand("analysis/igblast/merge/{run}.done", run=RUNS_FOR_SAMPLES)
 
 rule all_merge:
     input: expand("analysis/merge/{run}.done", run=RUNS_FOR_SAMPLES)
@@ -26,16 +26,16 @@ rule all_getreads:
 
 ### By-pair rules grouped by run
 
-def run_igblast_input(w):
+def run_igblastmerge_input(w):
     targets = []
     for sample, attrs in SAMPLES.items():
         if attrs["Run"] == w.run:
-            targets.append(f"analysis/igblast/{{run}}/{sample}.tsv.gz")
+            targets.append(f"analysis/igblast/merge/{{run}}/{sample}.tsv.gz")
     return targets
 
-rule run_igblast:
-    output: "analysis/igblast/{run}.done"
-    input: run_igblast_input
+rule run_igblast_merge:
+    output: "analysis/igblast/merge/{run}.done"
+    input: run_igblast_merge_input
     shell: "touch {output}"
 
 def run_merge_input(w):
@@ -70,7 +70,7 @@ rule run_trim:
 
 rule merged_igblast:
     output:
-        tsv="analysis/igblast/{run}/{sample}.tsv.gz"
+        tsv="analysis/igblast/merge/{run}/{sample}.tsv.gz"
     input:
         fqgz="analysis/merge/{run}/{sample}.fastq.gz"
     threads: 4

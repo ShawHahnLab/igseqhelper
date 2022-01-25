@@ -19,18 +19,18 @@ rule igblast_run:
     There's a bit of redundancy in things like the chain getting repeated, but
     it's easier that way with the generalized rules here.
     """
-    output: "analysis/igblast/{ref}/{querytype}/{query}.tsv"
+    output: "analysis/igblast/custom/{ref}/{querytype}/{query}.tsv"
     input:
-        query="analysis/igblast/{ref}/{querytype}/{query}.fasta",
-        db_v="analysis/igblast/{ref}/db/V.nhr",
-        db_d="analysis/igblast/{ref}/db/D.nhr",
-        db_j="analysis/igblast/{ref}/db/J.nhr"
+        query="analysis/igblast/custom/{ref}/{querytype}/{query}.fasta",
+        db_v="analysis/igblast/custom/{ref}/db/V.nhr",
+        db_d="analysis/igblast/custom/{ref}/db/D.nhr",
+        db_j="analysis/igblast/custom/{ref}/db/J.nhr"
     params:
         outfmt=19, # AIRR TSV format
         organism="rhesus_monkey",
-        db_v="analysis/igblast/{ref}/db/V",
-        db_d="analysis/igblast/{ref}/db/D",
-        db_j="analysis/igblast/{ref}/db/J"
+        db_v="analysis/igblast/custom/{ref}/db/V",
+        db_d="analysis/igblast/custom/{ref}/db/D",
+        db_j="analysis/igblast/custom/{ref}/db/J"
     shell:
         """
             igblastn \
@@ -57,7 +57,7 @@ def input_for_igblast_query_fasta_sonar_inferred(w):
 
 rule igblast_query_fasta_sonar_inferred:
     """Set up query FASTA with SONAR's inferred ancestors for one lineage+chain+type."""
-    output: "analysis/igblast/{ref}/sonar.{antibody_lineage}.{chain}.{chain_type}/longitudinal.inferredAncestors.fasta"
+    output: "analysis/igblast/custom/{ref}/sonar.{antibody_lineage}.{chain}.{chain_type}/longitudinal.inferredAncestors.fasta"
     input: input_for_igblast_query_fasta_sonar_inferred
     shell: "cp {input} {output}"
 
@@ -73,7 +73,7 @@ def input_for_igblast_query_fasta_sonar_island(w):
 
 rule igblast_query_fasta_sonar_island:
     """Set up query FASTA with SONAR's goodVJ unique for one lineage+chain+type+specimen."""
-    output: "analysis/igblast/{ref}/sonar.{antibody_lineage}.{chain}.{chain_type}/{specimen}.island.fasta"
+    output: "analysis/igblast/custom/{ref}/sonar.{antibody_lineage}.{chain}.{chain_type}/{specimen}.island.fasta"
     input: input_for_igblast_query_fasta_sonar_island
     shell: "cp {input} {output}"
 
@@ -89,13 +89,13 @@ def input_for_igblast_query_fasta_sonar(w):
 
 rule igblast_query_fasta_sonar:
     """Set up query FASTA with SONAR's goodVJ unique for one lineage+chain+type+specimen."""
-    output: "analysis/igblast/{ref}/sonar.{antibody_lineage}.{chain}.{chain_type}/{specimen}.fasta"
+    output: "analysis/igblast/custom/{ref}/sonar.{antibody_lineage}.{chain}.{chain_type}/{specimen}.fasta"
     input: input_for_igblast_query_fasta_sonar
     shell: "cp {input} {output}"
 
 rule igblast_query_fasta_antibodies:
     """Set up query FASTA with known mAbs for a given lineage and chain."""
-    output: "analysis/igblast/{ref}/lineage.{chain}/{antibody_lineage}.fasta"
+    output: "analysis/igblast/custom/{ref}/lineage.{chain}/{antibody_lineage}.fasta"
     run:
         from Bio.SeqRecord import SeqRecord
         from Bio.Seq import Seq
@@ -121,15 +121,15 @@ rule igblast_query_fasta_antibodies:
 
 rule igblast_ref:
     """Set up VDJ BLAST DB from reference FASTA."""
-    output: "analysis/igblast/{ref}/db/{segment}.nhr"
-    input: "analysis/igblast/{ref}/db/{segment}.fasta"
-    params: out="analysis/igblast/{ref}/db/{segment}"
+    output: "analysis/igblast/custom/{ref}/db/{segment}.nhr"
+    input: "analysis/igblast/custom/{ref}/db/{segment}.fasta"
+    params: out="analysis/igblast/custom/{ref}/db/{segment}"
     shell: "makeblastdb -dbtype nucl -parse_seqids -in {input} -out {params.out}"
 
 rule igblast_ref_fasta_igdiscover:
     """Set up reference FASTA from an individualized database."""
     # actually makes segment.nhr/nin/nog/nsd/nsi/nsq but we'll just use .nhr for the rules
-    output: "analysis/igblast/igdiscover.{specimen}.{chain}.{chain_type}/db/{segment}.fasta"
+    output: "analysis/igblast/custom/igdiscover.{specimen}.{chain}.{chain_type}/db/{segment}.fasta"
     input: "analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/{segment}.fasta"
     shell: "cp {input} {output}"
 
@@ -141,6 +141,6 @@ def input_for_igblast_ref_fasta_sonarramesh(w):
 
 rule igblast_ref_fasta_sonarramesh:
     """Set up reference FASTA from SONAR's copy of the Ramesh sequences."""
-    output: "analysis/igblast/sonarramesh.{locus}/db/{segment}.fasta"
+    output: "analysis/igblast/custom/sonarramesh.{locus}/db/{segment}.fasta"
     input: input_for_igblast_ref_fasta_sonarramesh
     shell: "cp {input} {output}"
