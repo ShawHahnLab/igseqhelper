@@ -26,7 +26,7 @@ rule all_getreads:
 
 ### By-pair rules grouped by run
 
-def run_igblastmerge_input(w):
+def run_igblast_merge_input(w):
     targets = []
     for sample, attrs in SAMPLES.items():
         if attrs["Run"] == w.run:
