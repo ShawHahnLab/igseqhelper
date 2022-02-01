@@ -45,7 +45,7 @@ def divide(val1, val2, fmt="{:.2f}"):
 
 def counts_by_sample(csv_out):
     fieldnames = [
-        "Run", "Specimen", "CellType", "Type", "Sample",
+        "Run", "Subject", "Specimen", "CellType", "Type", "Sample",
         "CountsDemux", "CountsTrim", "CountsMerge",
         "CellCount", "RatioDemux", "RatioMerge"]
     demux = {}
@@ -78,6 +78,7 @@ def counts_by_sample(csv_out):
             samp_merge = counts_for(samp, attrs["Run"], "merge")
             row = {
                 "Run": attrs["Run"],
+                "Subject": attrs["SpecimenAttrs"]["Subject"],
                 "Specimen": attrs["Specimen"],
                 "CellType": attrs["SpecimenAttrs"]["CellType"],
                 "Type": attrs["Type"],
@@ -149,15 +150,51 @@ def counts_by_run(input_csv, output_csv):
             del row["TotalSeqs"]
             writer.writerow(row)
 
+def sonar_airr_counts(input_tsv, output_csv):
+    # Reads: grand total in the file.  Some don't make it this far if they
+    #        didn't even look like antibody reads (e.g. ferritin)
+    # GoodReads: The good (no stops, all parts intact) antibody reads
+    # ClusteredReads: Good ones that made it into clusters (not quite all do)
+    # ClusteredUnique The *number* of clusters
+    counts = {"SONARReads": 0, "SONARGoodReads": 0, "SONARClusteredReads": 0, "SONARClusteredUnique": 0}
+    with open(input_tsv) as f_in:
+        reader = csv.DictReader(f_in, delimiter="\t")
+        for row in reader:
+            counts["SONARReads"] += int(row["duplicate_count"])
+            if row["status"] == "good":
+                counts["SONARGoodReads"] += int(row["duplicate_count"])
+                if row["cluster_count"]:
+                    # counting the number of reads counted in clusters.  Ony good
+                    # reads get clustered, and only those with the minimum dupliate
+                    # count (by default singletons are not assigned clusters, good
+                    # or not).
+                    counts["SONARClusteredReads"] += int(row["cluster_count"])
+                    # counting each cluster once for this one
+                    counts["SONARClusteredUnique"] += 1
+    with open(output_csv, "wt") as f_out:
+        writer = DictWriter(f_out, fieldnames=counts.keys(), lineterminator="\n")
+        writer.writeheader()
+        writer.writerow(counts)
+
+rule sonar_airr_counts:
+    output: csv="analysis/reporting/counts/sonar/{subject}.{chain_type}.{specimen}.csv"
+    input: tsv="analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv"
+    run: sonar_airr_counts(input.tsv, output.csv)
+
+rule sonar_airr_counts_by_subject_and_type:
+    output: touch("analysis/reporting/counts/sonar/{subject}.{chain_type}.done")
+    input: lambda w: expand("analysis/reporting/counts/sonar/{{subject}}.{{chain_type}}.{specimen}.csv", specimen={samp["Specimen"] for samp in SAMPLES.values() if samp["SpecimenAttrs"]["Subject"] == w.subject and samp["Type"] == w.chain_type})
+
 def counts_by_specimen(input_csv, output_csv):
     spec_info = {}
     with open(input_csv) as f_in:
         reader = DictReader(f_in)
         for row in reader:
-            key = (row["Specimen"], row["Type"])
+            key = (row["Subject"], row["Specimen"], row["Type"])
             if row["Specimen"]:
                 if key not in spec_info:
                     spec_info[key] = {
+                        "Subject": row["Subject"],
                         "Specimen": row["Specimen"],
                         "CellType": row["CellType"],
                         "CellCount": row["CellCount"],
@@ -169,10 +206,21 @@ def counts_by_specimen(input_csv, output_csv):
                     spec_info[key]["TrimSeqs"].append(int(row["CountsTrim"]))
                 if row["CountsMerge"]:
                     spec_info[key]["MergeSeqs"].append(int(row["CountsMerge"]))
+                # These take a while to crunch through so I'm doing that in a
+                # separate rule, but still not explicitly giving it as input so
+                # this rule will only use whatever's already on disk
+                sonar_counts = Path(f"analysis/reporting/counts/sonar/{row['Subject']}.{row['Type']}.{row['Specimen']}.csv")
+                if sonar_counts.exists():
+                    with open(sonar_counts) as f_in_sonar:
+                        reader = DictReader(f_in_sonar)
+                        spec_info[key].update(next(reader))
+    fieldnames = ["Subject", "Specimen", "CellType", "Type",
+        "DemuxSeqs", "TrimSeqs", "MergeSeqs", "CellCount", "RatioDemux", "RatioMerge",
+        "SONARReads", "SONARGoodReads", "SONARClusteredReads", "SONARClusteredUnique"]
     with open(output_csv, "wt") as f_out:
         writer = DictWriter(
             f_out,
-            fieldnames=["Specimen", "CellType", "Type", "DemuxSeqs", "TrimSeqs", "MergeSeqs", "CellCount", "RatioDemux", "RatioMerge"],
+            fieldnames=fieldnames,
             lineterminator="\n")
         writer.writeheader()
         for row in spec_info.values():
