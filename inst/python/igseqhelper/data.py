@@ -127,6 +127,7 @@ def load_csv(fp_in, key=None):
     used.
     """
     LOGGER.debug("load_csv: fp_in %s", fp_in)
+    warn = False
     with open(fp_in) as f_in:
         entries = {}
         reader = csv.DictReader(f_in)
@@ -134,12 +135,17 @@ def load_csv(fp_in, key=None):
             key = reader.fieldnames[0]
         for row in reader:
             row_key = row[key]
+            if not row_key:
+                warn = True
+                continue
             if row_key in entries:
                 msg = "Duplicate keys in CSV %s under column %s (value %s)" % (
                     fp_in, key, row_key)
                 LOGGER.critical(msg)
                 raise MetadataError(msg)
             entries[row_key] = row
+    if warn:
+        LOGGER.error(f"skipped rows with missing key value from {fp_in}")
     return entries
 
 def get_data(runid, outdir, runs, runpath=None, threads=None):

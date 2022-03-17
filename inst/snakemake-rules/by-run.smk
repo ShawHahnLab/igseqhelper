@@ -94,6 +94,10 @@ rule pair_merge:
         """
 
 def pair_trim_input(w):
+    # special case for already-prepared files from elsewhere
+    if w.run == "external":
+        return []
+    # The usual case
     for samp, attrs in SAMPLES.items():
         if samp == w.sample:
             runid = attrs["Run"]
@@ -169,13 +173,13 @@ def grouped_samples_input(w, pattern="analysis/merge/{runid}/{samp}.fastq.gz"):
                 if not celltype:
                     raise ValueError("cell type needed if grouping by subject")
                 if cellmatch(w.celltype, attrs["SpecimenAttrs"]["CellType"]):
-                    runid = attrs["Run"]
+                    runid = attrs["Run"] or "external"
                     targets.extend(expand(pattern, runid=runid, samp=samp))
     elif w.thing == "specimen":
         for samp, attrs in SAMPLES.items():
             if attrs["Specimen"] == w.name and attrs["Type"] == w.type:
                 if not celltype or cellmatch(w.celltype, attrs["SpecimenAttrs"]["CellType"]):
-                    runid = attrs["Run"]
+                    runid = attrs["Run"] or "external"
                     targets.extend(expand(pattern, runid=runid, samp=samp))
     else:
         raise ValueError("unrecognized wildcards for rule grouped_samples_input")
