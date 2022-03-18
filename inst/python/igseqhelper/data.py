@@ -17,25 +17,6 @@ LOGGER = logging.getLogger(__name__)
 class MetadataError(Exception):
     """Errors related to missing or invalid metadata."""
 
-
-def load_sequences(fp_in):
-    """Load sequence metadata CSV.
-
-    Output is a dictionary of sequence names to sequences and their attributes.
-    """
-    LOGGER.info("load_sequences: fp_in %s", fp_in)
-    sequences = load_csv(fp_in, "Name")
-    # remove any spaces in the sequence content
-    for _, seq_data in sequences.items():
-        seq_data["Seq"] = re.sub(" ", "", seq_data["Seq"])
-    # check for duplicate sequence content
-    seqs_unique = {entry["Seq"] for entry in sequences.values()}
-    if len(seqs_unique) != len(sequences.values()):
-        msg = "Duplicate entries in CSV %s in Seq column" % fp_in
-        LOGGER.critical(msg)
-        raise MetadataError(msg)
-    return sequences
-
 def load_runs(fp_in):
     """Load run metadata CSV.
 
@@ -54,7 +35,7 @@ def load_specimens(fp_in):
     LOGGER.info("load_specimens: fp_in %s", fp_in)
     return load_csv(fp_in, "Specimen")
 
-def load_samples(fp_in, specimens=None, runs=None, sequences=None):
+def load_samples(fp_in, specimens=None, runs=None):
     """Load sample metadata CSV and optionally link to barcode data.
 
     Output is a dictionary of sample names to sample attributes.  If
@@ -64,7 +45,6 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
     LOGGER.info("load_samples: fp_in %s", fp_in)
     LOGGER.info("load_samples: specimens %s...", str(specimens)[0:60])
     LOGGER.info("load_samples: runs %s...", str(runs)[0:60])
-    LOGGER.info("load_samples: sequences %s...", str(sequences)[0:60])
     samples = load_csv(fp_in, "Sample")
     samples = {k: v for k, v in samples.items() if v["Skip"] != "TRUE"}
     noblanks = {k: v for k, v in samples.items() if \
@@ -80,9 +60,6 @@ def load_samples(fp_in, specimens=None, runs=None, sequences=None):
         # Missing all three of these is a special case where we have the
         # preprocessed files but not the raw material
         if sample["BarcodeFwd"] or sample["BarcodeRev"] or sample["Run"]:
-            if sequences:
-                _load_nested_items(sample, "Sample", sequences, "BarcodeFwd")
-                _load_nested_items(sample, "Sample", sequences, "BarcodeRev")
             if runs:
                 _load_nested_items(sample, "Sample", runs, "Run")
         if specimens:

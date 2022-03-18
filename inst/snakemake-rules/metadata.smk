@@ -6,29 +6,25 @@ import igseqhelper.data
 
 rule all_get_metadata:
     input:
-       sequences="metadata/sequences.csv",
        specimens="metadata/specimens.csv",
        runs="metadata/runs.csv",
        samples="metadata/samples.csv",
        antibody_lineages="metadata/antibody_lineages.csv",
        antibody_isolates="metadata/antibody_isolates.csv"
 
-def _setup_metadata(fp_sequences, fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates):
-    global SEQUENCES, SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES
-    SEQUENCES = igseqhelper.data.load_sequences(fp_sequences)
+def _setup_metadata(fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates):
+    global SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES
     SPECIMENS = igseqhelper.data.load_specimens(fp_specimens)
     RUNS = igseqhelper.data.load_runs(fp_runs)
     SAMPLES = igseqhelper.data.load_samples(
         fp_samples,
         specimens=SPECIMENS,
-        runs=RUNS,
-        sequences=SEQUENCES)
+        runs=RUNS)
     ANTIBODY_LINEAGES = igseqhelper.data.load_antibody_lineages(fp_antibody_lineages)
     ANTIBODY_ISOLATES = igseqhelper.data.load_antibody_isolates(fp_antibody_isolates, ANTIBODY_LINEAGES)
 
 try:
     _setup_metadata(
-        "metadata/sequences.csv",
         "metadata/specimens.csv",
         "metadata/runs.csv",
         "metadata/samples.csv",
@@ -36,7 +32,6 @@ try:
         "metadata/antibody_isolates.csv")
 except FileNotFoundError:
     print("Skipping metadata loading; be sure to run get_metadata rule.")
-    SEQUENCES = {}
     SPECIMENS = {}
     RUNS = {}
     SAMPLES = {}
@@ -46,7 +41,6 @@ except FileNotFoundError:
 rule get_metadata:
     """Create CSV files from Google sheets based on metadata YAML."""
     output:
-       sequences="metadata/sequences.csv",
        specimens="metadata/specimens.csv",
        runs="metadata/runs.csv",
        samples="metadata/samples.csv",
@@ -61,7 +55,6 @@ rule get_metadata:
         # build a shell command.
         shell("""R -e 'devtools::load_all("igseqhelper"); update_metadata_via_yaml("{input}", ".")' """)
         _setup_metadata(
-            output.sequences,
             output.specimens,
             output.runs,
             output.samples,
