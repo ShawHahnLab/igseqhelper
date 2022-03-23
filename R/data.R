@@ -113,7 +113,7 @@ update_metadata <- function(google_sheets, prefix=NULL) {
         header = TRUE,
         stringsAsFactors = FALSE,
         check.names = FALSE)
-      write.csv(data, path_file, row.names = FALSE)
+      write.csv(data, path_file, row.names = FALSE, na="")
     }
   }
 }
