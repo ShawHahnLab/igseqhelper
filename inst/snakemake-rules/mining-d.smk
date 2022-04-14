@@ -22,7 +22,7 @@ rule miningd_get_cdrh3s:
     # from the by-run rules, even though it's always going to be by-subject and
     # mu sequences from IgM+ cells.
     output: "analysis/mining-d/{thing}_{name}.{celltype}.{type}.cdr3.fasta"
-    input: lambda w: grouped_samples_input(w, "analysis/igblast/{runid}/{samp}.tsv.gz")
+    input: lambda w: grouped_samples_input(w, "analysis/igblast/merge/{runid}/{samp}.tsv.gz")
     run:
         cdrh3s_from_airr(input, output[0])
 
