@@ -190,30 +190,3 @@ load_fasta <- function(fp) {
 save_fasta <- function(txt, fp) {
   dnar::write.fa(names = names(txt), dna = txt, fileName = fp)
 }
-
-
-# Misc --------------------------------------------------------------------
-
-
-load_blast_table <- function(fp, columns=NULL) {
-  if (is.null(columns)) {
-    columns <- c(
-      "qseqid", "sseqid", "pident", "length", "mismatch", "gapopen",
-      "qstart", "qend", "sstart", "send", "evalue", "bitscore")
-  }
-  data <- read.table(
-    fp,
-    sep = "\t",
-    stringsAsFactors = FALSE,
-    header = FALSE,
-    col.names = columns)
-  data
-}
-
-#' Parse gene names from allele names
-#' @param txt character vector of immunoglobulin allele names
-#' @return character vector of gene names
-#' @export
-parse_gene <- function(txt) {
-  gsub("^I?G?([^\\*]+)\\*.*", "\\1", txt)
-}

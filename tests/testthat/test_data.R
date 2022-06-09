@@ -90,16 +90,3 @@ test_that("load_samples can load a joined sample metadata CSV", {
   expect_equal(rownames(samples), expected$rows)
   expect_equal(colnames(samples), expected$cols)
 })
-
-# CSV ---------------------------------------------------------------------
-
-
-test_that("load_csv can load a basic CSV", {
-  sequences <- load_csv(file.path(testdir(), "metadata", "sequences.csv"))
-  # Or, we can use a different key, so long as it's unique.
-  sequences <- load_csv(file.path(testdir(), "metadata", "sequences.csv"), "Seq")
-  # Non-unique should give an error.
-  expect_error(
-    load_csv(file.path(testdir(), "metadata", "sequences.csv"), "Use"),
-    "Non-unique keys")
-})
