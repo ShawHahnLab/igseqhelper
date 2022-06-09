@@ -169,7 +169,7 @@ def grouped_samples_input(w, pattern="analysis/merge/{runid}/{samp}.fastq.gz"):
     celltype = dict(w).get("celltype")
     if w.thing == "subject":
         for samp, attrs in SAMPLES.items():
-            if attrs["SpecimenAttrs"]["Subject"] == w.name and attrs["Type"] == w.type:
+            if attrs["SpecimenAttrs"]["Subject"] == w.name and attrs["Type"] == w.chain_type:
                 if not celltype:
                     raise ValueError("cell type needed if grouping by subject")
                 if cellmatch(w.celltype, attrs["SpecimenAttrs"]["CellType"]):
@@ -177,7 +177,7 @@ def grouped_samples_input(w, pattern="analysis/merge/{runid}/{samp}.fastq.gz"):
                     targets.extend(expand(pattern, runid=runid, samp=samp))
     elif w.thing == "specimen":
         for samp, attrs in SAMPLES.items():
-            if attrs["Specimen"] == w.name and attrs["Type"] == w.type:
+            if attrs["Specimen"] == w.name and attrs["Type"] == w.chain_type:
                 if not celltype or cellmatch(w.celltype, attrs["SpecimenAttrs"]["CellType"]):
                     runid = attrs["Run"] or "external"
                     targets.extend(expand(pattern, runid=runid, samp=samp))
@@ -198,14 +198,14 @@ def symlink_in(path_real, link_dir):
     link_from.symlink_to(link_to)
 
 rule grouped_samples_by_celltype:
-    output: directory("analysis/samples-by-{thing}/{celltype}/{name}.{type}")
+    output: directory("analysis/samples-by-{thing}/{celltype}/{name}.{chain_type}")
     input: lambda w: grouped_samples_input(w)
     run:
         for path in input:
             symlink_in(path, output[0])
 
 rule grouped_samples:
-    output: directory("analysis/samples-by-{thing}/{name}.{type}")
+    output: directory("analysis/samples-by-{thing}/{name}.{chain_type}")
     input: lambda w: grouped_samples_input(w)
     run:
         for path in input:

@@ -1,3 +1,4 @@
+# See also: merged_igblast in by-run.smk
 rule igblast_run:
     """A generic rule to igblast any query against any reference.
     
@@ -22,25 +23,22 @@ rule igblast_run:
     output: "analysis/igblast/custom/{ref}/{querytype}/{query}.tsv"
     input:
         query="analysis/igblast/custom/{ref}/{querytype}/{query}.fasta",
-        db_v="analysis/igblast/custom/{ref}/db/V.nhr",
-        db_d="analysis/igblast/custom/{ref}/db/D.nhr",
-        db_j="analysis/igblast/custom/{ref}/db/J.nhr"
+        db_v="analysis/igblast/custom/{ref}/db/V.fasta",
+        db_d="analysis/igblast/custom/{ref}/db/D.fasta",
+        db_j="analysis/igblast/custom/{ref}/db/J.fasta"
     params:
         outfmt=19, # AIRR TSV format
-        organism="rhesus_monkey",
-        db_v="analysis/igblast/custom/{ref}/db/V",
-        db_d="analysis/igblast/custom/{ref}/db/D",
-        db_j="analysis/igblast/custom/{ref}/db/J"
+        species="rhesus",
+        db="analysis/igblast/custom/{ref}/db"
+    threads: 8
     shell:
         """
-            igblastn \
-                -germline_db_V {params.db_v} \
-                -germline_db_D {params.db_d} \
-                -germline_db_J {params.db_j} \
+            igseq igblast \
+                -t {threads} \
+                -S {params.species} \
+                -r {params.db} \
+                -Q {input.query} \
                 -outfmt {params.outfmt} \
-                -organism {params.organism} \
-                -ig_seqtype Ig \
-                -query {input.query} \
                 -out {output}
         """
 
@@ -119,16 +117,8 @@ rule igblast_query_fasta_antibodies:
 
 ### References
 
-rule igblast_ref:
-    """Set up VDJ BLAST DB from reference FASTA."""
-    output: "analysis/igblast/custom/{ref}/db/{segment}.nhr"
-    input: "analysis/igblast/custom/{ref}/db/{segment}.fasta"
-    params: out="analysis/igblast/custom/{ref}/db/{segment}"
-    shell: "makeblastdb -dbtype nucl -parse_seqids -in {input} -out {params.out}"
-
 rule igblast_ref_fasta_igdiscover:
     """Set up reference FASTA from an individualized database."""
-    # actually makes segment.nhr/nin/nog/nsd/nsi/nsq but we'll just use .nhr for the rules
     output: "analysis/igblast/custom/igdiscover.{specimen}.{chain}.{chain_type}/db/{segment}.fasta"
     input: "analysis/igdiscover/{chain}.{chain_type}/{specimen}/final/database/{segment}.fasta"
     shell: "cp {input} {output}"

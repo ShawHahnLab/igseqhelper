@@ -14,6 +14,7 @@ wildcard_constraints:
     run="[-_A-Za-z0-9]+",
     # antibody concepts
     chain="(heavy|light)",
+    celltype="igm|igg",
     chain_type="(alpha|delta|gamma|mu|epsilon|kappa|lambda)",
     segment="(V|D|J)",
     antibody_type="(IgA|IgD|IgG|IgM|IgE)",
