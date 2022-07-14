@@ -427,8 +427,14 @@ def sonar_module_3_igphyml_param_v_id(wildcards):
         return ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VL"]
     return ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VH"]
 
-rule sonar_module_3_igphyml:
-    """SONAR 3: Run phylogenetic analysis and generate tree across specimens."""
+
+# If a custom alignment is available, use that, but fall back on automatic
+# alignment during module 3.
+# The auto version puts its alignment in work/phylo/{projdir}_aligned.afa
+ruleorder: sonar_module_3_igphyml_custom > sonar_module_3_igphyml_auto
+
+rule sonar_module_3_igphyml_auto:
+    """SONAR 3: Run phylogenetic analysis with automatic alignment and generate tree across specimens."""
     output:
         tree=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree",
         inferred_nucl=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa",
@@ -461,6 +467,28 @@ rule sonar_module_3_igphyml:
                 --lib {params.input_germline_v} \
                 --natives {params.input_natives} \
                 {params.args}
+        """
+
+rule sonar_module_3_igphyml_custom:
+    """SONAR 3: Run phylogenetic analysis with custom alignment and generate tree across specimens."""
+    output:
+        tree=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree",
+        inferred_nucl=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa",
+        inferred_prot=WD_SONAR_LONG / "output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa",
+        stats=WD_SONAR_LONG / "output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt"
+    input:
+        alignment=Path(WD_SONAR_LONG / "../alignment.{antibody_lineage}.fa").resolve()
+    singularity: "docker://jesse08/sonar"
+    threads: 4
+    params:
+        wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
+        args="-f"
+    shell:
+        """
+            # See sonar_module_3_igphyml_auto about LANG
+            unset LANG
+            cd {params.wd_sonar}
+            sonar igphyml -i {input.alignment} {params.args}
         """
 
 rule sonar_make_natives_table:
