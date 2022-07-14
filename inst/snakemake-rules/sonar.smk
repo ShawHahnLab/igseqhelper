@@ -58,11 +58,8 @@ rule helper_sonar_module_3_tree_pdf:
     output: touch("analysis/sonar/{subject}.{chain_type}/module3treepdf.{antibody_lineage}.done")
     input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree.pdf")
 
-# just a default setup using sonarramesh -> IgDiscover results
-# D will be ignored for light chian but is always there (which makes the
-# snakemake rules easy)
-# for light chain we want the corresponding light chain from the IgDiscover
-# files, but for heavy chain it'd be mu.
+# For whatever chain we're analyzing, what chain do we need to reference in our
+# IgDiscover results?  (heavy -> mu, light -> same light)
 IGG_IGM = {
     "alpha": "mu",
     "delta": "mu",
@@ -71,7 +68,17 @@ IGG_IGM = {
     "epsilon": "mu",
     "kappa": "kappa",
     "lambda": "lambda"}
-rule sonar_germline:
+# Default to using IgDiscover results based on KIMDB (the latest reference that
+# started in Bernat et al.  2021) IGH, but fall back on sonarramesh for IGK/IGL
+# since KIMDB doesn't include light chain.
+# D will be ignored for light chain but is always there (which makes the
+# snakemake rules here easy)
+ruleorder: sonar_germline_kimdb > sonar_germline_sonarramesh
+rule sonar_germline_kimdb:
+    output: WD_SONAR.parent/"germline.{segment}.fasta"
+    input: lambda w: expand("analysis/igdiscover/kimdb/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type])
+    shell: "cp {input} {output}"
+rule sonar_germline_sonarramesh:
     output: WD_SONAR.parent/"germline.{segment}.fasta"
     input: lambda w: expand("analysis/igdiscover/sonarramesh/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type])
     shell: "cp {input} {output}"

@@ -1,5 +1,5 @@
 """
-Rules for running IgDisover, starting from demultiplexed, adapter-trimmed,
+Rules for running IgDiscover, starting from demultiplexed, adapter-trimmed,
 merged IgM+ reads on a per-subject per-amplicon-type basis.
 
 These rules are configured to allow different reference databases.
@@ -8,6 +8,7 @@ The default targets here will use SONAR's local copy of the Ramesh et al.
 database (https://doi.org/10.3389/fimmu.2017.01407) from within our igseq
 package.
 """
+
 rule igdiscover_db_sonarramesh:
     # As per the IgDiscover manual: "The directory must contain the three files
     # V.fasta, D.fasta, J.fasta. These files contain the V, D, J gene sequences,
@@ -20,11 +21,18 @@ rule igdiscover_db_sonarramesh:
     output: expand("analysis/igdiscover/sonarramesh/{{chain_type}}/{segment}.fasta", segment=["V", "D", "J"])
     params:
         outdir="analysis/igdiscover/sonarramesh/{chain_type}",
-        locus=lambda w: {"gamma": "IGH", "kappa": "IGK", "lambda": "IGL"}[w.chain_type]
+        locus=lambda w: {"mu": "IGH", "kappa": "IGK", "lambda": "IGL"}[w.chain_type]
     shell:
         """
             igseq vdj-gather sonarramesh/IGH/IGHD sonarramesh/{params.locus} -o {params.outdir}
         """
+
+# KIMDB is only heavy chain so it's simpler to handle here than sonarramesh
+# above
+rule igdiscover_db_kimdb:
+    output: expand("analysis/igdiscover/kimdb/mu/{segment}.fasta", segment=["V", "D", "J"])
+    params: outdir="analysis/igdiscover/kimdb/mu"
+    shell: "igseq vdj-gather kimdb -o {params.outdir}"
 
 rule catsubjects:
     output: "analysis/samples-by-subject/igm/{subject}.{chain_type}.fastq.gz"

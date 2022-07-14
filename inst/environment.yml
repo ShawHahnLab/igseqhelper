@@ -11,4 +11,4 @@ dependencies:
   - seqmagick>=0.8.4
   - fastqc>=0.11.9
   # igseq
-  - igseq>=0.1.1
+  - igseq>=0.3.0
