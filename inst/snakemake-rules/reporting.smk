@@ -252,7 +252,7 @@ rule sonar_island_stats:
     """Condense the full ID/DIV stats to just those for one island and sumamrize across antibodies."""
     output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv"
     input:
-        iddiv=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab"),
+        iddiv=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.alt.tab"),
         fasta=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
     run:
         # just calculate relative to the members of this lineage (for cases
@@ -262,7 +262,7 @@ rule sonar_island_stats:
         fp_input_iddiv = input.iddiv[0]
         fp_input_fasta = input.fasta[0]
         timepoint = [attrs["Timepoint"] for spec, attrs in SPECIMENS.items() if spec == wildcards.specimen][0]
-        fieldnames = ["specimen", "timepoint", "sequence_id", "length", "v_gene", "germ_div", "ab_id_min", "ab_id_median", "ab_id_max"]
+        fieldnames = ["specimen", "timepoint", "sequence_id", "length", "n_count", "v_gene", "germ_div", "ab_id_min", "ab_id_median", "ab_id_max"]
         # outer dict: seq ID to attributes
         # each inner dict: key/val pairs from sequence descriptions
         descs = {}
@@ -295,6 +295,7 @@ rule sonar_island_stats:
                     "timepoint": timepoint,
                     "sequence_id": row["sequence_id"],
                     "length": len(seqs[row["sequence_id"]]),
+                    "n_count": len(re.sub("[^N]", "", seqs[row["sequence_id"]])),
                     "v_gene": row["v_gene"],
                     "germ_div": row["germ_div"],
                     "ab_id_min": ab_min,
@@ -306,8 +307,9 @@ rule sonar_island_stats:
 
 def sonar_island_summary(fp_output_csv, fps_input_csv):
     fieldnames = [
-        "specimen", "timepoint", "total",
+        "specimen", "timepoint", "total", "has_n",
         "germ_div_min", "germ_div_max", "germ_div_median",
+        "duplicate_count_median", "cluster_count_median",
         "ab_id_min", "ab_id_max", "ab_id_median"]
     with open(fp_output_csv, "wt") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=fieldnames, lineterminator="\n")
@@ -331,15 +333,22 @@ def _sonar_island_summary_row(fp_in):
     ab_ids_meds = []
     ab_ids_mins = []
     ab_ids_maxes = []
+    cluster_counts = []
+    duplicate_counts = []
+    has_n = 0
     specimen = ""
     timepoint = ""
     with open(fp_in) as f_in:
         reader = csv.DictReader(f_in)
         for row in reader:
             germ_divs.append(float(row["germ_div"]))
+            if int(row["n_count"]) > 0:
+                has_n += 1
             ab_ids_meds.append(float(row["ab_id_median"]))
             ab_ids_mins.append(float(row["ab_id_min"]))
             ab_ids_maxes.append(float(row["ab_id_max"]))
+            duplicate_counts.append(int(row["duplicate_count"]))
+            cluster_counts.append(int(row["cluster_count"]))
             # just take the last specimen and timepoint given (if any) since
             # they should be constant per file
             specimen = row.get("specimen", "")
@@ -349,23 +358,23 @@ def _sonar_island_summary_row(fp_in):
             "specimen": specimen,
             "timepoint": timepoint,
             "total": len(germ_divs),
+            "has_n": has_n,
             "germ_div_min": round(min(germ_divs), 4),
             "germ_div_max": round(max(germ_divs), 4),
             "germ_div_median": round(median(germ_divs), 4),
+            "duplicate_count_median": round(median(duplicate_counts)),
+            "cluster_count_median": round(median(cluster_counts)),
             "ab_id_min": round(min(ab_ids_mins), 4),
             "ab_id_max": round(max(ab_ids_maxes), 4),
             "ab_id_median": round(median(ab_ids_meds), 4)}
     else:
+        # Missing keys will get blanks in the output so that will take care of
+        # the rest
         row_out = {
             "specimen": specimen,
             "timepoint": timepoint,
             "total": 0,
-            "germ_div_min": '',
-            "germ_div_max": '',
-            "germ_div_median": '',
-            "ab_id_min": '',
-            "ab_id_max": '',
-            "ab_id_median": ''}
+            "has_n": 0}
     return row_out
 
 rule sonar_island_summary:
