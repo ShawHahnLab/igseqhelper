@@ -5,9 +5,9 @@ This ambiguous alignment stuff is currently a mess.  proceed with caution.
 import csv
 import logging
 from warnings import warn
-from Bio.Alphabet.IUPAC import IUPACAmbiguousDNA
 from Bio import SeqIO, AlignIO
 from Bio.Align import PairwiseAligner
+from Bio.Align.substitution_matrices import Array
 from Bio.Seq import Seq
 
 warn(DeprecationWarning("Don't use this junk!"), stacklevel=2)
@@ -85,7 +85,7 @@ def ambiguify_alignment(fasta_fp):
         else:
             key = "-"
         bases.append(key)
-    sequence = Seq("".join(bases), alphabet=IUPACAmbiguousDNA)
+    sequence = Seq("".join(bases))
     return sequence
 
 def score_ambiguous_matches(data_fp, ref_fp, out_fp, min_length=None):
@@ -103,20 +103,11 @@ def score_ambiguous_matches(data_fp, ref_fp, out_fp, min_length=None):
     scoring_dict = make_iupac_scores()
     LOGGER.info("score_ambiguous_matches: scoring seqs and writing output to %s", data_fp)
 
-    #ref_len = len(ref)
-    #gap_penalty = -5
-    #def gap1(pos, length):
-    #    """gap at start or end of reference gets no penalty.  Any other, default."""
-    #    if pos == 0 or pos == ref_len:
-    #        return 0
-    #    return length*gap_penalty
-
-    #def gap2(pos, length):
-    #    """Ordinary gap penalty by length."""
-    #    return length*gap_penalty
-
     aligner = PairwiseAligner()
-    aligner.substitution_matrix = scoring_dict
+    # https://biopython.org/docs/latest/api/Bio.Align.substitution_matrices.html
+    array = Array(dims=2)
+    array.update(scoring_dict)
+    aligner.substitution_matrix = array
     aligner.gap_score = -5
     aligner.query_left_gap_score = -100
     aligner.query_right_gap_score = -100
@@ -138,16 +129,6 @@ def score_ambiguous_matches(data_fp, ref_fp, out_fp, min_length=None):
             alignments = aligner.align(ref, record.seq)
             print(alignments[0])
             score = alignments.score
-
-            # pairwise2
-            ##al = align.globalds(ref, record.seq, scoring_dict, -1, 0, one_alignment_only = True)
-            ##score = al[0][2]
-            ##als = align.globalds(ref, record.seq, scoring_dict, -5, -1)
-            #als = align.localds(ref, record.seq, scoring_dict, -5, -1)
-            ##als = align.globaldc(ref, record.seq, scoring_dict, gap1, gap2)
-            #print(format_alignment(*als[0]))
-            #sys.stdout.flush()
-            #score = als[0][2]
 
             LOGGER.debug(
                 "score_ambiguous_matches: score %s: %d",
