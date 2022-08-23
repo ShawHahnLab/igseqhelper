@@ -7,11 +7,44 @@ import csv
 import logging
 import hashlib
 import gzip
+import yaml
+import urllib.request
+from io import StringIO
 from pathlib import Path
 from Bio import SeqIO
 from snakemake.shell import shell
 
 LOGGER = logging.getLogger(__name__)
+
+def download_metadata(path_yaml, path_out=None):
+    """Download CSV from google sheets.
+
+    YAML like this:
+        metadata:
+          slug: 2PACX-1vRsc...
+          sheets:
+            samples: 1692570416
+            specimens: 1355081593
+            ...
+    Becomes:
+         metadata/samples.csv
+         metadata/specimens.csv
+         metadata/...
+    """
+    with open(path_yaml) as f_in:
+        info = yaml.safe_load(f_in)
+    for key in info:
+        slug = info[key]["slug"]
+        sheets = info[key]["sheets"]
+        for sheet_name, gid in sheets.items():
+            url = f"https://docs.google.com/spreadsheets/d/e/{slug}/pub?gid={gid}&single=true&output=csv"
+            path = Path(key)/(sheet_name + ".csv")
+            if path_out is not None and str(path) == path_out:
+                with urllib.request.urlopen(url) as f_in, open(path, "wt") as f_out:
+                    reader = csv.reader(StringIO(f_in.read().decode("UTF8")))
+                    writer = csv.writer(f_out, lineterminator="\n")
+                    for row in reader:
+                        writer.writerow(row)
 
 class MetadataError(Exception):
     """Errors related to missing or invalid metadata."""

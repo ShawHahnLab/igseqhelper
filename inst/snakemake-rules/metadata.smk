@@ -40,23 +40,7 @@ except FileNotFoundError:
 
 rule get_metadata:
     """Create CSV files from Google sheets based on metadata YAML."""
-    output:
-       specimens="metadata/specimens.csv",
-       runs="metadata/runs.csv",
-       samples="metadata/samples.csv",
-       antibody_lineages="metadata/antibody_lineages.csv",
-       antibody_isolates="metadata/antibody_isolates.csv"
+    output: "metadata/{sheet}.csv"
     input: "metadata.yml"
     run:
-        # Previously used snakemake.utils.R but that broken for me recently.
-        # Snakmake docs now say "This is deprecated in favor of the script
-        # directive. This function executes the R code given as a string. The
-        # function requires rpy2 to be installed." ...so I'll just ditch it and
-        # build a shell command.
-        shell("""R -e 'devtools::load_all("igseqhelper"); update_metadata_via_yaml("{input}", ".")' """)
-        _setup_metadata(
-            output.specimens,
-            output.runs,
-            output.samples,
-            output.antibody_lineages,
-            output.antibody_isolates)
+        igseqhelper.data.download_metadata(input[0], output[0])
