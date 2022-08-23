@@ -424,9 +424,12 @@ rule sonar_module_3_collect:
 
 def sonar_module_3_igphyml_param_v_id(wildcards):
     if wildcards.chain_type in ["kappa", "lambda"]:
-        return ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VL"]
-    return ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VH"]
-
+        v_call = ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VL"]
+    else:
+        v_call = ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VH"]
+    if not v_call:
+        raise ValueError("No V assigned for %s" % wildcards)
+    return v_call
 
 # If a custom alignment is available, use that, but fall back on automatic
 # alignment during module 3.
