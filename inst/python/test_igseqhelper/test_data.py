@@ -32,13 +32,6 @@ class TestMetadataBase(unittest.TestCase):
     def setUp(self):
         self.path = ROOT / "metadata"
         self.expected = {
-            "sequences": {
-                "cols": ["Name", "Seq", "Use", "Annotation", "Direction", "Notes"],
-                "rows":
-                    ["P5_Graft", "P5_Seq", "5PIIA", "P7", "IgG", "IgD", "IgK", "IgL", "RhIgM"] +
-                    ["BC_%d" % val for val in range(1, 21)] +
-                    ["i7_%d" % val for val in range(1, 21)]
-                },
             "runs": {
                 "cols": ["Run", "ReverseComplement", "PhiX", "Skip", "Comments",
                          "URL", "URLR1", "URLR2", "URLI1",
@@ -65,11 +58,6 @@ class TestMetadataBase(unittest.TestCase):
                 "rows": ["ISO_S1_1", "ISO_S3_1", "ISO_S4_1"]
                 }
             }
-
-    def test_load_sequences(self):
-        """Test loading sequences CSV."""
-        sequences = igseqhelper.data.load_sequences(self.path / "sequences.csv")
-        self.check_metadata(sequences, self.expected["sequences"], "Name")
 
     def test_load_runs(self):
         """Test loading runs CSV."""
@@ -123,13 +111,10 @@ class TestMetadataBase(unittest.TestCase):
         """
         specimens = igseqhelper.data.load_specimens(self.path / "specimens.csv")
         runs = igseqhelper.data.load_runs(self.path / "runs.csv")
-        sequences = igseqhelper.data.load_sequences(self.path / "sequences.csv")
-        samples = igseqhelper.data.load_samples(self.path / "samples.csv", specimens, runs, sequences)
+        samples = igseqhelper.data.load_samples(self.path / "samples.csv", specimens, runs)
         # Check the same sort of rows/columns things as above, but also the nested metadata
         nested_items = {
             "SpecimenAttrs": "specimens",
-            "BarcodeFwdAttrs": "sequences",
-            "BarcodeRevAttrs": "sequences",
             "RunAttrs": "runs"}
         self.assertEqual(list(samples.keys()), self.expected["samples"]["rows"])
         for name, attrs in samples.items():
@@ -144,21 +129,6 @@ class TestMetadataBase(unittest.TestCase):
             # Excluding those nested keys, the sample attributes should still match up as before.
             keys = [key for key in keys if key not in nested_items.keys()]
             self.assertEqual(keys, self.expected["samples"]["cols"])
-
-    def test_load_csv(self):
-        """Test generic CSV loading."""
-        # This should behave similarly to the load_sequences wrapper, except
-        # for the extra sequence content processing.
-        sequences = igseqhelper.data.load_csv(self.path / "sequences.csv")
-        for _, seq_data in sequences.items():
-            seq_data["Seq"] = re.sub(" ", "", seq_data["Seq"])
-        self.check_metadata(sequences, self.expected["sequences"], "Name")
-        # Or, we can use a different key, so long as it's unique.
-        sequences = igseqhelper.data.load_csv(self.path / "sequences.csv", "Seq")
-        # Non-unique should give an error.
-        with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(MetadataError):
-                igseqhelper.data.load_csv(self.path / "sequences.csv", "Use")
 
     def test_get_data(self):
         """Test getting data from local disk or URLs."""
@@ -213,15 +183,6 @@ class TestMetadataDuplicates(TestMetadataBase):
 
     def setUp(self):
         self.path = ROOT / "metadata_duplicates"
-
-    def test_load_sequences(self):
-        with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(MetadataError):
-                igseqhelper.data.load_sequences(self.path / "sequences.csv")
-        # But also, we shouldn't have any duplicated sequences.
-        with self.assertLogs(level=logging.CRITICAL):
-            with self.assertRaises(MetadataError):
-                igseqhelper.data.load_sequences(self.path / "sequences_dup_seq.csv")
 
     def test_load_runs(self):
         with self.assertLogs(level=logging.CRITICAL):
@@ -283,26 +244,6 @@ class TestData(unittest.TestCase):
         self.assertEqual(
             igseqhelper.data.md5("/dev/null"),
             "d41d8cd98f00b204e9800998ecf8427e")
-
-    def test_chunk_fqgz(self):
-        """Test divvying up a fastq.gz into a fixed number of files."""
-
-        path_in = self.path / "stub.fastq.gz"
-        # With 1:1 you get the same thing out as you put in
-        with NamedTemporaryFile() as path_out:
-            igseqhelper.data.chunk_fqgz([path_in], [path_out.name])
-            self.assertEqual(zcat(path_in), zcat(path_out.name))
-        # With 1:N it's split up and will leave empty files for any extras
-        paths_out = [NamedTemporaryFile() for _ in range(6)]
-        igseqhelper.data.chunk_fqgz([path_in], paths_out)
-        for path_out in paths_out:
-            path_out.flush()
-        self.assertEqual(
-            zcat(path_in),
-            "".join([zcat(path_out.name) for path_out in paths_out]))
-        self.assertEqual("", zcat(paths_out[-1].name))
-        for path_out in paths_out:
-            path_out.close()
 
     def test_amplicon_files(self):
         """Test filename helper for files per specimen per target chain type."""

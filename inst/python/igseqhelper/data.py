@@ -10,7 +10,6 @@ import gzip
 from pathlib import Path
 from Bio import SeqIO
 from snakemake.shell import shell
-from igseqhelper.util import RoundRobinWriter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -216,16 +215,6 @@ def md5(fp_in):
         for chunk in iter(lambda: f_in.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
-
-def chunk_fqgz(files_in, files_out):
-    """round-robin the input fastq.gz files to the output, one after the other."""
-    LOGGER.info("chunk_fgqz: files_in: %s", files_in)
-    LOGGER.info("chunk_fgqz: files_out: %s", files_out)
-    with RoundRobinWriter(files_out, gzip.open) as f_out:
-        for path_in in files_in:
-            with gzip.open(path_in, "rt") as f_in:
-                for record in SeqIO.parse(f_in, "fastq"):
-                    SeqIO.write(record, f_out, "fastq")
 
 def get_samples_per_run(samples):
     """Make a dictionary of run names -> lists of sample names.
