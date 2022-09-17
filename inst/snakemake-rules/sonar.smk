@@ -89,7 +89,11 @@ rule sonar_gather_mature:
     This includes all lineages for the subject, if applicable.  This is stored
     in each project directory for a given subject so that you can optionally
     add custom sequences for a given timepoint.  (But, not at the top of the
-    proejct directory, or SONAR will use it as input.)
+    project directory, or SONAR will use it as input.)
+
+    This will only keep the first occurrence of each sequence, so that mAb
+    isolates that have identical sequences won't result in duplication of
+    effort.
     """
     output: "analysis/sonar/{subject}.{chain_type}/{projdir}/mab/mab.fasta"
     run:
@@ -97,12 +101,17 @@ rule sonar_gather_mature:
             seq_col = "LightSeq"
         else:
             seq_col = "HeavySeq"
+        seen = {""} # always skip empty entries
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
-                if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject and attrs[seq_col]:
+                seq = attrs[seq_col]
+                if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject and seq not in seen:
                     f_out.write(f">{seqid}\n")
                     f_out.write(attrs[seq_col]+"\n")
+                    seen.add(seq)
 
+# I think this only comes up for including sequences for IgPhyML.  In this case
+# we *will* keep duplicates so all mAb sequences will be in the tree.
 rule sonar_gather_mature_by_lineage:
     output: "analysis/sonar/{subject}.{chain_type}/{projdir}/mab/mab.{antibody_lineage}.fasta"
     run:
@@ -214,7 +223,6 @@ rule alternate_iddiv_with_igblast:
                     raise ValueError(
                         "row mismatch between ID-DIV table and AIRR: %s vs %s", iddiv_id, airr_id)
                 sonar_gene = iddiv_row["v_gene"]
-                sonar_div = float(iddiv_row["germ_div"])
                 airr_gene = airr_row["v_call"].split("*")[0]
                 airr_div = 100 - float(airr_row["v_identity"])
                 iddiv_row["germ_div"] = f"{airr_div:.2f}"
@@ -264,12 +272,15 @@ rule sonar_list_members_for_lineage:
             seq_col = "LightSeq"
         else:
             seq_col = "HeavySeq"
+        seen = {""} # same logic as for sonar_gather_mature
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
+                seq = attrs[seq_col]
                 if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject \
-                    and attrs[seq_col] and \
+                    and seq not in seen and \
                     attrs["AntibodyLineage"] == wildcards.antibody_lineage:
                         f_out.write(f"{seqid}\n")
+                        seen.add(seq)
 
 # NOTE this step is interactive over X11
 ##
