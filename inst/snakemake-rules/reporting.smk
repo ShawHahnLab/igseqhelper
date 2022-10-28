@@ -176,14 +176,16 @@ def sonar_airr_counts(input_tsv, output_csv, fmt_islands=None, lineages=None):
     # If there are islandSeqs files for the expected lineages, tally those up
     # too (but just if available)
     if lineages and fmt_islands:
-        members = 0
+        members = None
         for antibody_lineage in lineages:
             path = Path(fmt_islands.format(antibody_lineage = antibody_lineage))
             if path.exists():
+                members = members or 0
                 with open(path) as f_in:
                     for line in f_in:
                         members += 1
-        counts["LineageMembers"] = members
+        if members is not None:
+            counts["LineageMembers"] = members
     with open(output_csv, "wt") as f_out:
         writer = DictWriter(f_out, fieldnames=counts.keys(), lineterminator="\n")
         writer.writeheader()
@@ -524,3 +526,12 @@ rule sonar_ancestors_table:
             writer = DictWriter(f_out, fieldnames=fields, lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
+
+# See also the final/dendrogram_{segment}.pdf files from IgDiscover
+rule igdiscover_tree:
+    output: "analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.tree.nex"
+    input:
+        # IGG_IGM from sonar rules
+        after=lambda w: expand("analysis/igdiscover/{{ref}}/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type]),
+        before="analysis/igdiscover/{ref}/{chain_type}/{segment}.fasta"
+    shell: "igseq tree before={input.before} after={input.after} {output}"
