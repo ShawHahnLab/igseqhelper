@@ -136,6 +136,19 @@ JMOTIF = {
     "kappa": "TT[C|T][G|A]G",
     "lambda": "TT[C|T][G|A]G"}
 
+# Some of these SONAR tables and FASTAs are huge, so I'm compressing recent
+# ones with xz, and adding this rule to default to compressed files if already
+# available.  (Note to self: if you go and xz-compress some other module's
+# stuff Snakemake will probably complain about ambiguous rules.)
+ruleorder: sonar_module_1_decompress > sonar_module_1
+rule sonar_module_1_decompress:
+    output: (WD_SONAR/"output/{thing}")
+    input: (WD_SONAR/"output/{thing}.xz")
+    shell:
+        """
+            xz --decompress < {input} > {output}
+        """
+
 rule sonar_module_1:
     output:
         fasta=(WD_SONAR/"output/sequences/nucleotide/{specimen}_goodVJ_unique.fa"),
