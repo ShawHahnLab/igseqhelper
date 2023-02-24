@@ -142,8 +142,8 @@ JMOTIF = {
 # stuff Snakemake will probably complain about ambiguous rules.)
 ruleorder: sonar_module_1_decompress > sonar_module_1
 rule sonar_module_1_decompress:
-    output: (WD_SONAR/"output/{thing}")
-    input: (WD_SONAR/"output/{thing}.xz")
+    output: (WD_SONAR/"output/{compressed}")
+    input: (WD_SONAR/"output/{compressed}.xz")
     shell:
         """
             xz --decompress < {input} > {output}

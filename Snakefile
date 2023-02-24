@@ -21,6 +21,7 @@ wildcard_constraints:
     antibody_isolate=r"[-_A-Za-z0-9\.]+",
     antibody_lineage=r"[-_A-Za-z0-9\.]+",
     # other flow control
+    compressed="((?!xz$).)*",
     chunk="[0-9]+",
     rp="(R1|R2|I1|I2)"
 
