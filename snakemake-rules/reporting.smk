@@ -237,19 +237,22 @@ def counts_by_specimen(input_csv, output_csv):
         "DemuxSeqs", "TrimSeqs", "MergeSeqs", "CellCount", "RatioDemux", "RatioMerge",
         "SONARReads", "SONARGoodReads", "SONARClusteredReads", "SONARClusteredUnique",
         "LineageMembers"]
+    rows = []
+    for row in spec_info.values():
+        row["DemuxSeqs"] = sum(row["DemuxSeqs"]) if row["DemuxSeqs"] else ""
+        row["TrimSeqs"] = sum(row["TrimSeqs"]) if row["TrimSeqs"] else ""
+        row["MergeSeqs"] = sum(row["MergeSeqs"]) if row["MergeSeqs"] else ""
+        row["RatioDemux"] = divide(row["DemuxSeqs"], row["CellCount"])
+        row["RatioMerge"] = divide(row["MergeSeqs"], row["CellCount"])
+        rows.append(row)
+    rows = sorted(rows, key=lambda row: [row.get(field, "") for field in fieldnames])
     with open(output_csv, "wt") as f_out:
         writer = DictWriter(
             f_out,
             fieldnames=fieldnames,
             lineterminator="\n")
         writer.writeheader()
-        for row in spec_info.values():
-            row["DemuxSeqs"] = sum(row["DemuxSeqs"]) if row["DemuxSeqs"] else ""
-            row["TrimSeqs"] = sum(row["TrimSeqs"]) if row["TrimSeqs"] else ""
-            row["MergeSeqs"] = sum(row["MergeSeqs"]) if row["MergeSeqs"] else ""
-            row["RatioDemux"] = divide(row["DemuxSeqs"], row["CellCount"])
-            row["RatioMerge"] = divide(row["MergeSeqs"], row["CellCount"])
-            writer.writerow(row)
+        writer.writerows(rows)
 
 
 ### FastQC
