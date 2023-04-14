@@ -223,7 +223,6 @@ rule alternate_iddiv_with_igblast:
         iddiv=WD_SONAR/"output/tables/{specimen}_goodVJ_unique_id-div.tab",
         airr=WD_SONAR/"output/tables/{specimen}_goodVJ_unique.igblast.tsv"
     run:
-        pass
         with open(input.iddiv) as f_in, open(input.airr) as f_in_airr, open(output.iddiv, "wt") as f_out:
             iddiv = csv.DictReader(f_in, delimiter="\t")
             airr = csv.DictReader(f_in_airr, delimiter="\t")
@@ -430,7 +429,6 @@ def sonar_module_3_collect_param_seqs(_, input):
     args = [" --labels {key} --seqs {val}".format(key=key, val=Path(val).resolve()) for key, val in input.items()]
     return " ".join(args)
 
-# analysis/sonar/T681.gamma/longitudinal-T681/output/sequences/nucleotide/longitudinal-T681-collected.fa
 rule sonar_module_3_collect:
     output:
         collected=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa"
