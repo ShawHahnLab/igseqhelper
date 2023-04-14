@@ -32,6 +32,11 @@ def input_helper_sonar(w, pattern):
 
     parts["subject"] = subject
     parts["specimen"] = specimens
+    # I swear vars(w) *used* to just give you a dictionary of wildcard names
+    # and values, but now I'm getting a bunch of functions (and other stuff
+    # like _names) mixed in too, which crashes expand().  This is hacky but
+    # fixes this for now.
+    parts = {key: parts[key] for key in parts if not callable(parts[key])}
     return expand(pattern, **parts)
 
 # For one subject and amplicon, process all specimens for module 1
