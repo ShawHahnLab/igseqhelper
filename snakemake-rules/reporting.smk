@@ -37,12 +37,17 @@ AVAILABLE_IGDISCOVER = dict(zip(
     ["ref", "chain_type", "subject", "segment"],
     glob_wildcards("analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/{segment}.fasta")))
 
+AVAILABLE_MININGD = filter_wildcards_by_metadata(dict(zip(
+    ["subject"], glob_wildcards("analysis/mining-d/{subject}.output.fasta"))))
+
 TARGET_REPORT_COUNTS = expand("analysis/reporting/counts/counts_by_{thing}.csv", thing=["sample", "run", "specimen"])
 TARGET_REPORT_SONAR_ISLAND_SUMMARIES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/island_stats_summary.csv", zip, **AVAILABLE_SONAR_ISLANDS)
 TARGET_REPORT_SONAR_MEMBERS_TABLES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/members.csv", zip, **AVAILABLE_SONAR_ISLANDS)
 TARGET_REPORT_SONAR_ANCESTORS_TABLES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/ancestors.csv", zip, **AVAILABLE_SONAR_ANCESTORS)
 TARGET_REPORT_IGDISCOVER_TREES = expand("analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.nex", zip, **AVAILABLE_IGDISCOVER)
 TARGET_REPORT_IGDISCOVER_FINAL_DBS = expand("analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.fasta", zip, **AVAILABLE_IGDISCOVER)
+TARGET_REPORT_MININGD_FASTAS = expand("analysis/reporting/mining-d/{subject}/{subject}.fasta", zip, **AVAILABLE_MININGD)
+TARGET_REPORT_MININGD_TREES = expand("analysis/reporting/mining-d/{subject}/{subject}.nex", zip, **AVAILABLE_MININGD)
 
 rule all_report:
     input: TARGET_REPORT_COUNTS +
@@ -50,7 +55,9 @@ rule all_report:
         TARGET_REPORT_SONAR_MEMBERS_TABLES +
         TARGET_REPORT_SONAR_ANCESTORS_TABLES +
         TARGET_REPORT_IGDISCOVER_TREES +
-        TARGET_REPORT_IGDISCOVER_FINAL_DBS
+        TARGET_REPORT_IGDISCOVER_FINAL_DBS +
+        TARGET_REPORT_MININGD_TREES +
+        ["analysis/reporting/mining-d/all.nex"]
 
 rule report_counts:
     input: TARGET_REPORT_COUNTS
@@ -69,6 +76,12 @@ rule report_available_igdiscover_trees:
 
 rule report_available_igdiscover_final_dbs:
     input: TARGET_REPORT_IGDISCOVER_FINAL_DBS
+
+rule report_available_miningd_fastas:
+    input: TARGET_REPORT_MININGD_FASTAS
+
+rule report_available_miningd_trees:
+    input: TARGET_REPORT_MININGD_TREES
 
 ### Counts
 
@@ -592,4 +605,100 @@ rule report_igdiscover_tree:
 rule report_igdiscover_final_db:
     output: "analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.fasta"
     input: "analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/{segment}.fasta"
+    shell: "cp {input} {output}"
+
+### MINING-D
+
+rule report_miningd_combo_tree:
+    """Make a tree of all subjects' MINING-D output compared with all known D sequences."""
+    output: "analysis/reporting/mining-d/all.nex"
+    input: "analysis/reporting/mining-d/all.msa.fasta"
+    shell: "igseq tree {input} {output}"
+
+rule report_miningd_combo_msa:
+    """Align all subjects' MINING-D output with all known D sequences."""
+    output: "analysis/reporting/mining-d/all.msa.fasta"
+    input:
+        subject="analysis/reporting/mining-d/all.fasta",
+        refs="analysis/reporting/mining-d/refs.fa"
+    shell: "cat {input.refs} {input.subject} | igseq msa --input-format fa - {output}"
+
+rule report_miningd_combo_fasta:
+    """Combine all subjects' MINING-D outputs into one FASTA."""
+    output: "analysis/reporting/mining-d/all.fasta"
+    input: TARGET_REPORT_MININGD_FASTAS
+    params:
+        subjects = AVAILABLE_MININGD["subject"]
+    run:
+        with open(output[0], "wt") as f_out:
+            for subject, path in zip(params.subjects, input):
+                with open(path) as f_in:
+                    for rec in SeqIO.parse(f_in, "fasta"):
+                        rec.id = f"{subject}_{rec.id}"
+                        SeqIO.write(rec, f_out, "fasta-2line")
+
+rule report_miningd_tree:
+    """Make a tree of each subject's MINING-D output compared with all known D sequences."""
+    output: "analysis/reporting/mining-d/{subject}/{subject}.nex"
+    input:
+        msa="analysis/reporting/mining-d/{subject}/{subject}.msa.fasta",
+        subject="analysis/reporting/mining-d/{subject}/{subject}.fasta",
+        refs="analysis/reporting/mining-d/refs.fa"
+    shell:
+        """
+            igseq tree \
+                -C subject=#880000 -C refs=#000000 \
+                -L subject=<(grep '^>' {input.subject} | cut -c 2- | cut -f 1 -d ' ') \
+                -L refs=<(grep '^>' {input.refs} | cut -c 2- | cut -f 1 -d ' ') \
+                {input.msa} {output}
+        """
+
+rule report_miningd_msa:
+    """Align a subject's MINING-D output with all known D sequences."""
+    output: "analysis/reporting/mining-d/{subject}/{subject}.msa.fasta"
+    input:
+        subject="analysis/reporting/mining-d/{subject}/{subject}.fasta",
+        refs="analysis/reporting/mining-d/refs.fa"
+    shell: "cat {input.refs} {input.subject} | igseq msa --input-format fa - {output}"
+
+rule report_miningd_refs:
+    """
+    Make a combined D gene FASTA across rhesus refs.
+
+    Output has one line per unqiue sequence across all references, with
+    automated seq IDs, and IDs within individual references in the
+    descriptions.
+    """
+    output: "analysis/reporting/mining-d/refs.fasta"
+    run:
+        from igseq.util import FILES, DATA
+        from base64 import b32encode
+        from hashlib import sha1
+        refs = {
+            "germ/rhesus/imgt/IGH/IGHD.fasta": "IMGT",
+            "germ/rhesus/sonarramesh/IGH/IGHD.fasta": "Ramesh",
+            "germ/rhesus/kimdb/IGH/IGHD.fasta": "KIMDB"}
+        ref_seqs = defaultdict(list)
+        for path in FILES:
+            key = str(path.relative_to(DATA))
+            if key not in refs:
+                continue
+            with open(path) as f_in:
+                for rec in SeqIO.parse(f_in, "fasta"):
+                    ref_seqs[str(rec.seq)].append((refs[key], rec.id))
+        with open(output[0], "wt") as f_out:
+            for seq, id_list in ref_seqs.items():
+                # ID syntax inspired by 10.1016/j.immuno.2023.100025
+                # except I'm making it deterministic (why make it random when you
+                # can make it reproducible?)
+                seqhash = sha1()
+                seqhash.update(seq.encode("UTF8"))
+                seqhash = b32encode(seqhash.digest()).decode("ASCII")
+                seqid = "IGHD0-" + seqhash[:4] + "*00"
+                seqdesc = " ".join([f"{ref}:{seqid}" for ref, seqid in id_list])
+                f_out.write(f">{seqid} {seqdesc}\n{seq}\n")
+
+rule report_miningd_output:
+    output: "analysis/reporting/mining-d/{subject}/{subject}.fasta"
+    input: "analysis/mining-d/{subject}.output.fasta"
     shell: "cp {input} {output}"
