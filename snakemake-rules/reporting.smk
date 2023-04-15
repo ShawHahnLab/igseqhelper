@@ -4,26 +4,91 @@ from collections import defaultdict
 from csv import DictWriter, DictReader
 from Bio import SeqIO
 
-rule all_counts:
-    input: expand("analysis/reporting/counts/counts_by_{thing}.csv", thing=["sample", "run", "specimen"])
+# Just a helper for the below rules.
+# Filter out any entries that don't match the metadata since we rely on the
+# metadata when prepping the tables.  (This could be things like
+# "subject-(datestamp)" or what have you)
+def filter_wildcards_by_metadata(wildcards_dict):
+    removes = set()
+    for key, vec in wildcards_dict.items():
+        for idx, item in enumerate(vec):
+            if (key == "subject" and item not in {row["Subject"] for row in SPECIMENS.values()}) or \
+                (key == "chain_type" and item not in {row["Type"] for row in SAMPLES.values()}) or \
+                (key == "specimen" and item not in SPECIMENS.keys()) or \
+                (key == "antibody_lineage" and item not in ANTIBODY_LINEAGES.keys()):
+                removes.add(idx)
+    # (careful, need to remove consistently across all wildcards)
+    wildcards_dict_out = {}
+    for key, vec in wildcards_dict.items():
+        wildcards_dict_out[key] = [item for idx, item in enumerate(vec) if idx not in removes]
+    return wildcards_dict_out
+
+AVAILABLE_SONAR_ISLANDS = filter_wildcards_by_metadata(dict(zip(
+    ["subject", "chain_type", "specimen", "antibody_lineage", "dummy"],
+    glob_wildcards("analysis/sonar/{subject}.{chain_type}/{specimen}/"
+        "output/sequences/nucleotide/islandSeqs_{dummy}.fa"))))
+
+AVAILABLE_SONAR_ANCESTORS = filter_wildcards_by_metadata(dict(zip(
+    ["subject", "chain_type", "antibody_lineage", "dummy"],
+    glob_wildcards("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/"
+        "output/sequences/nucleotide/longitudinal-{dummy}_inferredAncestors.fa"))))
+
+AVAILABLE_IGDISCOVER = dict(zip(
+    ["ref", "chain_type", "subject", "segment"],
+    glob_wildcards("analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/{segment}.fasta")))
+
+TARGET_REPORT_COUNTS = expand("analysis/reporting/counts/counts_by_{thing}.csv", thing=["sample", "run", "specimen"])
+TARGET_REPORT_SONAR_ISLAND_SUMMARIES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/island_stats_summary.csv", zip, **AVAILABLE_SONAR_ISLANDS)
+TARGET_REPORT_SONAR_MEMBERS_TABLES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/members.csv", zip, **AVAILABLE_SONAR_ISLANDS)
+TARGET_REPORT_SONAR_ANCESTORS_TABLES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/ancestors.csv", zip, **AVAILABLE_SONAR_ANCESTORS)
+TARGET_REPORT_IGDISCOVER_TREES = expand("analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.nex", zip, **AVAILABLE_IGDISCOVER)
+TARGET_REPORT_IGDISCOVER_FINAL_DBS = expand("analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.fasta", zip, **AVAILABLE_IGDISCOVER)
+
+rule all_report:
+    input: TARGET_REPORT_COUNTS +
+        TARGET_REPORT_SONAR_ISLAND_SUMMARIES +
+        TARGET_REPORT_SONAR_MEMBERS_TABLES +
+        TARGET_REPORT_SONAR_ANCESTORS_TABLES +
+        TARGET_REPORT_IGDISCOVER_TREES +
+        TARGET_REPORT_IGDISCOVER_FINAL_DBS
+
+rule report_counts:
+    input: TARGET_REPORT_COUNTS
+
+rule report_available_sonar_island_summaries:
+    input: TARGET_REPORT_SONAR_ISLAND_SUMMARIES
+
+rule report_available_sonar_members_tables:
+    input: TARGET_REPORT_SONAR_MEMBERS_TABLES
+
+rule report_available_sonar_ancestors_tables:
+    input: TARGET_REPORT_SONAR_ANCESTORS_TABLES
+
+rule report_available_igdiscover_trees:
+    input: TARGET_REPORT_IGDISCOVER_TREES
+
+rule report_available_igdiscover_final_dbs:
+    input: TARGET_REPORT_IGDISCOVER_FINAL_DBS
+
+### Counts
 
 # this rule has no inputs so it'll just take whatever files are available at
 # run time.
-rule counts_by_sample:
+rule report_counts_by_sample:
     output: "analysis/reporting/counts/counts_by_sample.csv"
     run: counts_by_sample(output[0])
 
-rule counts_by_run:
+rule report_counts_by_run:
     output: "analysis/reporting/counts/counts_by_run.csv"
     input: "analysis/reporting/counts/counts_by_sample.csv"
     run: counts_by_run(input[0], output[0])
 
-rule counts_by_specimen:
+rule report_counts_by_specimen:
     output: "analysis/reporting/counts/counts_by_specimen.csv"
     input: "analysis/reporting/counts/counts_by_sample.csv"
     run: counts_by_specimen(input[0], output[0])
 
-def counts_for(samp, runid, category):
+def report_counts_for(samp, runid, category):
     path = Path("analysis")/category/runid/f"{samp}.{category}.counts.csv"
     if path.exists():
         with open(path) as f_in:
@@ -191,7 +256,7 @@ def sonar_airr_counts(input_tsv, output_csv, fmt_islands=None, lineages=None):
         writer.writeheader()
         writer.writerow(counts)
 
-rule sonar_airr_counts:
+rule report_sonar_airr_counts:
     output: csv="analysis/reporting/counts/sonar/{subject}.{chain_type}.{specimen}.csv"
     input: tsv="analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv"
     run:
@@ -200,7 +265,7 @@ rule sonar_airr_counts:
         lineages = [lineage for lineage, attrs in ANTIBODY_LINEAGES.items() if attrs["Subject"] == wildcards.subject]
         sonar_airr_counts(input.tsv, output.csv, fmt_islands, lineages)
 
-rule sonar_airr_counts_by_subject_and_type:
+rule report_sonar_airr_counts_by_subject_and_type:
     output: touch("analysis/reporting/counts/sonar/{subject}.{chain_type}.done")
     input: lambda w: expand("analysis/reporting/counts/sonar/{{subject}}.{{chain_type}}.{specimen}.csv", specimen={samp["Specimen"] for samp in SAMPLES.values() if samp["SpecimenAttrs"]["Subject"] == w.subject and samp["Type"] == w.chain_type})
 
@@ -254,79 +319,7 @@ def counts_by_specimen(input_csv, output_csv):
         writer.writeheader()
         writer.writerows(rows)
 
-
-### FastQC
-
-rule fastqc_merge:
-    input: expand("analysis/reporting/fastqc/merge/{run}/{sample}_fastqc.html", zip, run=[attrs["Run"] for attrs in SAMPLES.values() if attrs["Run"]], sample=[attrs["Sample"] for attrs in SAMPLES.values() if attrs["Run"]])
-
-rule fastqc_reads:
-    input: expand("analysis/reporting/fastqc/reads/{run}/Undetermined_S0_L001_{rp}_001_fastqc.html", run=RUNS_FOR_IGSEQ, rp=["I1", "R1", "R2"])
-
-rule fastqc:
-    output: "analysis/reporting/fastqc/{path}_fastqc.html"
-    input: "analysis/{path}.fastq.gz"
-    threads: 8
-    shell: "fastqc -t {threads} {input} -o $(dirname {output})"
-
 ### SONAR Members and Ancestors
-
-rule sonar_island_stats:
-    """Condense the full ID/DIV stats to just those for one island and sumamrize across antibodies."""
-    output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv"
-    input:
-        iddiv=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.alt.tab"),
-        fasta=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
-    run:
-        # just calculate relative to the members of this lineage (for cases
-        # where there's more than one)
-        mabs = [attrs["AntibodyIsolate"] for attrs in ANTIBODY_ISOLATES.values() if attrs["AntibodyLineage"] == wildcards.antibody_lineage]
-        fp_output = output[0]
-        fp_input_iddiv = input.iddiv[0]
-        fp_input_fasta = input.fasta[0]
-        timepoint = [attrs["Timepoint"] for spec, attrs in SPECIMENS.items() if spec == wildcards.specimen][0]
-        fieldnames = ["specimen", "timepoint", "sequence_id", "length", "n_count", "v_gene", "germ_div", "ab_id_min", "ab_id_median", "ab_id_max"]
-        # outer dict: seq ID to attributes
-        # each inner dict: key/val pairs from sequence descriptions
-        descs = {}
-        seqs = {}
-        with open(fp_input_fasta) as f_in:
-            for record in SeqIO.parse(f_in, "fasta"):
-                descs[record.id] = igseqhelper.util.parse_seq_desc(record.description)
-                seqs[record.id] = str(record.seq)
-        desc_keys = [val.keys() for val in descs.values()]
-        desc_keys = sorted(list(set(itertools.chain(*desc_keys))))
-        fieldnames += desc_keys
-        with open(fp_input_iddiv) as f_in, open(fp_output, "wt") as f_out:
-            reader = csv.DictReader(f_in, delimiter="\t")
-            writer = csv.DictWriter(f_out, fieldnames=fieldnames, lineterminator="\n")
-            writer.writeheader()
-            for row in reader:
-                if row["sequence_id"] not in descs.keys():
-                    continue
-                vals = [float(val) for key, val in row.items() if key in mabs]
-                if vals:
-                    ab_min = min(vals)
-                    ab_med = round(median(vals), 4)
-                    ab_max = max(vals)
-                else:
-                    ab_min = ''
-                    ab_med = ''
-                    ab_max = ''
-                row_out = {
-                    "specimen": wildcards.specimen,
-                    "timepoint": timepoint,
-                    "sequence_id": row["sequence_id"],
-                    "length": len(seqs[row["sequence_id"]]),
-                    "n_count": len(re.sub("[^N]", "", seqs[row["sequence_id"]])),
-                    "v_gene": row["v_gene"],
-                    "germ_div": row["germ_div"],
-                    "ab_id_min": ab_min,
-                    "ab_id_median": ab_med,
-                    "ab_id_max": ab_max}
-                for key in desc_keys:
-                    row_out[key] = descs[row["sequence_id"]].get(key, "")
-                writer.writerow(row_out)
 
 def sonar_island_summary(fp_output_csv, fps_input_csv):
     fieldnames = [
@@ -400,13 +393,70 @@ def _sonar_island_summary_row(fp_in):
             "has_n": 0}
     return row_out
 
-rule sonar_island_summary:
+rule report_sonar_island_summary:
     """Further condense ID/DIV stats to one file per lineage."""
     output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/island_stats_summary.csv"
     input: lambda w: input_helper_sonar(w, "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv")
     run: sonar_island_summary(output[0], input)
 
-rule sonar_members_table:
+rule report_sonar_island_stats:
+    """Condense the full ID/DIV stats to just those for one island and sumamrize across antibodies."""
+    output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv"
+    input:
+        iddiv=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.alt.tab"),
+        fasta=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
+    run:
+        # just calculate relative to the members of this lineage (for cases
+        # where there's more than one)
+        mabs = [attrs["AntibodyIsolate"] for attrs in ANTIBODY_ISOLATES.values() if attrs["AntibodyLineage"] == wildcards.antibody_lineage]
+        fp_output = output[0]
+        fp_input_iddiv = input.iddiv[0]
+        fp_input_fasta = input.fasta[0]
+        timepoint = [attrs["Timepoint"] for spec, attrs in SPECIMENS.items() if spec == wildcards.specimen][0]
+        fieldnames = ["specimen", "timepoint", "sequence_id", "length", "n_count", "v_gene", "germ_div", "ab_id_min", "ab_id_median", "ab_id_max"]
+        # outer dict: seq ID to attributes
+        # each inner dict: key/val pairs from sequence descriptions
+        descs = {}
+        seqs = {}
+        with open(fp_input_fasta) as f_in:
+            for record in SeqIO.parse(f_in, "fasta"):
+                descs[record.id] = igseqhelper.util.parse_seq_desc(record.description)
+                seqs[record.id] = str(record.seq)
+        desc_keys = [val.keys() for val in descs.values()]
+        desc_keys = sorted(list(set(itertools.chain(*desc_keys))))
+        fieldnames += desc_keys
+        with open(fp_input_iddiv) as f_in, open(fp_output, "wt") as f_out:
+            reader = csv.DictReader(f_in, delimiter="\t")
+            writer = csv.DictWriter(f_out, fieldnames=fieldnames, lineterminator="\n")
+            writer.writeheader()
+            for row in reader:
+                if row["sequence_id"] not in descs.keys():
+                    continue
+                vals = [float(val) for key, val in row.items() if key in mabs]
+                if vals:
+                    ab_min = min(vals)
+                    ab_med = round(median(vals), 4)
+                    ab_max = max(vals)
+                else:
+                    ab_min = ''
+                    ab_med = ''
+                    ab_max = ''
+                row_out = {
+                    "specimen": wildcards.specimen,
+                    "timepoint": timepoint,
+                    "sequence_id": row["sequence_id"],
+                    "length": len(seqs[row["sequence_id"]]),
+                    "n_count": len(re.sub("[^N]", "", seqs[row["sequence_id"]])),
+                    "v_gene": row["v_gene"],
+                    "germ_div": row["germ_div"],
+                    "ab_id_min": ab_min,
+                    "ab_id_median": ab_med,
+                    "ab_id_max": ab_max}
+                for key in desc_keys:
+                    row_out[key] = descs[row["sequence_id"]].get(key, "")
+                writer.writerow(row_out)
+
+rule report_sonar_members_table:
     output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/members.csv"
     input:
         lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
@@ -455,8 +505,7 @@ rule sonar_members_table:
             writer.writeheader()
             writer.writerows(rows)
 
-
-rule sonar_ancestors_table:
+rule report_sonar_ancestors_table:
     """Convert inferred ancestor FASTA into a table with detected clade details.
 
     This can be used as input to the Inferred sheet.
@@ -530,11 +579,17 @@ rule sonar_ancestors_table:
             writer.writeheader()
             writer.writerows(rows)
 
+### IgDiscover
+
 # See also the final/dendrogram_{segment}.pdf files from IgDiscover
-rule igdiscover_tree:
-    output: "analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.tree.nex"
+rule report_igdiscover_tree:
+    output: "analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.nex"
     input:
-        # IGG_IGM from sonar rules
-        after=lambda w: expand("analysis/igdiscover/{{ref}}/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type]),
+        after="analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.fasta",
         before="analysis/igdiscover/{ref}/{chain_type}/{segment}.fasta"
     shell: "igseq tree before={input.before} after={input.after} {output}"
+
+rule report_igdiscover_final_db:
+    output: "analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.fasta"
+    input: "analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/{segment}.fasta"
+    shell: "cp {input} {output}"
