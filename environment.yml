@@ -11,5 +11,6 @@ dependencies:
   - seqmagick>=0.8.4
   - fastqc>=0.11.9
   - fasttree>=2.1.11
+  - plotnine>=0.10.1
   # igseq
   - igseq>=0.5.1
