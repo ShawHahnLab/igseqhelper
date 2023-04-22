@@ -3,6 +3,7 @@ from statistics import median
 from collections import defaultdict
 from csv import DictWriter, DictReader
 from Bio import SeqIO
+import igseqhelper.util
 
 # Just a helper for the below rules.
 # Filter out any entries that don't match the metadata since we rely on the
@@ -41,9 +42,13 @@ AVAILABLE_MININGD = filter_wildcards_by_metadata(dict(zip(
     ["subject"], glob_wildcards("analysis/mining-d/{subject}.output.fasta"))))
 
 TARGET_REPORT_COUNTS = expand("analysis/reporting/counts/counts_by_{thing}.csv", thing=["sample", "run", "specimen"])
-TARGET_REPORT_SONAR_ISLAND_SUMMARIES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/island_stats_summary.csv", zip, **AVAILABLE_SONAR_ISLANDS)
-TARGET_REPORT_SONAR_MEMBERS_TABLES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/members.csv", zip, **AVAILABLE_SONAR_ISLANDS)
-TARGET_REPORT_SONAR_ANCESTORS_TABLES = expand("analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/ancestors.csv", zip, **AVAILABLE_SONAR_ANCESTORS)
+TARGET_REPORT_SONAR_ISLAND_SUMMARIES = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/island_stats_summary.csv", zip, **AVAILABLE_SONAR_ISLANDS)
+TARGET_REPORT_SONAR_MEMBERS_TABLES = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/members.csv", zip, **AVAILABLE_SONAR_ISLANDS)
+TARGET_REPORT_SONAR_IGPHYML_COLLECTED = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_collected.csv", zip, **AVAILABLE_SONAR_ANCESTORS)
+TARGET_REPORT_SONAR_IGPHYML_ANCESTORS = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.csv", zip, **AVAILABLE_SONAR_ANCESTORS)
+TARGET_REPORT_SONAR_IGPHYML_ALIGNED = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_aligned.fa", zip, **AVAILABLE_SONAR_ANCESTORS)
+TARGET_REPORT_SONAR_IGPHYML_TREES = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_tree.tree", zip, **AVAILABLE_SONAR_ANCESTORS)
+TARGET_REPORT_SONAR_IGPHYML_TREEPDFS = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_tree.pdf", zip, **AVAILABLE_SONAR_ANCESTORS)
 TARGET_REPORT_IGDISCOVER_TREES = expand("analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.nex", zip, **AVAILABLE_IGDISCOVER)
 TARGET_REPORT_IGDISCOVER_FINAL_DBS = expand("analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.fasta", zip, **AVAILABLE_IGDISCOVER)
 TARGET_REPORT_MININGD_FASTAS = expand("analysis/reporting/mining-d/{subject}/{subject}.fasta", zip, **AVAILABLE_MININGD)
@@ -53,11 +58,28 @@ rule all_report:
     input: TARGET_REPORT_COUNTS +
         TARGET_REPORT_SONAR_ISLAND_SUMMARIES +
         TARGET_REPORT_SONAR_MEMBERS_TABLES +
-        TARGET_REPORT_SONAR_ANCESTORS_TABLES +
+        TARGET_REPORT_SONAR_IGPHYML_COLLECTED +
+        TARGET_REPORT_SONAR_IGPHYML_ANCESTORS +
+        TARGET_REPORT_SONAR_IGPHYML_ALIGNED +
+        TARGET_REPORT_SONAR_IGPHYML_TREES +
+        TARGET_REPORT_SONAR_IGPHYML_TREEPDFS +
         TARGET_REPORT_IGDISCOVER_TREES +
         TARGET_REPORT_IGDISCOVER_FINAL_DBS +
         TARGET_REPORT_MININGD_TREES +
         ["analysis/reporting/mining-d/all.nex"]
+
+rule report_available_sonar:
+    input: TARGET_REPORT_SONAR_ISLAND_SUMMARIES +
+        TARGET_REPORT_SONAR_MEMBERS_TABLES +
+        TARGET_REPORT_SONAR_IGPHYML_COLLECTED +
+        TARGET_REPORT_SONAR_IGPHYML_ANCESTORS +
+        TARGET_REPORT_SONAR_IGPHYML_ALIGNED +
+        TARGET_REPORT_SONAR_IGPHYML_TREES +
+        TARGET_REPORT_SONAR_IGPHYML_TREEPDFS
+
+rule report_available_igdiscover:
+    input: TARGET_REPORT_IGDISCOVER_TREES +
+        TARGET_REPORT_IGDISCOVER_FINAL_DBS
 
 rule report_counts:
     input: TARGET_REPORT_COUNTS
@@ -68,8 +90,20 @@ rule report_available_sonar_island_summaries:
 rule report_available_sonar_members_tables:
     input: TARGET_REPORT_SONAR_MEMBERS_TABLES
 
-rule report_available_sonar_ancestors_tables:
-    input: TARGET_REPORT_SONAR_ANCESTORS_TABLES
+rule report_available_sonar_igphyml_collected:
+    input: TARGET_REPORT_SONAR_IGPHYML_COLLECTED
+
+rule report_available_sonar_igphyml_ancestors:
+    input: TARGET_REPORT_SONAR_IGPHYML_ANCESTORS
+
+rule report_available_sonar_igphyml_aligned:
+    input: TARGET_REPORT_SONAR_IGPHYML_ALIGNED
+
+rule report_available_sonar_igphyml_trees:
+    input: TARGET_REPORT_SONAR_IGPHYML_TREES
+
+rule report_available_sonar_igphyml_treepdfs:
+    input: TARGET_REPORT_SONAR_IGPHYML_TREEPDFS
 
 rule report_available_igdiscover_trees:
     input: TARGET_REPORT_IGDISCOVER_TREES
@@ -334,6 +368,34 @@ def counts_by_specimen(input_csv, output_csv):
 
 ### SONAR Members and Ancestors
 
+# dynamic rules for per-lineage targets
+for antibody_lineage, attrs in ANTIBODY_LINEAGES.items():
+    chain_types = ["gamma"]
+    try:
+        chain_types.append({"L": "lambda", "K": "kappa"}[attrs["VL"][2]])
+    except:
+        pass
+    things = [
+        "island_stats_summary.csv",
+        "rearrangements_summary.tsv",
+        "members.csv",
+        "igphyml_collected.csv",
+        "igphyml_ancestors.csv",
+        "igphyml_aligned.fa",
+        "igphyml_tree.tree",
+        "igphyml_tree.pdf"]
+    inputs = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/{thing}",
+        antibody_lineage = antibody_lineage, chain_type = chain_types, thing = things)
+    rule:
+        name: f"report_sonar_for_{antibody_lineage}"
+        input: inputs
+    for chain_type in chain_types:
+        inputs = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/{thing}",
+            antibody_lineage = antibody_lineage, chain_type = chain_type, thing = things)
+        rule:
+            name: f"report_sonar_for_{antibody_lineage}.{chain_type}"
+            input: inputs
+
 def sonar_island_summary(fp_output_csv, fps_input_csv):
     fieldnames = [
         "specimen", "timepoint", "total", "has_n",
@@ -407,14 +469,14 @@ def _sonar_island_summary_row(fp_in):
     return row_out
 
 rule report_sonar_island_summary:
-    """Further condense ID/DIV stats to one file per lineage."""
-    output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/island_stats_summary.csv"
-    input: lambda w: input_helper_sonar(w, "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv")
+    """Further condense SONAR ID/DIV stats to one file per lineage."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/island_stats_summary.csv"
+    input: lambda w: input_helper_sonar(w, "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv")
     run: sonar_island_summary(output[0], input)
 
 rule report_sonar_island_stats:
-    """Condense the full ID/DIV stats to just those for one island and sumamrize across antibodies."""
-    output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv"
+    """Condense the full SONAR ID/DIV stats to just those for one island and sumamrize across antibodies."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/{specimen}.island_stats.csv"
     input:
         iddiv=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.alt.tab"),
         fasta=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
@@ -469,8 +531,50 @@ rule report_sonar_island_stats:
                     row_out[key] = descs[row["sequence_id"]].get(key, "")
                 writer.writerow(row_out)
 
+rule report_sonar_member_rearrangements_summary:
+    """Further condense SONAR rearrangements tables to one file per lineage."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/rearrangements_summary.tsv"
+    input: lambda w: input_helper_sonar(w, "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/{specimen}.rearrangements.tsv")
+    run:
+        rows_out = []
+        for path in input:
+            with open(path) as f_in:
+                for row in DictReader(f_in, delimiter="\t"):
+                    rows_out.append(row)
+        rows_out = sorted(
+            rows_out, key=lambda r: (r["timepoint"], r["specimen"], r["sequence_id"]))
+        with open(output[0], "wt") as f_out:
+            writer = DictWriter(
+                f_out, fieldnames=rows_out[0].keys(),
+                delimiter="\t", lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows_out)
+
+rule report_sonar_member_rearrangements:
+    """Filter SONAR rearrangements table per specimen to just those for lineage members."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/{specimen}.rearrangements.tsv"
+    input:
+        seqids=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/islandSeqs_{antibody_lineage}.txt"),
+        tsv=lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv")
+    run:
+        tp_map = {attrs["Specimen"]: attrs["Timepoint"] for attrs in SPECIMENS.values()}
+        with open(input.seqids[0]) as f_in:
+            seq_ids = [line.strip() for line in f_in]
+        with open(input.tsv[0]) as f_in, open(output[0], "wt") as f_out:
+            reader = DictReader(f_in, delimiter="\t")
+            fields = ["specimen", "timepoint"] + reader.fieldnames
+            writer = DictWriter(
+                f_out, fieldnames=fields,
+                delimiter="\t", lineterminator="\n")
+            writer.writeheader()
+            for row in reader:
+                if row["sequence_id"] in seq_ids:
+                    row["specimen"] = wildcards.specimen
+                    row["timepoint"] = tp_map[wildcards.specimen]
+                    writer.writerow(row)
+
 rule report_sonar_members_table:
-    output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/members.csv"
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/members.csv"
     input:
         lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
     run:
@@ -518,15 +622,68 @@ rule report_sonar_members_table:
             writer.writeheader()
             writer.writerows(rows)
 
-rule report_sonar_ancestors_table:
+rule report_sonar_igphyml_collected_table:
+    """Convert SONAR module 3 collected FASTA into a table."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_collected.csv"
+    input: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_collected.fa"
+    run:
+        rows = []
+        with open(input[0]) as f_in:
+            for record in SeqIO.parse(f_in, "fasta"):
+                fields = igseqhelper.util.parse_seq_desc(record.description)
+                tp_label = re.sub("-.*", "", record.id)
+                tp_match = re.match(r"wk(N?)([0-9]+)\.?[0-9]*", tp_label)
+                tp = ""
+                if tp_match:
+                    tp = int(tp_match.group(2))
+                    if tp_match.group(1) == "N":
+                        tp = - tp
+                attrs = {
+                    "timepoint": tp,
+                    "timepoint_label": tp_label,
+                    "sequence_id": record.id,
+                    "sequence": str(record.seq),
+                    }
+                attrs.update(fields)
+                rows.append(attrs)
+        keys = [row.keys() for row in rows]
+        keys = list(set(itertools.chain(*keys)))
+        field_defaults = [
+            "timepoint", "timepoint_label", "num_observations", "num_timepoints", "total_observations",
+            "persist", "last_timepoint", "sequence_id", "sequence"]
+        def fieldsort(k):
+            try:
+                return field_defaults.index(k)
+            except ValueError:
+                return len(keys)
+        keys = sorted(keys, key=fieldsort)
+        with open(output[0], "w") as f_out:
+            writer = DictWriter(f_out, fieldnames=keys, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
+
+rule report_sonar_igphyml_collected:
+    """Copy SONAR module 3 collected FASTA.
+
+    This information is subtly different from the per-specimen members.csv
+    files, because repeated observations of the same sequence between
+    timepoints are collapsed down to the earliest observation and the details
+    noted in the sequence descriptions.
+    """
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_collected.fa"
+    input:
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa")
+    # Using igseq convert here and elsewhere instead of just cp to unwrap any
+    # of these that are wrapped
+    shell: "igseq convert {input} {output}"
+
+rule report_sonar_igphyml_ancestors_table:
     """Convert inferred ancestor FASTA into a table with detected clade details.
 
     This can be used as input to the Inferred sheet.
     """
-    output: "analysis/reporting/by-lineage/{antibody_lineage}.{chain_type}/ancestors.csv"
-    input: lambda w: expand(\
-        "analysis/sonar/{subject}.{{chain_type}}/longitudinal-{{antibody_lineage}}/output/sequences/nucleotide/longitudinal-{{antibody_lineage}}_inferredAncestors.fa", \
-        subject=ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"])
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.csv"
+    input: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.fa"
     run:
         locus = {"gamma": "H", "lambda": "L", "kappa": "K", "mu": "H"}[wildcards.chain_type]
         chain = "heavy" if locus == "H" else "light"
@@ -591,6 +748,34 @@ rule report_sonar_ancestors_table:
             writer = DictWriter(f_out, fieldnames=fields, lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
+
+rule report_sonar_igphyml_ancestors:
+    """Copy SONAR module 3 inferred ancestors FASTA."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.fa"
+    input:
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa")
+    shell: "igseq convert {input} {output}"
+
+rule report_sonar_igphyml_alignment:
+    """Copy SONAR module 3 alignment FASTA."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_aligned.fa"
+    input:
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/work/phylo/longitudinal-{antibody_lineage}_aligned.afa")
+    shell: "igseq convert {input} {output}"
+
+rule report_sonar_igphyml_tree_pdf:
+    """Copy SONAR module 3 tree PDF."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_tree.pdf"
+    input:
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree.pdf")
+    shell: "cp {input} {output}"
+
+rule report_sonar_igphyml_tree:
+    """Copy SONAR module 3 newick tree file."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_tree.tree"
+    input:
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree")
+    shell: "cp {input} {output}"
 
 ### IgDiscover
 
