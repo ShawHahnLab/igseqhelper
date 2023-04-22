@@ -46,6 +46,7 @@ TARGET_REPORT_SONAR_ISLAND_SUMMARIES = expand("analysis/reporting/sonar/{antibod
 TARGET_REPORT_SONAR_MEMBERS_TABLES = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/members.csv", zip, **AVAILABLE_SONAR_ISLANDS)
 TARGET_REPORT_SONAR_IGPHYML_COLLECTED = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_collected.csv", zip, **AVAILABLE_SONAR_ANCESTORS)
 TARGET_REPORT_SONAR_IGPHYML_ANCESTORS = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.csv", zip, **AVAILABLE_SONAR_ANCESTORS)
+TARGET_REPORT_SONAR_IGPHYML_ANCS_COMMON = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.common.csv", zip, **AVAILABLE_SONAR_ANCESTORS)
 TARGET_REPORT_SONAR_IGPHYML_ALIGNED = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_aligned.fa", zip, **AVAILABLE_SONAR_ANCESTORS)
 TARGET_REPORT_SONAR_IGPHYML_TREES = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_tree.tree", zip, **AVAILABLE_SONAR_ANCESTORS)
 TARGET_REPORT_SONAR_IGPHYML_TREEPDFS = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_tree.pdf", zip, **AVAILABLE_SONAR_ANCESTORS)
@@ -60,6 +61,7 @@ rule all_report:
         TARGET_REPORT_SONAR_MEMBERS_TABLES +
         TARGET_REPORT_SONAR_IGPHYML_COLLECTED +
         TARGET_REPORT_SONAR_IGPHYML_ANCESTORS +
+        TARGET_REPORT_SONAR_IGPHYML_ANCS_COMMON +
         TARGET_REPORT_SONAR_IGPHYML_ALIGNED +
         TARGET_REPORT_SONAR_IGPHYML_TREES +
         TARGET_REPORT_SONAR_IGPHYML_TREEPDFS +
@@ -73,6 +75,7 @@ rule report_available_sonar:
         TARGET_REPORT_SONAR_MEMBERS_TABLES +
         TARGET_REPORT_SONAR_IGPHYML_COLLECTED +
         TARGET_REPORT_SONAR_IGPHYML_ANCESTORS +
+        TARGET_REPORT_SONAR_IGPHYML_ANCS_COMMON +
         TARGET_REPORT_SONAR_IGPHYML_ALIGNED +
         TARGET_REPORT_SONAR_IGPHYML_TREES +
         TARGET_REPORT_SONAR_IGPHYML_TREEPDFS
@@ -95,6 +98,9 @@ rule report_available_sonar_igphyml_collected:
 
 rule report_available_sonar_igphyml_ancestors:
     input: TARGET_REPORT_SONAR_IGPHYML_ANCESTORS
+
+rule report_available_sonar_igphyml_ancs_common:
+    input: TARGET_REPORT_SONAR_IGPHYML_ANCS_COMMON
 
 rule report_available_sonar_igphyml_aligned:
     input: TARGET_REPORT_SONAR_IGPHYML_ALIGNED
@@ -453,6 +459,7 @@ for antibody_lineage, attrs in ANTIBODY_LINEAGES.items():
         "members.csv",
         "igphyml_collected.csv",
         "igphyml_ancestors.csv",
+        "igphyml_ancestors.common.fa",
         "igphyml_aligned.fa",
         "igphyml_tree.tree",
         "igphyml_tree.pdf"]
@@ -821,6 +828,14 @@ rule report_sonar_igphyml_ancestors_table:
             writer.writeheader()
             writer.writerows(rows)
 
+rule report_sonar_igphyml_ancestors_common:
+    """Make verison of SONAR module 3 inferred ancestors FASTA filtered to mAb ancestors."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.common.fa"
+    input:
+        ancs="analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.fa",
+        mabs="analysis/reporting/sonar/{antibody_lineage}.{chain_type}/mabs.csv"
+    shell: "sonar_ancs_common.py --ancestors {input.ancs} --clade {input.mabs} --output {output}"
+
 rule report_sonar_igphyml_ancestors:
     """Copy SONAR module 3 inferred ancestors FASTA."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.fa"
@@ -848,6 +863,29 @@ rule report_sonar_igphyml_tree:
     input:
         lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree")
     shell: "cp {input} {output}"
+
+rule report_sonar_mabs:
+    # not a SONAR output, exactly, but other outputs are relative to this
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/mabs.csv"
+    run:
+        chain = "heavy"
+        if wildcards.chain_type in ["kappa", "lambda"]:
+            chain = "light"
+        with open(output[0], "w") as f_out:
+            writer = DictWriter(
+                f_out,
+                fieldnames=["timepoint", "chain", "sequence_id", "sequence"],
+                lineterminator="\n")
+            writer.writeheader()
+            for attrs in ANTIBODY_ISOLATES.values():
+                if attrs["AntibodyLineage"] == wildcards.antibody_lineage:
+                    seq = attrs[chain.capitalize() + "Seq"]
+                    if seq:
+                        writer.writerow({
+                            "timepoint": attrs["Timepoint"],
+                            "chain": chain,
+                            "sequence_id": attrs["AntibodyIsolate"],
+                            "sequence": seq})
 
 ### IgDiscover
 
