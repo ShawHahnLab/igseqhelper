@@ -3,8 +3,10 @@ Processing steps from raw read data to finalized antibody results.
 """
 
 BASEDIR = Path(str(workflow.current_basedir))
+import os
 import sys
 sys.path.append(str(BASEDIR/"python"))
+os.environ["PATH"] += f":{BASEDIR}/scripts"
 
 wildcard_constraints:
     # project metadata

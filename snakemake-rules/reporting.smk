@@ -366,6 +366,78 @@ def counts_by_specimen(input_csv, output_csv):
         writer.writeheader()
         writer.writerows(rows)
 
+### Lineages
+
+def report_lineages_divergence_input(w):
+    # queries
+    chain_types = ["gamma"]
+    for attrs in ANTIBODY_LINEAGES.values():
+        if attrs["AntibodyLineage"] == w.antibody_lineage:
+            try:
+                chain_types.append({"L": "lambda", "K": "kappa"}[attrs["VL"][2]])
+            except:
+                pass
+    targets = {
+        "members": expand(
+            "analysis/reporting/sonar/{{antibody_lineage}}.{chain_type}/igphyml_collected.csv",
+            chain_type = chain_types),
+        "mabs": ["analysis/reporting/by-lineage/{antibody_lineage}.mabs.csv"]}
+    # refs
+    mktargets = lambda ct, segs: expand(
+        "analysis/reporting/igdiscover/sonarramesh/{chain_type}/{subject}/{segment}.fasta",
+        antibody_lineage=w.antibody_lineage, chain_type=ct, subject=subject, segment=segs)
+    light_ct = None
+    for attrs in ANTIBODY_LINEAGES.values():
+        if attrs["AntibodyLineage"] == w.antibody_lineage:
+            subject = attrs["Subject"]
+            try:
+                light_ct = {"L": "lambda", "K": "kappa"}[attrs["VL"][2]]
+                break
+            except:
+                pass
+    else:
+        raise ValueError
+    targets["refs"] = mktargets("mu", ["V", "D", "J"])
+    if light_ct:
+        targets["refs"] += mktargets(light_ct, ["V", "J"])
+    return targets
+
+def report_lineages_divergence_param_refs(w, input):
+    # to condense V/D/J to just parent dirs
+    return list({Path(path).parent for path in input.refs})
+
+rule report_lineages_divergence_plot:
+    output: "analysis/reporting/by-lineage/{antibody_lineage}.divergence.pdf"
+    input: "analysis/reporting/by-lineage/{antibody_lineage}.divergence.csv"
+    shell: "germ_div.py -Q {input} -o {output}"
+
+rule report_lineages_divergence:
+    output: "analysis/reporting/by-lineage/{antibody_lineage}.divergence.csv"
+    input: unpack(report_lineages_divergence_input)
+    params:
+        refs=report_lineages_divergence_param_refs
+    shell: "germ_div.py -S rhesus -r {params.refs} -Q {input.members} mabs={input.mabs} -G Member mabs=mAb -o {output}"
+
+rule report_lineages_mabs:
+    output: temp("analysis/reporting/by-lineage/{antibody_lineage}.mabs.csv")
+    run:
+        with open(output[0], "w") as f_out:
+            writer = DictWriter(
+                f_out,
+                fieldnames=["timepoint", "chain", "sequence_id", "sequence"],
+                lineterminator="\n")
+            writer.writeheader()
+            for attrs in ANTIBODY_ISOLATES.values():
+                if attrs["AntibodyLineage"] == wildcards.antibody_lineage:
+                    for chain in ["heavy", "light"]:
+                        seq = attrs[chain.capitalize() + "Seq"]
+                        if seq:
+                            writer.writerow({
+                                "timepoint": attrs["Timepoint"],
+                                "chain": chain,
+                                "sequence_id": attrs["AntibodyIsolate"] + f"_{chain}",
+                                "sequence": seq})
+
 ### SONAR Members and Ancestors
 
 # dynamic rules for per-lineage targets
