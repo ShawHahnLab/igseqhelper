@@ -8,7 +8,7 @@ jobs:
           path: igseqhelper
       - restore_cache:
           keys:
-            - cache-{{ checksum "igseqhelper/environment.yml" }}
+            - cache-{{ checksum "igseqhelper/conda/igseqhelper.yml" }}
       - run:
           name: Install
           command: |
@@ -16,12 +16,12 @@ jobs:
               wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
               bash Miniconda3-latest-Linux-x86_64.sh -b
               ~/miniconda3/bin/conda install -c conda-forge mamba --quiet
-              ~/miniconda3/bin/mamba env update --file igseqhelper/environment.yml --quiet
+              ~/miniconda3/bin/mamba env update --file igseqhelper/conda/igseqhelper.yml --quiet
             fi
           no_output_timeout: 20m
       - save_cache:
           paths: [ ~/miniconda3 ]
-          key: cache-{{ checksum "igseqhelper/environment.yml" }}
+          key: cache-{{ checksum "igseqhelper/conda/igseqhelper.yml" }}
       - run:
           name: Test python package
           command: |

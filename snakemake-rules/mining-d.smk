@@ -29,7 +29,7 @@ rule miningd_get_cdrh3s:
 rule miningd_run:
     output: "analysis/mining-d/{subject}.output.fasta" 
     input: "analysis/mining-d/subject_{subject}.igm.mu.cdr3.fasta"
-    conda: str(BASEDIR/"mining-d.yml")
+    conda: str(BASEDIR/"conda/mining-d.yml")
     threads: 8
     params:
         # The authors thought 600 was a good choice for rhesus macaque and
