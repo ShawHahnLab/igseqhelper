@@ -275,7 +275,7 @@ def _smooth_v_calls(rows):
         rows_out.append(row)
     return rows_out
 
-def germ_div_plot(rows, jitter_width=None, jitter_height=None):
+def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None, note_partial_seqs=False):
     tp_breaks = {round(row["timepoint"]) for row in rows}
     tp_breaks.add(0)
     tp_breaks = sorted(list(tp_breaks))
@@ -289,10 +289,16 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None):
         # similar idea for jitter height
         jitter_height = max_div / 100.0
 
+    plot_attrs = {"x": "timepoint", "y": "divergence", "color": "group"}
+    if note_partial_seqs:
+        plot_attrs["shape"] = "partial"
     plt = p9.ggplot(
         DataFrame(rows),
-        p9.aes(x = "timepoint", y = "divergence", color = "group", shape = "partial")) + \
+        p9.aes(**plot_attrs)) + \
         p9.geom_jitter(width=jitter_width, height=jitter_height) + \
+        p9.guides(
+            color=p9.guide_legend(title="Category"),
+            shape=False) + \
         p9.labs(
             x = "Timepoint",
             y = "V Divergence (%)") + \
@@ -301,6 +307,14 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None):
             ylim=[0, max_div]) + \
         p9.scale_x_continuous(breaks=tp_breaks) + \
         p9.theme_bw()
+    # Use automatic group colors if none supplied and there are exactly two
+    group_names = list({row["group"] for row in rows})
+    if len(group_names) == 2 and not group_colors:
+        group_names = sorted(group_names, key=lambda x: "member" not in x.lower())
+        group_colors = {group_names[0]: "#000000", group_names[1]: "#ff0000"}
+    if group_colors:
+        plt += p9.scale_color_manual(values=group_colors)
+    # If multiple loci, facet plot by locus
     loci = {row["locus"] for row in rows}
     if len(loci) > 1:
         LOGGER.info("Faceting plot by locus (%s)", loci)
