@@ -101,9 +101,9 @@ def __setup_arg_parser():
         "-T", "--timepoint", nargs="+", action=AggrAction, default=nonedict(),
         help="default timepoint to apply to subsequent file arguments")
     parser.add_argument(
-        "--plot-width", default=DEFAULTS["plot_width"], help="Width of plot if output is PDF")
+        "--plot-width", type=int, default=DEFAULTS["plot_width"], help="Width of plot if output is PDF")
     parser.add_argument(
-        "--plot-height", default=DEFAULTS["plot_height"], help="Height of plot if output is PDF")
+        "--plot-height", type=int, default=DEFAULTS["plot_height"], help="Height of plot if output is PDF")
     return parser
 
 def germ_div(
@@ -307,7 +307,8 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None
             ylim=[0, max_div]) + \
         p9.scale_x_continuous(breaks=tp_breaks) + \
         p9.theme_bw()
-    # Use automatic group colors if none supplied and there are exactly two
+    # Use specific default group colors if none supplied and there are exactly
+    # two (otherwise colors will be assigned automatically)
     group_names = list({row["group"] for row in rows})
     if len(group_names) == 2 and not group_colors:
         group_names = sorted(group_names, key=lambda x: "member" not in x.lower())
@@ -323,16 +324,22 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None
 
 def germ_div_output(rows, path_out, **kwargs):
     ext = Path(path_out).suffix.lower()
-    if ext == ".csv":
+    if ext == ".csv" or path_out == "-":
         for row in rows:
             if row["divergence"] is None:
                 row["divergence"] = ""
             else:
                 row["divergence"] = f"{row['divergence']:.6f}"
-        with open(path_out, "wt") as f_out:
-            writer = DictWriter(f_out, fieldnames = rows[0].keys(), lineterminator="\n")
+        try:
+            if path_out == "-":
+                handle = sys.stdout
+            else:
+                handle = open(path_out, "wt")
+            writer = DictWriter(handle, fieldnames = rows[0].keys(), lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
+        finally:
+            handle.close()
     elif ext == ".pdf":
         plt = germ_div_plot(rows)
         plt.save(path_out, **kwargs)
