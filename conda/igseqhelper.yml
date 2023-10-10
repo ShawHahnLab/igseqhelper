@@ -7,11 +7,11 @@ channels:
   - defaults
 dependencies:
   # general
-  - snakemake>=6.8.0
-  - seqmagick>=0.8.4
-  - fastqc>=0.11.9
-  - fasttree>=2.1.11
-  - plotnine>=0.10.1
+  - snakemake>=7.32,<8
+  - seqmagick>=0.8,<1
+  - fastqc>=0.12
+  - fasttree>=2.1
+  - plotnine>=0.10
   - pylint>=2.17,<3
   # igseq
   - igseq>=0.5.1
