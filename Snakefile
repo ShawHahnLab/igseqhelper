@@ -10,7 +10,7 @@ os.environ["PATH"] += f":{BASEDIR}/scripts"
 
 wildcard_constraints:
     # project metadata
-    sample="[A-Za-z0-9]+",
+    sample="[-A-Za-z0-9]+",
     specimen="[A-Za-z0-9]+",
     subject="[A-Za-z0-9]+",
     run="[-_A-Za-z0-9]+",
