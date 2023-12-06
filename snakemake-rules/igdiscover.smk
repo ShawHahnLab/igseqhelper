@@ -87,11 +87,58 @@ rule igdiscover_run:
         yaml="analysis/igdiscover/{ref}/{chain_type}/{subject}/igdiscover.yaml",
         r1="analysis/igdiscover/{ref}/{chain_type}/{subject}/reads.fastq.gz",
     log:
-        conda="analysis/igdiscover/{ref}.{chain_type}.{subject}.conda_build.txt"
+        conda="analysis/igdiscover/{ref}/{chain_type}/{subject}/igdiscover_run.conda_build.txt"
     conda: str(BASEDIR/"conda/igdiscover.yml")
     threads: 20
     shell:
         """
             conda list --explicit > {log.conda}
             cd $(dirname {output.stats})/.. && igdiscover run --cores {threads}
+        """
+
+# An extra step for kappa J specifically:
+#
+# We sometimes see an implausible number of slight variations on IGKJ2 reported
+# as novel alleles.  One IgDiscover author Martin Corcoran suggested more
+# stringent options for the J discovery setting, specifically 100% for J
+# coverage and 0.3 for the allele ratio (and suggested this may be related to
+# the relatively low expression of specific genes such as IGKJ2).  In my
+# testing it's the coverage setting that seems to do the trick here.
+#
+# from igdiscover discoverjd --help:
+#
+#  --j-coverage PERCENT  Require that the sequence covers at least PERCENT of
+#                        the J gene. Default: 90 when --gene=J; 0 otherwise
+#  --allele-ratio RATIO  Required allele ratio. Works only for genes named
+#                        "NAME*ALLELE". Default: 0.2
+rule custom_j_discovery:
+    output:
+        tab="analysis/igdiscover/{ref}/{chain_type}/{subject}/custom_j_discovery/J.tab",
+        fasta="analysis/igdiscover/{ref}/{chain_type}/{subject}/custom_j_discovery/J.fasta"
+    input:
+        # (This command actually uses iteration-01's J.fasta and
+        # filtered.tsv.gz but I don't have those listed as part of the
+        # input/output paths in all this.  So I'll just request the output of
+        # my igdiscover rule.)
+        db_j="analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/J.fasta",
+    params:
+        db_j="analysis/igdiscover/{ref}/{chain_type}/{subject}/iteration-01/database/J.fasta",
+        tab="analysis/igdiscover/{ref}/{chain_type}/{subject}/iteration-01/filtered.tsv.gz",
+        jcov=100,
+        ratio=0.3
+    log:
+        conda="analysis/igdiscover/{ref}/{chain_type}/{subject}/custom_j_discovery/conda_build.txt"
+    conda: str(BASEDIR/"conda/igdiscover.yml")
+    shell:
+        """
+            arg_j_cov=""
+            if [[ "{params.jcov}" != "" ]]; then
+                arg_j_cov="--j-coverage {params.jcov}"
+            fi
+            arg_allele_ratio=""
+            if [[ "{params.ratio}" != "" ]]; then
+                arg_allele_ratio="--allele-ratio {params.ratio}"
+            fi
+            conda list --explicit > {log.conda}
+            igdiscover discoverjd --database {params.db_j} --gene J $arg_j_cov $arg_allele_ratio {params.tab} --fasta {output.fasta} > {output.tab}
         """
