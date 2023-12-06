@@ -86,9 +86,12 @@ rule igdiscover_run:
     input:
         yaml="analysis/igdiscover/{ref}/{chain_type}/{subject}/igdiscover.yaml",
         r1="analysis/igdiscover/{ref}/{chain_type}/{subject}/reads.fastq.gz",
+    log:
+        conda="analysis/igdiscover/{ref}.{chain_type}.{subject}.conda_build.txt"
     conda: str(BASEDIR/"conda/igdiscover.yml")
     threads: 20
     shell:
         """
+            conda list --explicit > {log.conda}
             cd $(dirname {output.stats})/.. && igdiscover run --cores {threads}
         """

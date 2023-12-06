@@ -4,4 +4,4 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - igdiscover>=0.12.3
+  - igdiscover>=0.15,<0.16
