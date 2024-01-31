@@ -192,8 +192,8 @@ def counts_by_sample(csv_out):
                     with open(path_phix) as f_in:
                         rows = list(DictReader(f_in))
                     phix[attrs["Run"]] = rows
-            samp_trim = counts_for(samp, attrs["Run"], "trim")
-            samp_merge = counts_for(samp, attrs["Run"], "merge")
+            samp_trim = report_counts_for(samp, attrs["Run"], "trim")
+            samp_merge = report_counts_for(samp, attrs["Run"], "merge")
             row = {
                 "Run": attrs["Run"],
                 "Subject": attrs["SpecimenAttrs"]["Subject"],
@@ -261,8 +261,7 @@ def counts_by_run(input_csv, output_csv):
             row["SampleSeqs"] = sum(row["SampleSeqs"]) if row["SampleSeqs"] else ""
             parts = [row["UnassignedSeqs"], row["SampleSeqs"]]
             parts = [p for p in parts if p]
-            if parts:
-                row["TotalSeqs"] = sum(parts)
+            row["TotalSeqs"] = sum(parts) if parts else ""
             row["UnassignedFraction"] = divide(row["UnassignedSeqs"], row["TotalSeqs"])
             row["PhixFraction"] = divide(row["PhixSeqs"], row["TotalSeqs"])
             del row["TotalSeqs"]
