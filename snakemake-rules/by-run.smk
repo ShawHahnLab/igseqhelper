@@ -188,13 +188,26 @@ def grouped_samples_input(w, pattern="analysis/merge/{runid}/{samp}.fastq.gz"):
     return targets
 
 def symlink_in(path_real, link_dir):
+    """Make a relative symlink from a path to the same name in a directory."""
     # careful, symlink output/name TO each path!
-    # ideally I'd do relative links, but pathlib's relative_to
-    # apparently can't handle things like
-    # Path("foo").relative_to("foo/bar/baz") -> "../.."
     link_from = (Path(link_dir)/Path(path_real).name).resolve()
     link_from.parent.mkdir(exist_ok=True, parents=True)
     link_to = Path(path_real).resolve()
+    # Python 3.12 adds a walk_up argument to relative_to that I think would
+    # maybe take care of this.
+    def relative_to(path_from, path_to):
+        path_from = Path(path_from)
+        path_to = Path(path_to)
+        for idx, pair in enumerate(zip(path_from.parts, path_to.parts)):
+            if pair[0] != pair[1]:
+                break
+        else:
+            raise ValueError
+        suffix_to = Path("/".join(path_to.parts[idx:]))
+        ups = "/".join(".." for _ in range(len(suffix_to.parents)-1))
+        path_rel = f"{ups}/{suffix_to}"
+        return path_rel
+    link_to = relative_to(link_from, link_to)
     link_from.symlink_to(link_to)
 
 rule grouped_samples_by_celltype:
