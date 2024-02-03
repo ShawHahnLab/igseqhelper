@@ -3,7 +3,21 @@ from statistics import median
 from collections import defaultdict
 from csv import DictWriter, DictReader
 from Bio import SeqIO
-import igseqhelper.util
+
+
+def parse_seq_desc(record):
+    """Parse key=val pairs from a SeqRecord description to a dict.
+
+    If a sring is given, take that as the description.  Any entries without "="
+    are skipped.
+    """
+    try:
+        txt = record.description
+    except AttributeError:
+        txt = record
+    attrs = [pair.split("=", 1) for pair in txt.split(" ")]
+    attrs = {pair[0]: pair[1] for pair in attrs if len(pair) == 2}
+    return attrs
 
 # Just a helper for the below rules.
 # Filter out any entries that don't match the metadata since we rely on the
@@ -603,7 +617,7 @@ rule report_sonar_island_stats:
         seqs = {}
         with open(fp_input_fasta) as f_in:
             for record in SeqIO.parse(f_in, "fasta"):
-                descs[record.id] = igseqhelper.util.parse_seq_desc(record.description)
+                descs[record.id] = parse_seq_desc(record.description)
                 seqs[record.id] = str(record.seq)
         desc_keys = [val.keys() for val in descs.values()]
         desc_keys = sorted(list(set(itertools.chain(*desc_keys))))
@@ -738,7 +752,7 @@ rule report_sonar_igphyml_collected_table:
         rows = []
         with open(input[0]) as f_in:
             for record in SeqIO.parse(f_in, "fasta"):
-                fields = igseqhelper.util.parse_seq_desc(record.description)
+                fields = parse_seq_desc(record.description)
                 tp_label = re.sub("-.*", "", record.id)
                 tp_match = re.match(r"wk(N?)([0-9]+)\.?[0-9]*", tp_label)
                 tp = ""

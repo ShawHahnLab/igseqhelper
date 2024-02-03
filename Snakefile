@@ -18,6 +18,7 @@ wildcard_constraints:
     chain="(heavy|light)",
     celltype="igm|igg",
     chain_type="(alpha|delta|gamma|mu|epsilon|kappa|lambda)",
+    locus="(IGH|IGK|IGL)",
     segment="(V|D|J)",
     antibody_type="(IgA|IgD|IgG|IgM|IgE)",
     antibody_isolate=r"[-_A-Za-z0-9\.]+",

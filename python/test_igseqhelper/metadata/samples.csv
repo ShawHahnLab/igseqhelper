@@ -1,7 +1,0 @@
-Sample,Run,Specimen,BarcodeFwd,BarcodeRev,Replicate,Chain,Type,Skip,Comments
-sample1,200000_M05588_0227_000000000-XYZ12,specimen1,BC_1,i7_17,1,heavy,gamma,,
-sample2,200000_M05588_0227_000000000-XYZ12,specimen2,BC_2,i7_18,1,heavy,gamma,,
-sample3,200000_M05588_0227_000000000-XYZ12,specimen3,BC_3,i7_19,1,heavy,gamma,,
-sample4,200000_M00281_0522_000000000-ABC34,specimen1,BC_1,i7_12,1,light,lambda,,
-sample5,200000_M00281_0522_000000000-ABC34,specimen2,BC_2,i7_13,1,light,lambda,,
-sample6,200000_M00281_0522_000000000-ABC34,specimen3,BC_3,i7_14,1,light,lambda,,
