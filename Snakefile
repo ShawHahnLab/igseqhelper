@@ -4,8 +4,6 @@ Processing steps from raw read data to finalized antibody results.
 
 BASEDIR = Path(str(workflow.current_basedir))
 import os
-import sys
-sys.path.append(str(BASEDIR/"python"))
 os.environ["PATH"] += f":{BASEDIR}/scripts"
 
 wildcard_constraints:
@@ -28,11 +26,11 @@ wildcard_constraints:
     chunk="[0-9]+",
     rp="(R1|R2|I1|I2)"
 
-include: "snakemake-rules/metadata.smk"
-include: "snakemake-rules/by-run.smk"
-include: "snakemake-rules/mining-d.smk"
-include: "snakemake-rules/igdiscover.smk"
-include: "snakemake-rules/sonar.smk"
-include: "snakemake-rules/igblast.smk"
-include: "snakemake-rules/fastqc.smk"
-include: "snakemake-rules/reporting.smk"
+include: "workflow/metadata.smk"
+include: "workflow/by-run.smk"
+include: "workflow/mining-d.smk"
+include: "workflow/igdiscover.smk"
+include: "workflow/sonar.smk"
+include: "workflow/igblast.smk"
+include: "workflow/fastqc.smk"
+include: "workflow/reporting.smk"

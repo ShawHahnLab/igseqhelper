@@ -1,3 +1,4 @@
+# conda environment YAML for IgDiscover
 name: igdiscover
 channels:
   - conda-forge

@@ -108,7 +108,7 @@ rule igdiscover_init:
         db_d="analysis/igdiscover/{ref}/{chain_type}/D.fasta",
         db_j="analysis/igdiscover/{ref}/{chain_type}/J.fasta",
         reads="analysis/samples-by-subject/igm/{subject}.{chain_type}.fastq.gz",
-    conda: str(BASEDIR/"conda/igdiscover.yml")
+    conda: "igdiscover.yml"
     params:
         stranded="true",
         iterations=5
@@ -136,7 +136,7 @@ rule igdiscover_run:
         r1="analysis/igdiscover/{ref}/{chain_type}/{subject}/reads.fastq.gz",
     log:
         conda="analysis/igdiscover/{ref}/{chain_type}/{subject}/igdiscover_run.conda_build.txt"
-    conda: str(BASEDIR/"conda/igdiscover.yml")
+    conda: "igdiscover.yml"
     threads: 20
     shell:
         """
@@ -176,7 +176,7 @@ rule custom_j_discovery:
         ratio=0.3
     log:
         conda="analysis/igdiscover/{ref}/{chain_type}/{subject}/custom_j_discovery/conda_build.txt"
-    conda: str(BASEDIR/"conda/igdiscover.yml")
+    conda: "igdiscover.yml"
     shell:
         """
             arg_j_cov=""

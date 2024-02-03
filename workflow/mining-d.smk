@@ -21,7 +21,7 @@ rule miningd_get_cdrh3s:
     # using this pedantic level of detail so I can use grouped_samples_input
     # from the by-run rules, even though it's always going to be by-subject and
     # mu sequences from IgM+ cells.
-    output: "analysis/mining-d/{thing}_{name}.{celltype}.{type}.cdr3.fasta"
+    output: "analysis/mining-d/{thing}_{name}.{celltype}.{chain_type}.cdr3.fasta"
     input: lambda w: grouped_samples_input(w, "analysis/igblast/merge/{runid}/{samp}.tsv.gz")
     run:
         cdrh3s_from_airr(input, output[0])
@@ -29,7 +29,7 @@ rule miningd_get_cdrh3s:
 rule miningd_run:
     output: "analysis/mining-d/{subject}.output.fasta" 
     input: "analysis/mining-d/subject_{subject}.igm.mu.cdr3.fasta"
-    conda: str(BASEDIR/"conda/mining-d.yml")
+    conda: "mining-d.yml"
     threads: 8
     params:
         # The authors thought 600 was a good choice for rhesus macaque and

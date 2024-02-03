@@ -1,4 +1,5 @@
-name: example-mining-d
+# conda environment YAML for MINING-D
+name: mining-d
 channels:
   - conda-forge
   - defaults
