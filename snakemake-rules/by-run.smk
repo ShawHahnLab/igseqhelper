@@ -187,28 +187,32 @@ def grouped_samples_input(w, pattern="analysis/merge/{runid}/{samp}.fastq.gz"):
         raise ValueError("no matching inputs for rule grouped_samples_input")
     return targets
 
+# path_link -> path_real
+# (Python 3.12 adds a walk_up argument to the Path class' relative_to that I
+# think would maybe take care of this.)
+def relative_link_target(path_real, path_link):
+    # Trim away the matching parents
+    parts_real = [part for part in str(path_real).split("/") if part]
+    parts_link = [part for part in str(path_link).split("/") if part]
+    for idx, pair in enumerate(zip(parts_real, parts_link)):
+        if pair[0] != pair[1]:
+            break
+    remainder_real = parts_real[idx:]
+    remainder_link = parts_link[idx:]
+    # However deep the remaining part of the link is, that's how many .. we
+    # have to climb to point to the real path
+    suffix_real = "/".join(remainder_real)
+    ups = "/".join(".." for _ in range(len(remainder_link)-1))
+    link_target = f"{ups}/{suffix_real}"
+    return link_target
+
 def symlink_in(path_real, link_dir):
     """Make a relative symlink from a path to the same name in a directory."""
-    # careful, symlink output/name TO each path!
-    link_from = (Path(link_dir)/Path(path_real).name).resolve()
-    link_from.parent.mkdir(exist_ok=True, parents=True)
-    link_to = Path(path_real).resolve()
-    # Python 3.12 adds a walk_up argument to relative_to that I think would
-    # maybe take care of this.
-    def relative_to(path_from, path_to):
-        path_from = Path(path_from)
-        path_to = Path(path_to)
-        for idx, pair in enumerate(zip(path_from.parts, path_to.parts)):
-            if pair[0] != pair[1]:
-                break
-        else:
-            raise ValueError
-        suffix_to = Path("/".join(path_to.parts[idx:]))
-        ups = "/".join(".." for _ in range(len(suffix_to.parents)-1))
-        path_rel = f"{ups}/{suffix_to}"
-        return path_rel
-    link_to = relative_to(link_from, link_to)
-    link_from.symlink_to(link_to)
+    link_dir = Path(link_dir)
+    path_link = Path(link_dir)/Path(path_real).name
+    link_target = relative_link_target(path_real, path_link)
+    link_dir.mkdir(parents=True, exist_ok=True)
+    path_link.symlink_to(link_target)
 
 rule grouped_samples_by_celltype:
     output: directory("analysis/samples-by-{thing}/{celltype}/{name}.{chain_type}")
