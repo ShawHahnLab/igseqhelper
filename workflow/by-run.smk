@@ -26,18 +26,6 @@ rule all_getreads:
 
 ### By-pair rules grouped by run
 
-def run_igblast_merge_input(w):
-    targets = []
-    for sample, attrs in SAMPLES.items():
-        if attrs["Run"] == w.run:
-            targets.append(f"analysis/igblast/merge/{{run}}/{sample}.tsv.gz")
-    return targets
-
-rule run_igblast_merge:
-    output: "analysis/igblast/merge/{run}.done"
-    input: run_igblast_merge_input
-    shell: "touch {output}"
-
 def run_merge_input(w):
     targets = []
     suffixes = ["fastq.gz", "merge.counts.csv", "pear.log"]

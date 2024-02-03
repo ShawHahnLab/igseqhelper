@@ -223,28 +223,15 @@ rule sonar_module_1:
             sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2}
         """
 
-rule igblast_sonar:
-    # custom igblast with one of SONAR's FASTA files, giving AIRR-format TSV
-    # output.
-    output: WD_SONAR/"output/tables/{thing}.igblast.tsv"
-    input:
-        unpack(input_sonar_germline),
-        fasta=WD_SONAR/"output/sequences/nucleotide/{thing}.fa"
-    threads: 8
-    shell:
-        """
-            igseq igblast -t {threads} -S rhesus -r $(dirname {input.V}) -Q {input.fasta} -outfmt 19 -out {output}
-        """
-
 rule alternate_iddiv_with_igblast:
     # use IgBLAST results to supply the germline divergence values, rather than
     # SONAR's MUSCLE-derived values.
     output: iddiv=WD_SONAR/"output/tables/{specimen}_goodVJ_unique_id-div.alt.tab"
     input:
         iddiv=WD_SONAR/"output/tables/{specimen}_goodVJ_unique_id-div.tab",
-        airr=WD_SONAR/"output/tables/{specimen}_goodVJ_unique.igblast.tsv"
+        airr=lambda w: expand("analysis/igblast/custom-{{subject}}.{locus}/sonar/{{subject}}.{{chain_type}}/{{specimen}}/output/sequences/nucleotide/{{specimen}}_goodVJ_unique.fa.tsv.gz", locus={"kappa": "IGK", "lambda": "IGL"}.get(w.chain_type, "IGH"))
     run:
-        with open(input.iddiv) as f_in, open(input.airr) as f_in_airr, open(output.iddiv, "wt") as f_out:
+        with open(input.iddiv) as f_in, gzip.open(input.airr, "rt") as f_in_airr, open(output.iddiv, "wt") as f_out:
             iddiv = csv.DictReader(f_in, delimiter="\t")
             airr = csv.DictReader(f_in_airr, delimiter="\t")
             writer = csv.DictWriter(f_out, fieldnames=iddiv.fieldnames, delimiter="\t", lineterminator="\n")
