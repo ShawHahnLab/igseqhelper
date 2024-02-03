@@ -4,10 +4,58 @@ merged IgM+ reads on a per-subject per-amplicon-type basis.
 
 These rules are configured to allow different reference databases.
 
-The default targets here will use SONAR's local copy of the Ramesh et al.
-database (https://doi.org/10.3389/fimmu.2017.01407) from within our igseq
-package.
+The default targets here will use KIMDB originally published in Bernat et al.
+2021 for heavy chain and SONAR's local copy of the Ramesh et al.  database
+(https://doi.org/10.3389/fimmu.2017.01407) for light chain, both from within
+our igseq package.
 """
+
+import csv
+import json
+from datetime import (datetime, timezone)
+
+# D will be ignored for light chain but is always there (which makes the
+# snakemake rules here easy)
+def input_for_igdiscover_as_germline(w):
+    chain_type = {"IGH": "mu", "IGK": "kappa", "IGL": "lambda"}[w.locus]
+    ref = "kimdb" if w.locus == "IGH" else "sonarramesh"
+    targets = {segment: f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}/final/database/{segment}.fasta" for segment in ["V", "D", "J"]}
+    return targets
+
+rule igdiscover_as_germline:
+    """Copy over IgDiscover output as the canonical germline reference for a subject"""
+    output:
+        fastas=expand("analysis/germline/{{subject}}.{{locus}}/{segment}.fasta", segment=["V", "D", "J"]),
+        info="analysis/germline/{subject}.{locus}/info.csv"
+    input: unpack(input_for_igdiscover_as_germline)
+    run:
+        shell("cp {input.V} {output.fastas[0]}")
+        shell("cp {input.D} {output.fastas[1]}")
+        shell("cp {input.J} {output.fastas[2]}")
+        # Also, some basic information to help keep track of things
+        dt_now = datetime.now(tz=timezone.utc).isoformat()
+        # timestamp from IgDiscover log txt
+        dt_log = "???"
+        igdisc_log = Path(input.V).parent/"../../log.txt"
+        if igdisc_log.exists():
+            dt_log = datetime.fromtimestamp(
+                Path(igdisc_log).stat().st_ctime, tz=timezone.utc).isoformat()
+        # verison from stats.json
+        igdisc_version = "???"
+        igdisc_json = Path(input.V).parent/"../../stats/stats.json"
+        if igdisc_json.exists():
+            with open(igdisc_json) as f_in:
+                igdisc_version = json.load(f_in)["version"]
+        with open(output.info, "w") as f_out:
+            writer = csv.writer(f_out, lineterminator="\n")
+            writer.writerow(["key", "value"])
+            writer.writerow(["time_run", dt_log])
+            writer.writerow(["time_copied", dt_now])
+            writer.writerow(["igdiscover_version", igdisc_version])
+            writer.writerow(["V", input.V])
+            writer.writerow(["D", input.D])
+            writer.writerow(["J", input.J])
+
 
 rule igdiscover_db_sonarramesh:
     # As per the IgDiscover manual: "The directory must contain the three files
@@ -43,7 +91,7 @@ rule catsubjects:
         # symlink when there's only one and concatenate otherwise.
         inputs = list(Path(input[0]).glob("*.fastq.gz"))
         if len(inputs) == 1:
-            Path(output[0]).resolve().symlink_to(Path(inputs[0]).resolve())
+            Path(output[0]).symlink_to(Path(Path(input[0]).name)/inputs[0].name)
         elif inputs:
             shell("cat {input}/*.fastq.gz > {output}")
         else:

@@ -6,87 +6,98 @@ WD_SONAR_LONG = Path("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibo
 
 import math
 import csv
+from collections import defaultdict
 
 # if we have a custom version of the ID/DIV table, use that
 ruleorder: sonar_module_2_id_div_island_alternate > sonar_module_2_id_div_island
 
-def input_helper_sonar(w, pattern):
-    # Take all specimens for this subject and the corresponding amplicons.
-    # IgG+ is implicit in these rules but other types can be requested
-    # manually.
-    parts = vars(w)
-    specimens = set()
-    subject = parts.get("subject")
-    if not subject and "antibody_lineage" in parts:
-        subject = ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"]
-    if not subject:
-        raise ValueError
-    if "specimen" in parts:
-        specimens = parts["specimen"]
-    else:
-        for samp in SAMPLES.values():
-            if samp["Type"] == w.chain_type and \
-                "IgG" in samp["SpecimenAttrs"]["CellType"]:
-                if samp["SpecimenAttrs"]["Subject"] == subject:
-                    specimens.add(samp["Specimen"])
+# Make dynamically-defined rules for convenience, like "sonar_1_AJ09_gamma".
+#
+# The rules are:
+#
+#   * sonar_1_{subject}_{chain_type}
+#   * sonar_2_{subject}_{chain_type}
+#   * sonar_2_islands_{subject}_{chain_type}
+#   * sonar_2_islands_{subject}_{chain_type}_{antibody_lineage}
+#   * sonar_3_{subject}_{chain_type}
+#   * sonar_3_{subject}_{chain_type}_{antibody_lineage}
+#
+# Get a full list of these rules and their descriptions with snakemake -l.
+def sonar_setup_helper_rules():
+    # specimen -> sets of chain_type (but only for IgG+)
+    specimen_types = defaultdict(set)
+    for attrs in SAMPLES.values():
+        specimen_types[attrs["Specimen"]].add(attrs["Type"])
+    # subject/chain_type -> sets of those specimens
+    subject_type_map = defaultdict(set)
+    for specimen, attrs in SPECIMENS.items():
+        subject = attrs["Subject"]
+        for chain_type in specimen_types[specimen]:
+            if "IgG" in attrs["CellType"]:
+                subject_type_map[(subject, chain_type)].add(specimen)
+    # subject/chain_type -> sets of lineages
+    subject_type_lineage_map = defaultdict(set)
+    for key in subject_type_map:
+        subject, chain_type = key
+        for lineage, attrs in ANTIBODY_LINEAGES.items():
+            if attrs["Subject"] == subject:
+                subject_type_lineage_map[key].add(lineage)
 
-    parts["subject"] = subject
-    parts["specimen"] = specimens
-    # I swear vars(w) *used* to just give you a dictionary of wildcard names
-    # and values, but now I'm getting a bunch of functions (and other stuff
-    # like _names) mixed in too, which crashes expand().  This is hacky but
-    # fixes this for now.
-    parts = {key: parts[key] for key in parts if not callable(parts[key])}
-    return expand(pattern, **parts)
+    for key, specimens in subject_type_map.items():
+        subject, chain_type = key
+        # SONAR module 1 (annotation) for one subject and chain type
+        targets = expand(
+            "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv",
+            subject=subject, chain_type=chain_type, specimen=specimens)
+        rule:
+            f"SONAR Module 1 (annotation steps) for subject {subject} and chain type {chain_type}"
+            name: f"sonar_1_{subject}_{chain_type}"
+            input: targets
+        # SONAR module 2 ID/DIV for one subject and chain type
+        targets = expand(
+            "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab",
+            subject=subject, chain_type=chain_type, specimen=specimens)
+        rule:
+            f"SONAR Module 2 (ID/DIV table) for subject {subject} and chain type {chain_type}"
+            name: f"sonar_2_{subject}_{chain_type}"
+            input: targets
+        # SONAR module 2 island for one subject and chain type and lineage
+        # (rule for all lineages, and separate rules for each lineage)
+        targets = expand("analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{lineage}.fa",
+            subject=subject, chain_type=chain_type, specimen=specimens,
+            lineage=subject_type_lineage_map[key])
+        rule:
+            f"SONAR Module 2 (island selection) for subject {subject} and chain type {chain_type}, all lineages"
+            name: f"sonar_2_islands_{subject}_{chain_type}"
+            input: targets
+        for lineage in subject_type_lineage_map[key]:
+            targets = expand("analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{lineage}.fa",
+                subject=subject, chain_type=chain_type, specimen=specimens,
+                lineage=lineage)
+            rule:
+                f"SONAR Module 2 (island selection) for subject {subject} and chain type {chain_type}, lineage {lineage}"
+                name: f"sonar_2_islands_{subject}_{chain_type}_{lineage}"
+                input: targets
+    # SONAR module 3 (including tree PDF) for one subject and chain type
+    for key, lineages in subject_type_lineage_map.items():
+        if not lineages:
+            continue
+        subject, chain_type = key
+        targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{lineage}/output/longitudinal-{lineage}_igphyml.tree",
+            subject=subject, chain_type=chain_type, lineage=lineages)
+        rule:
+            f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, all lineages"
+            name: f"sonar_3_{subject}_{chain_type}"
+            input: targets
+        for lineage in lineages:
+            targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{lineage}/output/longitudinal-{lineage}_igphyml.tree",
+                subject=subject, chain_type=chain_type, lineage=lineage)
+            rule:
+                f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, lineage {lineage}"
+                name: f"sonar_3_{subject}_{chain_type}_{lineage}"
+                input: targets
 
-# For one subject and amplicon, process all specimens for module 1
-rule helper_sonar_module_1_by_subject:
-    output: touch("analysis/sonar/{subject}.{chain_type}/module1.done")
-    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv")
-
-# For one amplicon, process all specimens for module 2 (just ID/DIV, for members of all lineages)
-rule helper_sonar_module_2:
-    output: touch("analysis/sonar/{subject}.{chain_type}/module2.done")
-    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_goodVJ_unique_id-div.tab")
-
-# For one lineage and amplicon, make all the island FASTAs via the plots and lists
-rule helper_sonar_module_2_island_by_lineage:
-    output: touch("analysis/sonar/{subject}.{chain_type}/module2island.{antibody_lineage}.done")
-    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa")
-
-# For one lineage and amplicon, make the IgPhyML tree and related outputs
-rule helper_sonar_module_3_igphyml:
-    output: touch("analysis/sonar/{subject}.{chain_type}/module3tree.{antibody_lineage}.done")
-    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree")
-
-rule helper_sonar_module_3_tree_pdf:
-    output: touch("analysis/sonar/{subject}.{chain_type}/module3treepdf.{antibody_lineage}.done")
-    input: lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree.pdf")
-
-# For whatever chain we're analyzing, what chain do we need to reference in our
-# IgDiscover results?  (heavy -> mu, light -> same light)
-IGG_IGM = {
-    "alpha": "mu",
-    "delta": "mu",
-    "gamma": "mu",
-    "mu": "mu",
-    "epsilon": "mu",
-    "kappa": "kappa",
-    "lambda": "lambda"}
-# Default to using IgDiscover results based on KIMDB (the latest reference that
-# started in Bernat et al.  2021) IGH, but fall back on sonarramesh for IGK/IGL
-# since KIMDB doesn't include light chain.
-# D will be ignored for light chain but is always there (which makes the
-# snakemake rules here easy)
-ruleorder: sonar_germline_kimdb > sonar_germline_sonarramesh
-rule sonar_germline_kimdb:
-    output: WD_SONAR.parent/"germline.{segment}.fasta"
-    input: lambda w: expand("analysis/igdiscover/kimdb/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type])
-    shell: "cp {input} {output}"
-rule sonar_germline_sonarramesh:
-    output: WD_SONAR.parent/"germline.{segment}.fasta"
-    input: lambda w: expand("analysis/igdiscover/sonarramesh/{chain_type}/{{subject}}/final/database/{{segment}}.fasta", chain_type=IGG_IGM[w.chain_type])
-    shell: "cp {input} {output}"
+sonar_setup_helper_rules()
 
 rule sonar_gather_mature:
     """Get heavy or light chain mature antibody sequences.
@@ -104,11 +115,16 @@ rule sonar_gather_mature:
     run:
         if wildcards.chain_type in ["kappa", "lambda"]:
             seq_col = "LightSeq"
+            light_locus = {"kappa": "IGK", "lambda": "IGL"}[wildcards.chain_type]
         else:
             seq_col = "HeavySeq"
         seen = {""} # always skip empty entries
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
+                if seq_col == "LightSeq" and attrs["AntibodyLineageAttrs"]["LightLocus"] != light_locus:
+                    # Skip light chain sequences that are for the other locus
+                    # than whatever was amplified here
+                    continue
                 seq = attrs[seq_col]
                 if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject and seq not in seen:
                     f_out.write(f">{seqid}\n")
@@ -154,6 +170,10 @@ rule sonar_module_1_decompress:
             xz --decompress < {input} > {output}
         """
 
+def input_sonar_germline(w):
+    locus = {"kappa": "IGK", "lambda": "IGL"}.get(w.chain_type, "IGH")
+    return {seg: f"analysis/germline/{w.subject}.{locus}/{seg}.fasta" for seg in ["V", "D", "J"]}
+
 rule sonar_module_1:
     output:
         fasta=(WD_SONAR/"output/sequences/nucleotide/{specimen}_goodVJ_unique.fa"),
@@ -161,12 +181,8 @@ rule sonar_module_1:
     input:
         # SONAR can use multiple input files and will automatically detect
         # them, but it requires them to be plaintext.
-        reads="analysis/samples-by-specimen/{specimen}.{chain_type}",
-        # Using the already-prepped VDJ reference files from the sonar_germline
-        # rule above
-        V="analysis/sonar/{subject}.{chain_type}/germline.V.fasta",
-        D="analysis/sonar/{subject}.{chain_type}/germline.D.fasta",
-        J="analysis/sonar/{subject}.{chain_type}/germline.J.fasta"
+        unpack(input_sonar_germline),
+        reads="analysis/samples-by-specimen/{specimen}.{chain_type}"
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -212,12 +228,12 @@ rule igblast_sonar:
     # output.
     output: WD_SONAR/"output/tables/{thing}.igblast.tsv"
     input:
-        fasta=WD_SONAR/"output/sequences/nucleotide/{thing}.fa",
-        germline=expand("{prefix}/germline.{segment}.fasta", prefix=WD_SONAR.parent, segment=["V", "D", "J"])
+        unpack(input_sonar_germline),
+        fasta=WD_SONAR/"output/sequences/nucleotide/{thing}.fa"
     threads: 8
     shell:
         """
-            igseq igblast -t {threads} -S rhesus -r {input.germline} -Q {input.fasta} -outfmt 19 -out {output}
+            igseq igblast -t {threads} -S rhesus -r $(dirname {input.V}) -Q {input.fasta} -outfmt 19 -out {output}
         """
 
 rule alternate_iddiv_with_igblast:
@@ -255,12 +271,12 @@ rule sonar_module_2_id_div:
     output:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab"
     input:
+        unpack(input_sonar_germline),
         fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        mab=WD_SONAR / "mab/mab.fasta",
-        germline_v=WD_SONAR.parent / "germline.V.fasta"
+        mab=WD_SONAR / "mab/mab.fasta"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
-        input_v=lambda w, input: Path(input.germline_v).resolve(),
+        input_v=lambda w, input: Path(input.V).resolve(),
         input_mab=lambda w, input: Path(input.mab).resolve(),
         # either "mismatch" (the default) or "ignore".  Note that this is used
         # for both identity and divergence calculations, and while ignoring
@@ -471,14 +487,14 @@ rule sonar_module_3_igphyml_auto:
         inferred_prot=WD_SONAR_LONG / "output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa",
         stats=WD_SONAR_LONG / "output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt"
     input:
+        unpack(input_sonar_germline),
         collected=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
-        germline_v=WD_SONAR_LONG.parent / "germline.V.fasta",
         natives=WD_SONAR_LONG / "mab/mab.{antibody_lineage}.fasta"
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
-        input_germline_v=lambda w, input: Path(input.germline_v).resolve(),
+        input_germline_v=lambda w, input: Path(input.V).resolve(),
         input_natives=lambda w, input: Path(input.natives).resolve(),
         v_id=sonar_module_3_igphyml_param_v_id,
         args="-f"

@@ -546,6 +546,36 @@ def _sonar_island_summary_row(fp_in):
             "has_n": 0}
     return row_out
 
+def input_helper_sonar(w, pattern):
+    # Take all specimens for this subject and the corresponding amplicons.
+    # IgG+ is implicit in these rules but other types can be requested
+    # manually.
+    parts = vars(w)
+    specimens = set()
+    subject = parts.get("subject")
+    if not subject and "antibody_lineage" in parts:
+        subject = ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"]
+    if not subject:
+        raise ValueError
+    if "specimen" in parts:
+        specimens = parts["specimen"]
+    else:
+        for samp in SAMPLES.values():
+            if samp["Type"] == w.chain_type and \
+                "IgG" in samp["SpecimenAttrs"]["CellType"]:
+                if samp["SpecimenAttrs"]["Subject"] == subject:
+                    specimens.add(samp["Specimen"])
+
+    parts["subject"] = subject
+    parts["specimen"] = specimens
+    # I swear vars(w) *used* to just give you a dictionary of wildcard names
+    # and values, but now I'm getting a bunch of functions (and other stuff
+    # like _names) mixed in too, which crashes expand().  This is hacky but
+    # fixes this for now.
+    parts = {key: parts[key] for key in parts if not callable(parts[key])}
+    return expand(pattern, **parts)
+
+
 rule report_sonar_island_summary:
     """Further condense SONAR ID/DIV stats to one file per lineage."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/island_stats_summary.csv"
