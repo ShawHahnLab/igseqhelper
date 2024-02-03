@@ -1,7 +1,3 @@
-"""
-Processing steps from raw read data to finalized antibody results.
-"""
-
 BASEDIR = Path(str(workflow.current_basedir))
 import os
 os.environ["PATH"] += f":{BASEDIR}/scripts"
@@ -26,11 +22,11 @@ wildcard_constraints:
     chunk="[0-9]+",
     rp="(R1|R2|I1|I2)"
 
-include: "workflow/metadata.smk"
-include: "workflow/by-run.smk"
-include: "workflow/mining-d.smk"
-include: "workflow/igdiscover.smk"
-include: "workflow/sonar.smk"
-include: "workflow/igblast.smk"
-include: "workflow/fastqc.smk"
-include: "workflow/reporting.smk"
+include: "metadata.smk"
+include: "by-run.smk"
+include: "mining-d.smk"
+include: "igdiscover.smk"
+include: "sonar.smk"
+include: "igblast.smk"
+include: "fastqc.smk"
+include: "reporting.smk"
