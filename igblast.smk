@@ -49,14 +49,14 @@ rule igblast:
                 -t {threads} \
                 -S {params.species} \
                 -r {params.ref} \
-                -Q {input} \
+                -Q {input.query} \
                 -outfmt {params.outfmt} | gzip > {output}
         """
 
 # One automatically-available custom reference: per-subject per-locus germline
 # files
 rule igblast_ref_germline:
-    output: "analysis/igblast/ref-custom-{subject}.{locus}"
+    output: directory("analysis/igblast/ref-custom-{subject}.{locus}")
     input:
         fastas=expand("analysis/germline/{{subject}}.{{locus}}/{segment}.fasta", segment=["V", "D", "J"])
     params:
