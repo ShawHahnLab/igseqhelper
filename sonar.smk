@@ -231,7 +231,9 @@ rule alternate_iddiv_with_igblast:
         iddiv=WD_SONAR/"output/tables/{specimen}_goodVJ_unique_id-div.tab",
         airr=lambda w: expand("analysis/igblast/custom-{{subject}}.{locus}/sonar/{{subject}}.{{chain_type}}/{{specimen}}/output/sequences/nucleotide/{{specimen}}_goodVJ_unique.fa.tsv.gz", locus={"kappa": "IGK", "lambda": "IGL"}.get(w.chain_type, "IGH"))
     run:
-        with open(input.iddiv) as f_in, gzip.open(input.airr, "rt") as f_in_airr, open(output.iddiv, "wt") as f_out:
+        with open(input.iddiv) as f_in, \
+                gzip.open(str(input.airr), "rt") as f_in_airr, \
+                open(output.iddiv, "wt") as f_out:
             iddiv = csv.DictReader(f_in, delimiter="\t")
             airr = csv.DictReader(f_in_airr, delimiter="\t")
             writer = csv.DictWriter(f_out, fieldnames=iddiv.fieldnames, delimiter="\t", lineterminator="\n")
@@ -503,7 +505,10 @@ rule sonar_module_3_igphyml_auto:
         """
 
 rule sonar_module_3_igphyml_custom:
-    """SONAR 3: Run phylogenetic analysis with custom alignment and generate tree across specimens."""
+    """SONAR 3: Run phylogenetic analysis with custom alignment and generate tree across specimens.
+
+    This will given the first sequence ID in the alignment as the --root for sonar igphyml.
+    """
     output:
         tree=protected(WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree"),
         inferred_nucl=protected(WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
@@ -521,7 +526,8 @@ rule sonar_module_3_igphyml_custom:
             # See sonar_module_3_igphyml_auto about LANG
             unset LANG
             cd {params.wd_sonar}
-            sonar igphyml -i {input.alignment} {params.args}
+            root=$(head -n 1 {input.alignment} | cut -c 2- | cut -f 1 -d ' ')
+            sonar igphyml --root "$root" -i {input.alignment} {params.args}
         """
 
 rule sonar_make_natives_table:
