@@ -188,4 +188,4 @@ rule get_metadata:
     output: "metadata/{sheet}.csv"
     input: "metadata.yml"
     run:
-        igseqhelper.data.download_metadata(input[0], output[0])
+        download_metadata(input[0], output[0])
