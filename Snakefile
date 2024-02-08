@@ -19,7 +19,7 @@ wildcard_constraints:
     antibody_lineage=r"[-_A-Za-z0-9\.]+",
     # other flow control
     compressed="((?!xz$).)*",
-    chunk="[0-9]+",
+    thing="[^/]+", # any match limited to one directory
     rp="(R1|R2|I1|I2)"
 
 include: "metadata.smk"

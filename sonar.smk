@@ -2,7 +2,6 @@
 # In general these are organized by specimen and equivalently timepoint but the
 # longitudinal step gets its own project directory per-lineage.
 WD_SONAR = Path("analysis/sonar/{subject}.{chain_type}/{specimen}")
-WD_SONAR_LONG = Path("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}")
 
 import math
 import csv
@@ -82,6 +81,7 @@ def sonar_setup_helper_rules():
     for key, lineages in subject_type_lineage_map.items():
         if not lineages:
             continue
+        # Automatic gathering and alignment across timepoints
         subject, chain_type = key
         targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{lineage}/output/longitudinal-{lineage}_igphyml.tree",
             subject=subject, chain_type=chain_type, lineage=lineages)
@@ -95,6 +95,20 @@ def sonar_setup_helper_rules():
             rule:
                 f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, lineage {lineage}"
                 name: f"sonar_3_{subject}_{chain_type}_{lineage}"
+                input: targets
+        # Manually-prepared custom alignment input
+        targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{lineage}/output/longitudinal-custom-{lineage}_igphyml.tree",
+            subject=subject, chain_type=chain_type, lineage=lineages)
+        rule:
+            f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, all lineages, custom input"
+            name: f"sonar_3_{subject}_{chain_type}_custom"
+            input: targets
+        for lineage in lineages:
+            targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{lineage}/output/longitudinal-custom-{lineage}_igphyml.tree",
+                subject=subject, chain_type=chain_type, lineage=lineage)
+            rule:
+                f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, lineage {lineage}, custom input"
+                name: f"sonar_3_{subject}_{chain_type}_custom_{lineage}"
                 input: targets
 
 sonar_setup_helper_rules()
@@ -441,12 +455,12 @@ def sonar_module_3_collect_param_seqs(_, input):
 
 rule sonar_module_3_collect:
     output:
-        collected=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa"
+        collected="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa"
     input: unpack(sonar_module_3_collect_inputs)
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
-        wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
+        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}", **w),
         seqs=sonar_module_3_collect_param_seqs
     shell:
         """
@@ -463,26 +477,27 @@ def sonar_module_3_igphyml_param_v_id(wildcards):
         raise ValueError("No V assigned for %s" % wildcards)
     return v_call
 
-# If a custom alignment is available, use that, but fall back on automatic
-# alignment during module 3.
-# The auto version puts its alignment in work/phylo/{projdir}_aligned.afa
+# If a custom alignment is present and the pattern matches
+# "longitudinal-custom-{antibody_lineage}", prefer the custom rule.  Otherwise,
+# automatic.
 ruleorder: sonar_module_3_igphyml_custom > sonar_module_3_igphyml_auto
 
 rule sonar_module_3_igphyml_auto:
     """SONAR 3: Run phylogenetic analysis with automatic alignment and generate tree across specimens."""
     output:
-        tree=protected(WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree"),
-        inferred_nucl=protected(WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
-        inferred_prot=protected(WD_SONAR_LONG / "output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
-        stats=protected(WD_SONAR_LONG / "output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt")
+        tree=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree"),
+        inferred_nucl=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
+        inferred_prot=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
+        stats=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt"),
+        afa=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/work/phylo/longitudinal-{antibody_lineage}_aligned.afa")
     input:
         unpack(input_sonar_germline),
-        collected=WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
-        natives=WD_SONAR_LONG / "mab/mab.{antibody_lineage}.fasta"
+        collected="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
+        natives="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/mab/mab.{antibody_lineage}.fasta"
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
-        wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
+        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}", **w),
         input_germline_v=lambda w, input: Path(input.V).resolve(),
         input_natives=lambda w, input: Path(input.natives).resolve(),
         v_id=sonar_module_3_igphyml_param_v_id,
@@ -510,16 +525,16 @@ rule sonar_module_3_igphyml_custom:
     This will given the first sequence ID in the alignment as the --root for sonar igphyml.
     """
     output:
-        tree=protected(WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree"),
-        inferred_nucl=protected(WD_SONAR_LONG / "output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
-        inferred_prot=protected(WD_SONAR_LONG / "output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
-        stats=protected(WD_SONAR_LONG / "output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt")
+        tree=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/longitudinal-custom-{antibody_lineage}_igphyml.tree"),
+        inferred_nucl=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/nucleotide/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa"),
+        inferred_prot=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/amino_acid/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa"),
+        stats=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/logs/longitudinal-custom-{antibody_lineage}_igphyml_stats.txt")
     input:
-        alignment=Path(WD_SONAR_LONG / "../alignment.{antibody_lineage}.fa").resolve()
+        alignment=Path("analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.fa").resolve()
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
-        wd_sonar=lambda w: expand(str(WD_SONAR_LONG), **w),
+        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}", **w),
         args="-f"
     shell:
         """
@@ -532,12 +547,16 @@ rule sonar_module_3_igphyml_custom:
 
 rule sonar_make_natives_table:
     output:
-        table=WD_SONAR_LONG/"natives.tab"
+        # "thing" wildcard can be either "" (for regular automatic alignment)
+        # or "custom-" (for manually-prepped alignment with custom root on
+        # top).  We need to separate that part out from the lineage info itself
+        # so the lineage name can be used to gather the relevant mAb sequences.
+        table="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing,|custom-}{antibody_lineage}/natives.tab"
     # we don't actually need the files here but this has the logic to name the
     # timepoints
-    input: unpack(sonar_module_3_collect_inputs)
+    params: sonar_module_3_collect_inputs
     run:
-        keys = list(dict(input).keys())
+        keys = list(dict(params).keys())
         mabs = {}
         if wildcards.chain_type in ["kappa", "lambda"]:
             seq_col = "LightSeq"
@@ -561,10 +580,12 @@ rule sonar_make_natives_table:
 
 rule sonar_module_3_draw_tree:
     output:
-        tree_img=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree{suffix,.*}.pdf"
+        # here "thing" can include the lineage field since the lineage isn't
+        # directly used at this point
+        tree_img="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/output/longitudinal-{thing}_igphyml.tree{suffix,.*}.pdf"
     input:
-        tree=WD_SONAR_LONG / "output/longitudinal-{antibody_lineage}_igphyml.tree",
-        natives_tab=WD_SONAR_LONG / "natives{suffix}.tab"
+        tree="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/output/longitudinal-{thing}_igphyml.tree",
+        natives_tab="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/natives{suffix}.tab"
     singularity: "docker://jesse08/sonar"
     # Running via xvfb-run since the ETE toolkit requires X11 to render for
     # some reason
