@@ -551,32 +551,42 @@ rule sonar_make_natives_table:
         # or "custom-" (for manually-prepped alignment with custom root on
         # top).  We need to separate that part out from the lineage info itself
         # so the lineage name can be used to gather the relevant mAb sequences.
-        table="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing,|custom-}{antibody_lineage}/natives.tab"
-    # we don't actually need the files here but this has the logic to name the
-    # timepoints
-    params: sonar_module_3_collect_inputs
+        table="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}{antibody_lineage}/natives.tab"
+    params:
+        # we don't actually need the files here but this has the logic to name
+        # the timepoints
+        tp_fastas=sonar_module_3_collect_inputs
+    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}{antibody_lineage}/natives.tab.log"
+    wildcard_constraints:
+        thing="custom-|",
+        antibody_lineage="(?!custom-)[^/]+"
     run:
-        keys = list(dict(params).keys())
+        keys = list(dict(params.tp_fastas).keys())
         mabs = {}
         if wildcards.chain_type in ["kappa", "lambda"]:
             seq_col = "LightSeq"
         else:
             seq_col = "HeavySeq"
-        for seqid, attrs in ANTIBODY_ISOLATES.items():
-            if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col]:
-                tp = "wk" + attrs["Timepoint"]
-                if tp not in mabs:
-                    mabs[tp] = []
-                if tp not in keys:
-                    keys.append(tp)
-                mabs[tp].append(seqid)
-        with open(output.table, "wt") as f_out:
-            for key in keys:
-                if key in mabs:
-                    for mab in mabs[key]:
-                        f_out.write(f"{key}\t{mab}\t{mab}\n")
-                else:
-                    f_out.write(f"{key}\t\t\n")
+        with open(log[0], "w") as log_out:
+            log_out.write(f"starting timepoints {keys}\n")
+            log_out.write(f"lineage {wildcards.antibody_lineage}\n")
+            log_out.write(f"seq_col {seq_col}\n")
+            for seqid, attrs in ANTIBODY_ISOLATES.items():
+                if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col]:
+                    tp = "wk" + attrs["Timepoint"]
+                    if tp not in mabs:
+                        mabs[tp] = []
+                    if tp not in keys:
+                        keys.append(tp)
+                    mabs[tp].append(seqid)
+                    log_out.write(f"{tp} -> {seqid}\n")
+            with open(output.table, "wt") as f_out:
+                for key in keys:
+                    if key in mabs:
+                        for mab in mabs[key]:
+                            f_out.write(f"{key}\t{mab}\t{mab}\n")
+                    else:
+                        f_out.write(f"{key}\t\t\n")
 
 rule sonar_module_3_draw_tree:
     output:
