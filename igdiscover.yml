@@ -1,4 +1,4 @@
-# conda environment YAML for IgDiscover
+# conda environment YAML for IgDiscover (bioconda+github fork)
 name: igdiscover
 channels:
   - conda-forge

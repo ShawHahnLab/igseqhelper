@@ -190,3 +190,19 @@ rule custom_j_discovery:
             conda list --explicit > {log.conda}
             igdiscover discoverjd --database {params.db_j} --gene J $arg_j_cov $arg_allele_ratio {params.tab} --fasta {output.fasta} > {output.tab}
         """
+
+rule upstream:
+    """Derive a consensus sequence for the upstream portion (UTR+Leader) of each V gene."""
+    output: "analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}/upstream.fasta"
+    input: "analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/V.fasta"
+    params:
+        table="analysis/igdiscover/{ref}/{chain_type}/{subject}/final/filtered.tsv.gz"
+    conda: "gkhlab-igdiscover22.yml"
+    log:
+        main="analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}/log.txt",
+        conda="analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}/conda_build.txt"
+    shell:
+        """
+            conda list --explicit > {log.conda}
+            igdiscover upstream {params.table} > {output} 2> {log.main}
+        """
