@@ -608,15 +608,22 @@ rule sonar_module_3_draw_tree:
         tree="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/output/longitudinal-{thing}_igphyml.tree",
         natives_tab="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/natives{suffix}.tab"
     singularity: "docker://jesse08/sonar"
+    params:
+        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{thing}", **w),
+        # (Jumping through some hoops to run inside of the SONAR project
+        # directory to avoid leaving things like SONAR_command_history.log
+        # lying around at the top level)
+        input_tree=lambda w, input: Path(input.tree).resolve(),
+        input_natives_tab=lambda w, input: Path(input.natives_tab).resolve(),
+        output_tree_img=lambda w, input, output: Path(output.tree_img).resolve(),
     # Running via xvfb-run since the ETE toolkit requires X11 to render for
     # some reason
-    # TODO cd into project dir or use shadow rule to avoid getting
-    # SONAR_command_history.log in the top level directory
     shell:
         """
+            cd {params.wd_sonar}
             xvfb-run sonar display_tree \
-                -t {input.tree} \
-                -n {input.natives_tab} \
+                -t {params.input_tree} \
+                -n {params.input_natives_tab} \
                 --showAll \
-                -o {output.tree_img}
+                -o {params.output_tree_img}
         """
