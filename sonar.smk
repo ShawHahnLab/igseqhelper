@@ -494,6 +494,7 @@ rule sonar_module_3_igphyml_auto:
         unpack(input_sonar_germline),
         collected="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
         natives="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/mab/mab.{antibody_lineage}.fasta"
+    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/log.txt"
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -512,6 +513,10 @@ rule sonar_module_3_igphyml_auto:
             # So yeah let's just unset the LANG.
             unset LANG
             cd {params.wd_sonar}
+            date | tee -a {log}
+            echo "$(which sonar): $(sonar --version)" | tee -a {log}
+            echo "Running sonar igphyml with custom alignment" | tee -a {log}
+            echo "Project directory: $PWD" | tee -a {log}
             sonar igphyml \
                 -v '{params.v_id}' \
                 --lib {params.input_germline_v} \
@@ -531,6 +536,7 @@ rule sonar_module_3_igphyml_custom:
         stats=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/logs/longitudinal-custom-{antibody_lineage}_igphyml_stats.txt")
     input:
         alignment=Path("analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.fa").resolve()
+    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/log.txt"
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -541,8 +547,13 @@ rule sonar_module_3_igphyml_custom:
             # See sonar_module_3_igphyml_auto about LANG
             unset LANG
             cd {params.wd_sonar}
+            date | tee -a {log}
+            echo "$(which sonar): $(sonar --version)" | tee -a {log}
+            echo "Running sonar igphyml with custom alignment" | tee -a {log}
+            echo "Project directory: $PWD" | tee -a {log}
             root=$(head -n 1 {input.alignment} | cut -c 2- | cut -f 1 -d ' ')
-            sonar igphyml --root "$root" -i {input.alignment} {params.args}
+            echo "Detected seq ID for tree root from first FASTA record: $root" | tee -a {log}
+            sonar igphyml --root "$root" -i {input.alignment} {params.args} 2> {log}
         """
 
 rule sonar_make_natives_table:
@@ -599,6 +610,8 @@ rule sonar_module_3_draw_tree:
     singularity: "docker://jesse08/sonar"
     # Running via xvfb-run since the ETE toolkit requires X11 to render for
     # some reason
+    # TODO cd into project dir or use shadow rule to avoid getting
+    # SONAR_command_history.log in the top level directory
     shell:
         """
             xvfb-run sonar display_tree \
