@@ -19,6 +19,7 @@ wildcard_constraints:
     antibody_lineage=r"[-_A-Za-z0-9\.]+",
     # other flow control
     compressed="((?!xz$).)*",
+    ext="[^/]+", # file extension (limited to one directory)
     thing="[^/]+", # any match limited to one directory
     rp="(R1|R2|I1|I2)"
 
@@ -30,3 +31,4 @@ include: "sonar.smk"
 include: "igblast.smk"
 include: "fastqc.smk"
 include: "reporting.smk"
+include: "summary.smk"
