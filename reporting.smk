@@ -388,37 +388,21 @@ def counts_by_specimen(input_csv, output_csv):
 ### Lineages
 
 def report_lineages_divergence_input(w):
-    # queries
-    chain_types = ["gamma"]
+    loci = ["IGH"]
     for attrs in ANTIBODY_LINEAGES.values():
         if attrs["AntibodyLineage"] == w.antibody_lineage:
-            try:
-                chain_types.append({"L": "lambda", "K": "kappa"}[attrs["VL"][2]])
-            except:
-                pass
+            loci.append(attrs["LightLocus"])
+            subject = attrs["Subject"]
+            break
+    else:
+        raise ValueError(f"Can't find lineage {w.antibody_lineage}")
     targets = {
         "members": expand(
             "analysis/reporting/sonar/{{antibody_lineage}}.{chain_type}/igphyml_collected.csv",
-            chain_type = chain_types),
-        "mabs": ["analysis/reporting/by-lineage/{antibody_lineage}.mabs.csv"]}
-    # refs
-    mktargets = lambda ct, segs: expand(
-        "analysis/reporting/igdiscover/sonarramesh/{chain_type}/{subject}/{segment}.fasta",
-        antibody_lineage=w.antibody_lineage, chain_type=ct, subject=subject, segment=segs)
-    light_ct = None
-    for attrs in ANTIBODY_LINEAGES.values():
-        if attrs["AntibodyLineage"] == w.antibody_lineage:
-            subject = attrs["Subject"]
-            try:
-                light_ct = {"L": "lambda", "K": "kappa"}[attrs["VL"][2]]
-                break
-            except:
-                pass
-    else:
-        raise ValueError
-    targets["refs"] = mktargets("mu", ["V", "D", "J"])
-    if light_ct:
-        targets["refs"] += mktargets(light_ct, ["V", "J"])
+            chain_type = [{"IGH": "gamma", "IGK": "kappa", "IGL": "lambda"}[loc] for loc in loci]),
+        "mabs": "analysis/reporting/by-lineage/{antibody_lineage}.mabs.csv",
+        "refs": expand("analysis/germline/{subject}.{locus}/{segment}.fasta",
+            subject=subject, locus=loci, segment=["V", "D", "J"])}
     return targets
 
 def report_lineages_divergence_param_refs(w, input):
@@ -872,7 +856,7 @@ rule report_sonar_igphyml_ancestors_table:
             writer.writerows(rows)
 
 rule report_sonar_igphyml_ancestors_common:
-    """Make verison of SONAR module 3 inferred ancestors FASTA filtered to mAb ancestors."""
+    """Make version of SONAR module 3 inferred ancestors FASTA filtered to mAb ancestors."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.common.fa"
     input:
         ancs="analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.fa",
