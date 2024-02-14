@@ -1,5 +1,7 @@
 """
 Rules for select final output files per-subject-per-lineage.
+
+Everything here is just copying over lightweight files created in other rules.
 """
 
 def set_chain_type(w):
@@ -40,6 +42,10 @@ def summary_setup_helper_rules():
             targets += expand(
                 "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors{thing}.fa",
                 thing=things, **w)
+            targets += expand(
+                "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors{thing}.common.fa",
+                thing=things, **w)
+            targets += ["analysis/reporting/by-lineage/{antibody_lineage}_divergence.csv"]
         rule:
             f"Summary outputs for subject {subject} lineage {lineage}"
             name: f"summary_{lineage}"
@@ -80,4 +86,19 @@ rule summary_ancestors_auto:
 rule summary_ancestors_custom:
     output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.custom.fa"
     input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/nucleotide/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa", **set_chain_type(w))
+    shell: "cp {input} {output}"
+
+rule summary_ancestors_common:
+    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.common.fa"
+    input: lambda w: expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.common.fa", **set_chain_type(w))
+    shell: "cp {input} {output}"
+
+rule summary_ancestors_custom_common:
+    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.custom.common.fa"
+    input: lambda w: expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.custom.common.fa", **set_chain_type(w))
+    shell: "cp {input} {output}"
+
+rule summary_germline_divergence_plot:
+    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_divergence.pdf"
+    input: "analysis/reporting/by-lineage/{antibody_lineage}.divergence.pdf"
     shell: "cp {input} {output}"

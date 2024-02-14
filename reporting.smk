@@ -863,11 +863,25 @@ rule report_sonar_igphyml_ancestors_common:
         mabs="analysis/reporting/sonar/{antibody_lineage}.{chain_type}/mabs.csv"
     shell: "sonar_ancs_common.py --ancestors {input.ancs} --clade {input.mabs} --output {output}"
 
+rule report_sonar_igphyml_ancestors_custom_common:
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.custom.common.fa"
+    input:
+        ancs="analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.custom.fa",
+        mabs="analysis/reporting/sonar/{antibody_lineage}.{chain_type}/mabs.csv"
+    shell: "sonar_ancs_common.py --ancestors {input.ancs} --clade {input.mabs} --output {output}"
+
 rule report_sonar_igphyml_ancestors:
     """Copy SONAR module 3 inferred ancestors FASTA."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.fa"
     input:
         lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa")
+    shell: "igseq convert {input} {output}"
+
+rule report_sonar_igphyml_ancestors_custom:
+    """Copy SONAR module 3 (custom alignment) inferred ancestors FASTA."""
+    output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.custom.fa"
+    input:
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/nucleotide/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa")
     shell: "igseq convert {input} {output}"
 
 rule report_sonar_igphyml_alignment:
