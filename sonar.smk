@@ -20,6 +20,8 @@ ruleorder: sonar_module_2_id_div_island_alternate > sonar_module_2_id_div_island
 #   * sonar_2_islands_{subject}_{chain_type}_{antibody_lineage}
 #   * sonar_3_{subject}_{chain_type}
 #   * sonar_3_{subject}_{chain_type}_{antibody_lineage}
+#   * sonar_3_{subject}_{chain_type}_custom
+#   * sonar_3_{subject}_{chain_type}_custom_{antibody_lineage}
 #
 # Get a full list of these rules and their descriptions with snakemake -l.
 def sonar_setup_helper_rules():
@@ -116,10 +118,11 @@ sonar_setup_helper_rules()
 rule sonar_gather_mature:
     """Get heavy or light chain mature antibody sequences.
 
-    This includes all lineages for the subject, if applicable.  This is stored
-    in each project directory for a given subject so that you can optionally
-    add custom sequences for a given timepoint.  (But, not at the top of the
-    project directory, or SONAR will use it as input.)
+    This includes all lineages for the subject, if applicable, and all isolates
+    that are not marked for exclusion from member identification.  This is
+    stored in each project directory for a given subject so that you can
+    optionally add custom sequences for a given timepoint.  (But, not at the
+    top of the project directory, or SONAR will use it as input.)
 
     This will only keep the first occurrence of each sequence, so that mAb
     isolates that have identical sequences won't result in duplication of
@@ -139,6 +142,10 @@ rule sonar_gather_mature:
                     # Skip light chain sequences that are for the other locus
                     # than whatever was amplified here
                     continue
+                if attrs.get("IncludeInTracing") == "N":
+                    # Skip any isolates marked for exclusion from the tracing
+                    # itself
+                    continue
                 seq = attrs[seq_col]
                 if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject and seq not in seen:
                     f_out.write(f">{seqid}\n")
@@ -146,7 +153,8 @@ rule sonar_gather_mature:
                     seen.add(seq)
 
 # I think this only comes up for including sequences for IgPhyML.  In this case
-# we *will* keep duplicates so all mAb sequences will be in the tree.
+# we *will* keep duplicates so all mAb sequences will be in the tree, excluding
+# those explicitly marked for exclusion for this step.
 rule sonar_gather_mature_by_lineage:
     output: "analysis/sonar/{subject}.{chain_type}/{projdir}/mab/mab.{antibody_lineage}.fasta"
     run:
@@ -156,7 +164,8 @@ rule sonar_gather_mature_by_lineage:
             seq_col = "HeavySeq"
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
-                if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col]:
+                if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col] \
+                        and attrs.get("IncludeInOutput") != "N":
                     f_out.write(f">{seqid}\n")
                     f_out.write(attrs[seq_col]+"\n")
 
@@ -494,7 +503,7 @@ rule sonar_module_3_igphyml_auto:
         unpack(input_sonar_germline),
         collected="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
         natives="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/mab/mab.{antibody_lineage}.fasta"
-    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/log.txt"
+    log: Path("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/log.txt").resolve()
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -536,7 +545,7 @@ rule sonar_module_3_igphyml_custom:
         stats=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/logs/longitudinal-custom-{antibody_lineage}_igphyml_stats.txt")
     input:
         alignment=Path("analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.fa").resolve()
-    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/log.txt"
+    log: Path("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/log.txt").resolve()
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -567,7 +576,7 @@ rule sonar_make_natives_table:
         # we don't actually need the files here but this has the logic to name
         # the timepoints
         tp_fastas=sonar_module_3_collect_inputs
-    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}{antibody_lineage}/natives.tab.log"
+    log: Path("analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}{antibody_lineage}/natives.tab.log")
     wildcard_constraints:
         thing="custom-|",
         antibody_lineage="(?!custom-)[^/]+"
