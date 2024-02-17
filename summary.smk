@@ -45,7 +45,7 @@ def summary_setup_helper_rules():
             targets += expand(
                 "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors{thing}.common.fa",
                 thing=things, **w)
-            targets += ["analysis/reporting/by-lineage/{antibody_lineage}_divergence.csv"]
+            targets += [f"summary/{subject}/{lineage}/{lineage}_divergence.pdf"]
         rule:
             f"Summary outputs for subject {subject} lineage {lineage}"
             name: f"summary_{lineage}"
