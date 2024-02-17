@@ -148,7 +148,7 @@ rule sonar_gather_mature:
                     continue
                 seq = attrs[seq_col]
                 if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject and seq not in seen:
-                    f_out.write(f">{seqid}\n")
+                    f_out.write(f">{seqid} {attrs['AntibodyLineage']}\n")
                     f_out.write(attrs[seq_col]+"\n")
                     seen.add(seq)
 
