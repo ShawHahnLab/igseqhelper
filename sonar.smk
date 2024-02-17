@@ -618,7 +618,7 @@ rule sonar_module_3_draw_tree:
         natives_tab="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/natives{suffix}.tab"
     singularity: "docker://jesse08/sonar"
     params:
-        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{thing}", **w),
+        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}", **w),
         # (Jumping through some hoops to run inside of the SONAR project
         # directory to avoid leaving things like SONAR_command_history.log
         # lying around at the top level)
