@@ -445,6 +445,8 @@ def sonar_module_3_collect_inputs(w):
             "IgG" in samp["SpecimenAttrs"]["CellType"]:
             specimens.add(samp["Specimen"])
     specimens = list(specimens)
+    if not specimens:
+        return []
     # sort specimens by timepoint and generate timepoints (integers) and
     # timepoint labels (strings)
     timepoints, labels, specimens = format_timepoints([SPECIMENS[spec] for spec in specimens])
