@@ -21,6 +21,7 @@ wildcard_constraints:
     compressed="((?!xz$).)*",
     ext="[^/]+", # file extension (limited to one directory)
     thing="[^/]+", # any match limited to one directory
+    name="[^/]+", # ditto
     rp="(R1|R2|I1|I2)"
 
 include: "metadata.smk"
