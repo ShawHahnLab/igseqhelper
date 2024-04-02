@@ -14,12 +14,18 @@ import csv
 import json
 from datetime import (datetime, timezone)
 
+# We'll use the standard outputs for V (and D) but will take the more
+# stringently-filtered J output
 # D will be ignored for light chain but is always there (which makes the
 # snakemake rules here easy)
 def input_for_igdiscover_as_germline(w):
     chain_type = {"IGH": "mu", "IGK": "kappa", "IGL": "lambda"}[w.locus]
     ref = "kimdb" if w.locus == "IGH" else "sonarramesh"
-    targets = {segment: f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}/final/database/{segment}.fasta" for segment in ["V", "D", "J"]}
+    targets = {
+        "V": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}/final/database/V.fasta",
+        "D": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}/final/database/D.fasta",
+        "J": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}/custom_j_discovery/J.fasta",
+        }
     return targets
 
 rule igdiscover_as_germline:
