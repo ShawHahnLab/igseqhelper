@@ -68,7 +68,7 @@ def summary_setup_subject_helper_rules():
         # MINING-D output from heavy chain IgM
         if subject in m_subjects["IGH"]:
             targets += expand(
-                "summary/{subject}/{subject}.miningd.default.txt",
+                "summary/{subject}/{subject}.miningd.{pval}.txt",
                 subject=subject, pval=["default", "sensitive"])
         # IgDiscover output from IgM for whichever loci were sequenced
         loci = {locus for locus in m_subjects.keys() if subject in m_subjects[locus]}
@@ -143,8 +143,8 @@ rule summary_germline_divergence_plot:
 ### Subject summary rules
 
 rule summary_miningd:
-    output: "summary/{subject}/{subject}.miningd.default.txt"
-    input: "analysis/mining-d/{subject}.output.default.txt"
+    output: "summary/{subject}/{subject}.miningd.{thing}.txt"
+    input: "analysis/mining-d/{subject}.output.{thing}.txt"
     shell: "cp {input} {output}"
 
 rule summary_germline:
