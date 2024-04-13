@@ -23,6 +23,7 @@ def summary_setup_lineage_helper_rules():
         subject = attrs["Subject"]
         targets = []
         for chain in ["heavy", "light"]:
+            targets_chain = []
             w = set_chain_type({"subject": attrs["Subject"], "antibody_lineage": lineage, "chain": chain})
             # will default to just igphyml-based outputs for automatic alignment,
             # and only expect the custom alignment outputs if a custom alignment is
@@ -32,21 +33,26 @@ def summary_setup_lineage_helper_rules():
                 "analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.fa", **w)[0])
             if custom_aln.exists():
                 things += [".custom"]
-            targets += expand(
+            targets_chain += expand(
                 "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_igphyml{thing}.{ext}",
                 thing=things, ext=["tree", "tree.pdf"], **w)
-            targets += expand(
+            targets_chain += expand(
                 "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_aligned{thing}.afa",
                 thing=things, **w)
-            targets += expand(
+            targets_chain += expand(
                 "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_collected.fa", **w)
-            targets += expand(
+            targets_chain += expand(
                 "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors{thing}.fa",
                 thing=things, **w)
-            targets += expand(
+            targets_chain += expand(
                 "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors{thing}.common.fa",
                 thing=things, **w)
-            targets += [f"summary/{subject}/{lineage}/{lineage}_divergence.pdf"]
+            targets_chain += [f"summary/{subject}/{lineage}/{lineage}_divergence.pdf"]
+            targets += targets_chain
+            rule:
+                f"Summary outputs for subject {subject} lineage {lineage} chain {chain}"
+                name: f"summary_lineage_{lineage}_{chain}"
+                input: targets_chain
         rule:
             f"Summary outputs for subject {subject} lineage {lineage}"
             name: f"summary_lineage_{lineage}"
