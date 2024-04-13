@@ -199,8 +199,8 @@ def input_sonar_germline(w):
 
 rule sonar_module_1:
     output:
-        fasta=protected(WD_SONAR/"output/sequences/nucleotide/{specimen}_goodVJ_unique.fa"),
-        rearr=protected(WD_SONAR/"output/tables/{specimen}_rearrangements.tsv")
+        fasta=WD_SONAR/"output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
+        rearr=WD_SONAR/"output/tables/{specimen}_rearrangements.tsv"
     input:
         # SONAR can use multiple input files and will automatically detect
         # them, but it requires them to be plaintext.
@@ -340,7 +340,7 @@ rule sonar_list_members_for_lineage:
 # singularity.
 rule sonar_module_2_id_div_island:
     output:
-        seqids=protected(WD_SONAR / "output/tables/islandSeqs_{antibody_lineage}.txt")
+        seqids=WD_SONAR / "output/tables/islandSeqs_{antibody_lineage}.txt"
     input:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.tab",
         mab=WD_SONAR / "mab/mab.{antibody_lineage}.txt"
@@ -358,7 +358,7 @@ rule sonar_module_2_id_div_island:
 
 rule sonar_module_2_id_div_island_alternate:
     output:
-        seqids=protected(WD_SONAR / "output/tables/islandSeqs_{antibody_lineage}.txt")
+        seqids=WD_SONAR / "output/tables/islandSeqs_{antibody_lineage}.txt"
     input:
         iddiv=WD_SONAR / "output/tables/{specimen}_goodVJ_unique_id-div.alt.tab",
         mab=WD_SONAR / "mab/mab.{antibody_lineage}.txt"
@@ -377,7 +377,7 @@ rule sonar_module_2_id_div_island_alternate:
 rule sonar_module_2_id_div_getfasta:
     """SONAR 2: Extract FASTA matching selected island's seq IDs."""
     output:
-        fasta=protected(WD_SONAR / "output/sequences/nucleotide/islandSeqs_{txt}.fa")
+        fasta=WD_SONAR / "output/sequences/nucleotide/islandSeqs_{txt}.fa"
     input:
         fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
         seqids=WD_SONAR / "output/tables/islandSeqs_{txt}.txt"
