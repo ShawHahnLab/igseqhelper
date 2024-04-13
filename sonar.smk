@@ -496,11 +496,11 @@ ruleorder: sonar_module_3_igphyml_custom > sonar_module_3_igphyml_auto
 rule sonar_module_3_igphyml_auto:
     """SONAR 3: Run phylogenetic analysis with automatic alignment and generate tree across specimens."""
     output:
-        tree=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree"),
-        inferred_nucl=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
-        inferred_prot=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa"),
-        stats=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt"),
-        afa=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/work/phylo/longitudinal-{antibody_lineage}_aligned.afa")
+        tree="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree",
+        inferred_nucl="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa",
+        inferred_prot="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa",
+        stats="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt",
+        afa="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/work/phylo/longitudinal-{antibody_lineage}_aligned.afa"
     input:
         unpack(input_sonar_germline),
         collected="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
@@ -541,10 +541,10 @@ rule sonar_module_3_igphyml_custom:
     This will given the first sequence ID in the alignment as the --root for sonar igphyml.
     """
     output:
-        tree=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/longitudinal-custom-{antibody_lineage}_igphyml.tree"),
-        inferred_nucl=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/nucleotide/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa"),
-        inferred_prot=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/amino_acid/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa"),
-        stats=protected("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/logs/longitudinal-custom-{antibody_lineage}_igphyml_stats.txt")
+        tree="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/longitudinal-custom-{antibody_lineage}_igphyml.tree",
+        inferred_nucl="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/nucleotide/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa",
+        inferred_prot="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/amino_acid/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa",
+        stats="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/logs/longitudinal-custom-{antibody_lineage}_igphyml_stats.txt"
     input:
         alignment=Path("analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.fa").resolve()
     log: Path("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/log.txt").resolve()
