@@ -312,7 +312,7 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None
     # two (otherwise colors will be assigned automatically)
     group_names = list({row["group"] for row in rows})
     if len(group_names) == 2 and not group_colors:
-        group_names = sorted(group_names, key=lambda x: "member" not in x.lower())
+        group_names = sorted(group_names, key=lambda x: ("bulk" not in x.lower(), x))
         group_colors = {group_names[0]: "#000000", group_names[1]: "#ff0000"}
     if group_colors:
         plt += p9.scale_color_manual(values=group_colors)
@@ -349,9 +349,9 @@ def germ_div_output(rows, path_out, **kwargs):
 def main(arglist=None):
     parser = __setup_arg_parser()
     if arglist is None:
-        args, args_extra = parser.parse_known_args()
+        args = parser.parse_args()
     else:
-        args, args_extra = parser.parse_known_args(arglist)
+        args = parser.parse_args(arglist)
     if not vars(args):
         parser.print_help()
         sys.exit(0)

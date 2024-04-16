@@ -419,7 +419,7 @@ rule report_lineages_divergence:
     input: unpack(report_lineages_divergence_input)
     params:
         refs=report_lineages_divergence_param_refs
-    shell: "germ_div.py -S rhesus -r {params.refs} -Q {input.members} mabs={input.mabs} -G Bulk mabs=mAb -o {output}"
+    shell: "germ_div.py -S rhesus -r {params.refs} -Q {input.members} isol={input.mabs} -G Bulk isol=Isolate -o {output}"
 
 rule report_lineages_mabs:
     output: temp("analysis/reporting/by-lineage/{antibody_lineage}.mabs.csv")
