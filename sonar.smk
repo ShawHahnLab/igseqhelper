@@ -399,6 +399,8 @@ rule sonar_module_2_id_div_getfasta:
                 -o {params.output_fasta}
         """
 
+# NOTE: specimens of the same timepoint will be labeled in the order they are
+# given
 def format_timepoints(specimens):
     # e.g.:
     # -12   "wkN12"
@@ -438,24 +440,34 @@ def sonar_module_3_collect_inputs(w):
     # first gather all relevant specimens.  This is the same logic as the
     # module 2 helper above, searching via samples to select specimens that
     # have amplicons for the right chain type.
-    specimens = set()
+    spec_names_here = set()
     for samp in SAMPLES.values():
         if samp["Type"] == w.chain_type and \
             samp["SpecimenAttrs"]["Subject"] == w.subject and \
             "IgG" in samp["SpecimenAttrs"]["CellType"]:
-            specimens.add(samp["Specimen"])
-    specimens = list(specimens)
-    if not specimens:
+            spec_names_here.add(samp["Specimen"])
+    spec_names_here = list(spec_names_here)
+    if not spec_names_here:
         return []
     # sort specimens by timepoint and generate timepoints (integers) and
     # timepoint labels (strings)
-    timepoints, labels, specimens = format_timepoints([SPECIMENS[spec] for spec in specimens])
+    # first, an initial sort so any same-timepoint specimens are always labeled
+    # the same.  Also specifically sort so that things like "...IGG" come
+    # before "...IGG2"
+    def spec_name_sorter(txt):
+        match = re.search(r"IG[GM]([0-9]+)$", txt)
+        if match:
+            num = int(match.group(1))
+            return (txt, num)
+        return (txt, 0)
+    spec_names_here.sort(key=spec_name_sorter)
+    timepoints, labels, specs_here = format_timepoints([SPECIMENS[s] for s in spec_names_here])
     targets = expand(
         "analysis/sonar/{subject}.{chain_type}/{other_specimen}/"
         "output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa",
         subject=w.subject,
         chain_type=w.chain_type,
-        other_specimen=[attrs["Specimen"] for attrs in specimens],
+        other_specimen=[attrs["Specimen"] for attrs in specs_here],
         antibody_lineage=w.antibody_lineage)
     targets = {label: target for label, target in zip(labels, targets)}
     return targets
