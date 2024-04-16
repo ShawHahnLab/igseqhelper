@@ -15,6 +15,7 @@ from csv import DictReader, DictWriter
 from collections import defaultdict
 
 from pandas import DataFrame
+from numpy.random import RandomState
 import plotnine as p9
 
 from igseq import igblast
@@ -275,7 +276,7 @@ def _smooth_v_calls(rows):
         rows_out.append(row)
     return rows_out
 
-def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None, note_partial_seqs=False):
+def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None, note_partial_seqs=False, jitter_seed=1):
     tp_breaks = {round(row["timepoint"]) for row in rows}
     tp_breaks.add(0)
     tp_breaks = sorted(list(tp_breaks))
@@ -295,7 +296,7 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None
     plt = p9.ggplot(
         DataFrame(rows),
         p9.aes(**plot_attrs)) + \
-        p9.geom_jitter(width=jitter_width, height=jitter_height) + \
+        p9.geom_jitter(width=jitter_width, height=jitter_height, random_state=RandomState(jitter_seed)) + \
         p9.guides(
             color=p9.guide_legend(title="Category"),
             shape=False) + \
@@ -317,6 +318,7 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None
         plt += p9.scale_color_manual(values=group_colors)
     # If multiple loci, facet plot by locus
     loci = {row["locus"] for row in rows}
+    loci = sorted(list(loci), key=lambda locus: (locus != "IGH", locus))
     if len(loci) > 1:
         LOGGER.info("Faceting plot by locus (%s)", loci)
         plt += p9.facet_grid("locus ~ .")
