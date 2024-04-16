@@ -407,7 +407,7 @@ def report_lineages_divergence_input(w):
 
 def report_lineages_divergence_param_refs(w, input):
     # to condense V/D/J to just parent dirs
-    return list({Path(path).parent for path in input.refs})
+    return sorted(list({Path(path).parent for path in input.refs}))
 
 rule report_lineages_divergence_plot:
     output: "analysis/reporting/by-lineage/{antibody_lineage}.divergence.pdf"
