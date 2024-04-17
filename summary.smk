@@ -47,7 +47,6 @@ def summary_setup_lineage_helper_rules():
             targets_chain += expand(
                 "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors{thing}.common.fa",
                 thing=things, **w)
-            targets_chain += [f"summary/{subject}/{lineage}/{lineage}_divergence.pdf"]
             targets += targets_chain
             rule:
                 f"Summary outputs for subject {subject} lineage {lineage} chain {chain}"
@@ -56,7 +55,7 @@ def summary_setup_lineage_helper_rules():
         rule:
             f"Summary outputs for subject {subject} lineage {lineage}"
             name: f"summary_lineage_{lineage}"
-            input: targets
+            input: targets + [f"summary/{subject}/{lineage}/{lineage}_divergence.pdf"]
 
 def summary_setup_subject_helper_rules():
     """Define per-subject summary rules dynamically"""
