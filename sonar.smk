@@ -538,8 +538,9 @@ rule sonar_module_3_igphyml_auto:
             cd {params.wd_sonar}
             date | tee -a {log}
             echo "$(which sonar): $(sonar --version)" | tee -a {log}
-            echo "Running sonar igphyml with custom alignment" | tee -a {log}
+            echo "Running sonar igphyml with automatic alignment" | tee -a {log}
             echo "Project directory: $PWD" | tee -a {log}
+            echo "Given seq ID for tree root: {params.v_id}" | tee -a {log}
             sonar igphyml \
                 -v '{params.v_id}' \
                 --lib {params.input_germline_v} \
