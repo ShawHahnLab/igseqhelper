@@ -22,7 +22,13 @@ that subject and locus.
 
 # No input reference required unless prefixed with "custom-"
 def input_for_igblast(w):
-    targets = {"query": f"analysis/{w.path}"}
+    # special handling for .fasta: use xz-compressed FASTA directly if that's
+    # available on disk and the expected .fa isn't, but otherwise just use the
+    # input path that's implied
+    query = Path(f"analysis/{w.path}")
+    if not query.exists() and query.suffix == ".fa" and Path(str(query) + ".xz").exists():
+        query = str(query) + ".xz"
+    targets = {"query": query}
     if w.ref.startswith("custom-"):
         targets["ref"] = f"analysis/igblast/ref-{w.ref}"
     return targets
@@ -43,14 +49,19 @@ rule igblast:
         outfmt=19, # AIRR TSV format
         species="rhesus"
     threads: 8
+    # include special handling for xz-compressed FASTA I have for some older
+    # output files.
     shell:
         """
-            igseq igblast \
-                -t {threads} \
-                -S {params.species} \
-                -r {params.ref} \
-                -Q {input.query} \
-                -outfmt {params.outfmt} | gzip > {output}
+            if [[ {input.query} =~ \.fa\.xz$ ]]; then
+                xzcat {input.query} | igseq igblast --input-format fa -Q - \
+                    -t {threads} -S {params.species} -r {params.ref} \
+                    -outfmt {params.outfmt} | gzip > {output}
+            else
+                igseq igblast -Q {input.query} \
+                    -t {threads} -S {params.species} -r {params.ref} \
+                    -outfmt {params.outfmt} | gzip > {output}
+            fi
         """
 
 # One automatically-available custom reference: per-subject per-locus germline
