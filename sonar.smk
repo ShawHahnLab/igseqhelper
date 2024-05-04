@@ -525,6 +525,7 @@ rule sonar_module_3_igphyml_auto:
         input_germline_v=lambda w, input: Path(input.V).resolve(),
         input_natives=lambda w, input: Path(input.natives).resolve(),
         v_id=sonar_module_3_igphyml_param_v_id,
+        seed=123, # 123 is SONAR's default for igphyml --r_seed
         args="-f"
     shell:
         """
@@ -540,12 +541,14 @@ rule sonar_module_3_igphyml_auto:
             echo "$(which sonar): $(sonar --version)" | tee -a {log}
             echo "Running sonar igphyml with automatic alignment" | tee -a {log}
             echo "Project directory: $PWD" | tee -a {log}
+            echo "Random seed: {params.seed}" | tee -a {log}
             echo "Given seq ID for tree root: {params.v_id}" | tee -a {log}
             sonar igphyml \
                 -v '{params.v_id}' \
                 --lib {params.input_germline_v} \
                 --natives {params.input_natives} \
-                {params.args}
+                --seed {params.seed} \
+                {params.args} 2>&1 | tee -a {log}
         """
 
 rule sonar_module_3_igphyml_custom:
@@ -565,6 +568,7 @@ rule sonar_module_3_igphyml_custom:
     threads: 4
     params:
         wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}", **w),
+        seed=123,
         args="-f"
     shell:
         """
@@ -575,9 +579,10 @@ rule sonar_module_3_igphyml_custom:
             echo "$(which sonar): $(sonar --version)" | tee -a {log}
             echo "Running sonar igphyml with custom alignment" | tee -a {log}
             echo "Project directory: $PWD" | tee -a {log}
+            echo "Random seed: {params.seed}" | tee -a {log}
             root=$(head -n 1 {input.alignment} | cut -c 2- | cut -f 1 -d ' ')
             echo "Detected seq ID for tree root from first FASTA record: $root" | tee -a {log}
-            sonar igphyml --root "$root" -i {input.alignment} {params.args} 2> {log}
+            sonar igphyml --root "$root" -i {input.alignment} --seed {params.seed} {params.args} 2>&1 | tee -a {log}
         """
 
 rule sonar_make_natives_table:
