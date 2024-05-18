@@ -936,7 +936,14 @@ rule report_igdiscover_tree:
     input:
         after="analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.fasta",
         before="analysis/igdiscover/{ref}/{chain_type}/{segment}.fasta"
-    shell: "igseq tree before={input.before} after={input.after} {output}"
+    log:
+        conda="analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.nex.conda_build.txt"
+    conda: "igseq.yml"
+    shell:
+        """
+            conda list --explicit > {log.conda}
+            igseq tree before={input.before} after={input.after} {output}
+        """
 
 rule report_igdiscover_final_db:
     output: "analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.fasta"
@@ -949,7 +956,14 @@ rule report_miningd_combo_tree:
     """Make a tree of all subjects' MINING-D output compared with all known D sequences."""
     output: "analysis/reporting/mining-d/all.nex"
     input: "analysis/reporting/mining-d/all.msa.fasta"
-    shell: "igseq tree {input} {output}"
+    log:
+        conda="analysis/reporting/mining-d/all.nex.conda_build.txt"
+    conda: "igseq.yml"
+    shell:
+        """
+            conda list --explicit > {log.conda}
+            igseq tree {input} {output}
+        """
 
 rule report_miningd_combo_msa:
     """Align all subjects' MINING-D output with all known D sequences."""
@@ -957,7 +971,14 @@ rule report_miningd_combo_msa:
     input:
         subject="analysis/reporting/mining-d/all.fasta",
         refs="analysis/reporting/mining-d/refs.fa"
-    shell: "cat {input.refs} {input.subject} | igseq msa --input-format fa - {output}"
+    log:
+        conda="analysis/reporting/mining-d/all.msa.fasta.conda_build.txt"
+    conda: "igseq.yml"
+    shell:
+        """
+            conda list --explicit > {log.conda}
+            cat {input.refs} {input.subject} | igseq msa --input-format fa - {output}
+        """
 
 rule report_miningd_combo_fasta:
     """Combine all subjects' MINING-D outputs into one FASTA."""
@@ -980,8 +1001,12 @@ rule report_miningd_tree:
         msa="analysis/reporting/mining-d/{subject}/{subject}.msa.fasta",
         subject="analysis/reporting/mining-d/{subject}/{subject}.fasta",
         refs="analysis/reporting/mining-d/refs.fa"
+    log:
+        conda="analysis/reporting/mining-d/{subject}/{subject}.nex.conda_build.txt"
+    conda: "igseq.yml"
     shell:
         """
+            conda list --explicit > {log.conda}
             igseq tree \
                 -C subject=#880000 -C refs=#000000 \
                 -L subject=<(grep '^>' {input.subject} | cut -c 2- | cut -f 1 -d ' ') \
@@ -995,7 +1020,14 @@ rule report_miningd_msa:
     input:
         subject="analysis/reporting/mining-d/{subject}/{subject}.fasta",
         refs="analysis/reporting/mining-d/refs.fa"
-    shell: "cat {input.refs} {input.subject} | igseq msa --input-format fa - {output}"
+    log:
+        conda="analysis/reporting/mining-d/{subject}/{subject}.msa.fasta.conda_build.txt"
+    conda: "igseq.yml"
+    shell:
+        """
+            conda list --explicit > {log.conda}
+            cat {input.refs} {input.subject} | igseq msa --input-format fa - {output}
+        """
 
 rule report_miningd_refs:
     """

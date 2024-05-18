@@ -108,36 +108,43 @@ rule summary_tree_custom:
 rule summary_aln_auto:
     output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_aligned.afa"
     input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/work/phylo/longitudinal-{antibody_lineage}_aligned.afa", **set_chain_type(w))
+    conda: "igseq.yml"
     shell: "igseq convert {input} {output}"
     
 rule summary_aln_custom:
     output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_aligned.custom.afa"
     input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.fa", **set_chain_type(w))
+    conda: "igseq.yml"
     shell: "igseq convert {input} {output}"
 
 rule summary_collected:
     output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_collected.fa"
     input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa", **set_chain_type(w))
+    conda: "igseq.yml"
     shell: "igseq convert {input} {output}"
 
 rule summary_ancestors_auto:
     output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.fa"
     input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa", **set_chain_type(w))
+    conda: "igseq.yml"
     shell: "igseq convert {input} {output}"
 
 rule summary_ancestors_custom:
     output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.custom.fa"
     input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/nucleotide/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa", **set_chain_type(w))
+    conda: "igseq.yml"
     shell: "igseq convert {input} {output}"
 
 rule summary_ancestors_common:
     output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.common.fa"
     input: lambda w: expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.common.fa", **set_chain_type(w))
+    conda: "igseq.yml"
     shell: "igseq convert {input} {output}"
 
 rule summary_ancestors_custom_common:
     output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.custom.common.fa"
     input: lambda w: expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.custom.common.fa", **set_chain_type(w))
+    conda: "igseq.yml"
     shell: "igseq convert {input} {output}"
 
 rule summary_germline_divergence_plot:
@@ -155,4 +162,5 @@ rule summary_miningd:
 rule summary_germline:
     output: "summary/{subject}/{subject}.germline.{locus}{segment}.fasta"
     input: "analysis/germline/{subject}.{locus}/{segment}.fasta"
+    conda: "igseq.yml"
     shell: "igseq convert {input} {output}"

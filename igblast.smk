@@ -48,11 +48,15 @@ rule igblast:
         ref=ref_for_igblast,
         outfmt=19, # AIRR TSV format
         species="rhesus"
+    log:
+        conda="analysis/igblast/{ref}/{path}.conda_build.txt"
+    conda: "igseq.yml"
     threads: 8
     # include special handling for xz-compressed FASTA I have for some older
     # output files.
     shell:
         """
+            conda list --explicit > {log.conda}
             if [[ {input.query} =~ \.fa\.xz$ ]]; then
                 xzcat {input.query} | igseq igblast --input-format fa -Q - \
                     -t {threads} -S {params.species} -r {params.ref} \

@@ -61,9 +61,13 @@ rule merged_igblast:
         tsv="analysis/igblast/merge/{run}/{sample}.tsv.gz"
     input:
         fqgz="analysis/merge/{run}/{sample}.fastq.gz"
+    log:
+        conda="analysis/igblast/merge/{run}/{sample}.tsv.gz.conda_build.txt"
+    conda: "igseq.yml"
     threads: 4
     shell:
         """
+            conda list --explicit > {log.conda}
             igseq igblast -r rhesus/imgt -t {threads} -Q {input.fqgz} --outfmt 19 | gzip > {output}
         """
 
@@ -75,9 +79,13 @@ rule pair_merge:
     input:
         r1="analysis/trim/{run}/{sample}.R1.fastq.gz",
         r2="analysis/trim/{run}/{sample}.R2.fastq.gz"
+    log:
+        conda="analysis/merge/{run}/{sample}.fastq.gz.conda_build.txt"
+    conda: "igseq.yml"
     threads: 4
     shell:
         """
+            conda list --explicit > {log.conda}
             igseq merge -t {threads} {input.r1} {input.r2}
         """
 
@@ -105,9 +113,13 @@ rule pair_trim:
         report2="analysis/trim/{run}/{sample}.cutadapt2.json",
         counts="analysis/trim/{run}/{sample}.trim.counts.csv"
     input: unpack(pair_trim_input)
+    log:
+        conda="analysis/trim/{run}/{sample}.trim.conda_build.txt"
+    conda: "igseq.yml"
     threads: 4
     shell:
         """
+            conda list --explicit > {log.conda}
             igseq trim -t {threads} \
                 --samples {input.samples} \
                 --species rhesus \
@@ -121,9 +133,13 @@ rule pair_phix:
         counts="analysis/phix/{run}/phix.counts.csv"
     input:
         demux="analysis/demux/{run}"
+    log:
+        conda="analysis/phix/{run}/conda_build.txt"
+    conda: "igseq.yml"
     threads: 4
     shell:
         """
+            conda list --explicit > {log.conda}
             igseq phix -t {threads} {input}
         """
 
@@ -134,13 +150,27 @@ rule demux:
     input:
         reads="analysis/reads/{run}",
         samples=ancient("metadata/samples.csv")
-    shell: "igseq demux --samples {input.samples} --details {output}/details.csv.gz {input.reads}"
+    log:
+        conda="analysis/demux/{run}/conda_build.txt"
+    conda: "igseq.yml"
+    shell:
+        """
+            conda list --explicit > {log.conda}
+            igseq demux --samples {input.samples} --details {output}/details.csv.gz {input.reads}
+        """
 
 rule getreads:
     output: directory("analysis/reads/{run}")
     input: ancient("/seq/runs/{run}")
+    log:
+        conda="analysis/reads/{run}/conda_build.txt"
+    conda: "igseq.yml"
     threads: 28
-    shell: "igseq getreads -t {threads} --threads-load $(({threads}<4 ? {threads} : 4)) {input}"
+    shell:
+        """
+            conda list --explicit > {log.conda}
+            igseq getreads -t {threads} --threads-load $(({threads}<4 ? {threads} : 4)) {input}
+        """
 
 ### Samples grouped by subject or specimen
 # Each directory will contain a set of symbolic links pointing to the

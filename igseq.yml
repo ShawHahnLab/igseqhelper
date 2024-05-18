@@ -1,0 +1,9 @@
+# conda environment YAML for igseq (command-line tool)
+name: igseqhelper
+channels:
+  - ShawHahnLab
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - igseq>=0.5.1
