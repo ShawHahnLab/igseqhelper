@@ -206,6 +206,7 @@ rule sonar_module_1:
         # them, but it requires them to be plaintext.
         unpack(input_sonar_germline),
         reads="analysis/samples-by-specimen/{specimen}.{chain_type}"
+    log: (WD_SONAR/"log.txt").resolve()
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -240,10 +241,21 @@ rule sonar_module_1:
                 zcat $fqgz > {params.wd_sonar}/$(basename ${{fqgz%.gz}})
             done
             cd {params.wd_sonar}
-            sonar blast_V {params.libv_arg} --derep --threads {threads}
-            sonar blast_J {params.libd_arg} {params.libj_arg} --noC --threads {threads}
-            sonar finalize --jmotif '{params.jmotif}' --threads {threads}
-            sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2}
+            date | tee -a {log}
+            echo "$(which sonar): $(sonar --version)" | tee -a {log}
+            echo "Running sonar module 1" | tee -a {log}
+            echo "Project directory: $PWD" | tee -a {log}
+            echo "germline V: {input.V}" | tee -a {log}
+            echo "germline D: {input.D}" | tee -a {log}
+            echo "germline J: {input.J}" | tee -a {log}
+            echo "J motif: {params.jmotif}" | tee -a {log}
+            echo "Cluster ID fract: {params.cluster_id_fract}" | tee -a {log}
+            echo "Cluster min2: {params.cluster_min2}" | tee -a {log}
+            echo | tee -a {log}
+            sonar blast_V {params.libv_arg} --derep --threads {threads} 2>&1 | tee -a {log}
+            sonar blast_J {params.libd_arg} {params.libj_arg} --noC --threads {threads} 2>&1 | tee -a {log}
+            sonar finalize --jmotif '{params.jmotif}' --threads {threads} 2>&1 | tee -a {log}
+            sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2} 2>&1 | tee -a {log}
         """
 
 rule alternate_iddiv_with_igblast:
@@ -492,6 +504,11 @@ rule sonar_module_3_collect:
         """
 
 def sonar_module_3_igphyml_param_v_id(wildcards):
+    key_default = "germline_v"
+    key = "germline_v_{subject}_{chain_type}_{antibody_lineage}".format(**wildcards)
+    v_call = config.get(key, config.get(key_default))
+    if v_call:
+        return v_call
     if wildcards.chain_type in ["kappa", "lambda"]:
         v_call = ANTIBODY_LINEAGES[wildcards.antibody_lineage]["VL"]
     else:
