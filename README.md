@@ -1,6 +1,10 @@
 # IgSeq Helpers
 
-An attempt at generalizing our code for Rhesus macaque antibody analyses.  I'm
-aiming to move functionality from here into
-[igseq](https://github.com/shawhahnlab/igseq) wherever I can, so this is
-largely just Snakemake rules gluing everything together.
+A collection of [Snakemake] rules and [Conda] environment definitions for
+coordinating our Rhesus macaque antibody lineage tracing analyses.  The code
+here makes heavy use of our [igseq] command-line tool, so this is largely just
+Snakemake rules to glue everything together.
+
+[Snakemake]: https://snakemake.readthedocs.io
+[Conda]: https://conda.io
+[igseq]: https://github.com/shawhahnlab/igseq
