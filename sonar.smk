@@ -142,7 +142,7 @@ rule sonar_gather_mature:
                     # Skip light chain sequences that are for the other locus
                     # than whatever was amplified here
                     continue
-                if attrs.get("IncludeInTracing") == "N":
+                if attrs.get("IncludeInTracing") != "Y":
                     # Skip any isolates marked for exclusion from the tracing
                     # itself
                     continue
@@ -165,7 +165,7 @@ rule sonar_gather_mature_by_lineage:
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
                 if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col] \
-                        and attrs.get("IncludeInOutput") != "N":
+                        and attrs.get("IncludeInOutput") == "Y":
                     f_out.write(f">{seqid}\n")
                     f_out.write(attrs[seq_col]+"\n")
 
@@ -335,7 +335,8 @@ rule sonar_list_members_for_lineage:
                 seq = attrs[seq_col]
                 if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject \
                     and seq not in seen and \
-                    attrs["AntibodyLineage"] == wildcards.antibody_lineage:
+                    attrs["AntibodyLineage"] == wildcards.antibody_lineage and \
+                    attrs["IncludeInTracing"] == "Y":
                         f_out.write(f"{seqid}\n")
                         seen.add(seq)
 
