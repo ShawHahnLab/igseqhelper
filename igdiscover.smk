@@ -73,6 +73,7 @@ rule igdiscover_db_sonarramesh:
     # working with here.  (And if that's IGH, it'll still just write the D
     # sequences once.)
     output: expand("analysis/igdiscover/sonarramesh/{{chain_type}}/{segment}.fasta", segment=["V", "D", "J"])
+    conda: "igseq.yml"
     params:
         outdir="analysis/igdiscover/sonarramesh/{chain_type}",
         locus=lambda w: {"mu": "IGH", "kappa": "IGK", "lambda": "IGL"}[w.chain_type]
