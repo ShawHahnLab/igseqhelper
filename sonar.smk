@@ -629,6 +629,9 @@ rule sonar_make_natives_table:
             log_out.write(f"starting timepoints {keys}\n")
             log_out.write(f"lineage {wildcards.antibody_lineage}\n")
             log_out.write(f"seq_col {seq_col}\n")
+            # TODO don't assume that the isolates come later than all the
+            # bulk-sequenced timepoints.  That'll require a bit of reorganizing
+            # to how this is done, though.
             for seqid, attrs in ANTIBODY_ISOLATES.items():
                 if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col]:
                     tp = "wk" + attrs["Timepoint"]
