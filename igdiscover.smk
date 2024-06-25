@@ -97,6 +97,11 @@ rule catsubjects:
         # given subject, but once in an a while we have more than one.  We'll
         # symlink when there's only one and concatenate otherwise.
         inputs = list(Path(input[0]).glob("*.fastq.gz"))
+        # The files are listed as the filesystem gives them, which isn't
+        # necessarily in any particular order (for example it's often just
+        # determined by what file was created when) so let's make sure the
+        # paths are always ordered consistently here.
+        inputs.sort()
         if len(inputs) == 1:
             Path(output[0]).symlink_to(Path(Path(input[0]).name)/inputs[0].name)
         elif inputs:
