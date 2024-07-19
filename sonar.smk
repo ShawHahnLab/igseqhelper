@@ -569,7 +569,10 @@ rule sonar_module_3_igphyml_auto:
                 {params.args} 2>&1 | tee -a {log}
         """
 
-rule sonar_module_3_igphyml_custom:
+# (Setting this up as a checkpoint means we can have downstream rules structured
+# according to the contents of these output files, for example, what ancestor
+# sequences are inferred.)
+checkpoint sonar_module_3_igphyml_custom:
     """SONAR 3: Run phylogenetic analysis with custom alignment and generate tree across specimens.
 
     This will given the first sequence ID in the alignment as the --root for sonar igphyml.
