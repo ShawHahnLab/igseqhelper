@@ -1,0 +1,10 @@
+# conda environment YAML for ARMADiLLO
+# (Note there's also an unrelated "armadillo" package in conda-forge itself; we
+# don't use that)
+name: armadillo
+channels:
+  - ShawHahnLab
+  - conda-forge
+  - defaults
+dependencies:
+  - armadillo

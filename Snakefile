@@ -12,6 +12,7 @@ wildcard_constraints:
     chain="(heavy|light)",
     celltype="igm|igg",
     chain_type="(alpha|delta|gamma|mu|epsilon|kappa|lambda)",
+    locus_chain="(heavy|kappa|lambda)", # ARMADiLLO's notation
     locus="(IGH|IGK|IGL)",
     segment="(V|D|J)",
     antibody_type="(IgA|IgD|IgG|IgM|IgE)",
@@ -31,5 +32,6 @@ include: "igdiscover.smk"
 include: "sonar.smk"
 include: "igblast.smk"
 include: "fastqc.smk"
+include: "armadillo.smk"
 include: "reporting.smk"
 include: "summary.smk"
