@@ -55,8 +55,10 @@ rule miningd_get_cdrh3s:
         cdrh3s_from_airr(input, output[0])
 
 # Note that the order and naming of sequences changes from run to run, but the
-# sequences themselves do appear to be the same for any given input.  The
-# miningd_final rule below should give consistent output.
+# sequences themselves do appear to typically be the same for any given input.
+# The miningd_final rule below should give consistent output.
+# Note that the sequences are not *always* the same, though-- there's very
+# slight randomness in the output in some cases.
 rule miningd_run:
     output: "analysis/mining-d/{subject}.output.{pval}.fasta"
     input: "analysis/mining-d/{subject}.cdr3.fasta"
