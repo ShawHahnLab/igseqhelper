@@ -32,8 +32,10 @@ def sonar_ancs_common(path_ancestors, path_clade, path_output):
                 rec["depth"] = int(depth)
                 rec["dist"] = float(dist)
                 output.append(rec)
-    output = sorted(output, key=lambda rec: rec["depth"])
-    digits = len(str(output[-1]["depth"]))
+    digits = 0
+    if output:
+        output = sorted(output, key=lambda rec: rec["depth"])
+        digits = len(str(output[-1]["depth"]))
     with RecordWriter(path_output) as writer:
         for rec in output:
             depth = str(rec["depth"]).zfill(digits)
