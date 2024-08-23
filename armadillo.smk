@@ -89,7 +89,7 @@ rule armadillo:
         random_seed=123,
         species="rhesus",
         outdir="analysis/armadillo/{category}.{locus_chain}/{case}"
-    conda: "armadillo.yml"
+    conda: "envs/armadillo.yaml"
     shadow: "shallow"
     shell:
         """

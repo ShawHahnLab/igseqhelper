@@ -65,7 +65,7 @@ rule miningd_run:
     log:
         main="analysis/mining-d/{subject}.{pval}.log.txt",
         conda="analysis/mining-d/{subject}.{pval}.conda_build.txt"
-    conda: "mining-d.yml"
+    conda: "envs/mining-d.yaml"
     threads: 8
     params:
         # The authors thought 600 was a good choice for rhesus macaque and

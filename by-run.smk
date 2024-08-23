@@ -63,7 +63,7 @@ rule merged_igblast:
         fqgz="analysis/merge/{run}/{sample}.fastq.gz"
     log:
         conda="analysis/igblast/merge/{run}/{sample}.tsv.gz.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     threads: 4
     shell:
         """
@@ -81,7 +81,7 @@ rule pair_merge:
         r2="analysis/trim/{run}/{sample}.R2.fastq.gz"
     log:
         conda="analysis/merge/{run}/{sample}.fastq.gz.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     threads: 4
     shell:
         """
@@ -115,7 +115,7 @@ rule pair_trim:
     input: unpack(pair_trim_input)
     log:
         conda="analysis/trim/{run}/{sample}.trim.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     threads: 4
     shell:
         """
@@ -135,7 +135,7 @@ rule pair_phix:
         demux="analysis/demux/{run}"
     log:
         conda="analysis/phix/{run}/conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     threads: 4
     shell:
         """
@@ -152,7 +152,7 @@ rule demux:
         samples=ancient("metadata/samples.csv")
     log:
         conda="analysis/demux/{run}/conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     shell:
         """
             conda list --explicit > {log.conda}
@@ -164,7 +164,7 @@ rule getreads:
     input: ancient("/seq/runs/{run}")
     log:
         conda="analysis/reads/{run}/conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     threads: 28
     shell:
         """

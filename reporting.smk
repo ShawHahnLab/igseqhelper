@@ -938,7 +938,8 @@ rule report_igdiscover_tree:
         before="analysis/igdiscover/{ref}/{chain_type}/{segment}.fasta"
     log:
         conda="analysis/reporting/igdiscover/{ref}/{chain_type}/{subject}/{segment}.nex.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
+    conda: "envs/igseq.yaml"
     shell:
         """
             conda list --explicit > {log.conda}
@@ -958,7 +959,7 @@ rule report_miningd_combo_tree:
     input: "analysis/reporting/mining-d/all.msa.fasta"
     log:
         conda="analysis/reporting/mining-d/all.nex.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     shell:
         """
             conda list --explicit > {log.conda}
@@ -973,7 +974,7 @@ rule report_miningd_combo_msa:
         refs="analysis/reporting/mining-d/refs.fa"
     log:
         conda="analysis/reporting/mining-d/all.msa.fasta.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     shell:
         """
             conda list --explicit > {log.conda}
@@ -1003,7 +1004,7 @@ rule report_miningd_tree:
         refs="analysis/reporting/mining-d/refs.fa"
     log:
         conda="analysis/reporting/mining-d/{subject}/{subject}.nex.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     shell:
         """
             conda list --explicit > {log.conda}
@@ -1022,7 +1023,7 @@ rule report_miningd_msa:
         refs="analysis/reporting/mining-d/refs.fa"
     log:
         conda="analysis/reporting/mining-d/{subject}/{subject}.msa.fasta.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     shell:
         """
             conda list --explicit > {log.conda}

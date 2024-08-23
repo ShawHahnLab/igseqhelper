@@ -73,7 +73,7 @@ rule igdiscover_db_sonarramesh:
     # working with here.  (And if that's IGH, it'll still just write the D
     # sequences once.)
     output: expand("analysis/igdiscover/sonarramesh/{{chain_type}}/{segment}.fasta", segment=["V", "D", "J"])
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     params:
         outdir="analysis/igdiscover/sonarramesh/{chain_type}",
         locus=lambda w: {"mu": "IGH", "kappa": "IGK", "lambda": "IGL"}[w.chain_type]
@@ -86,6 +86,7 @@ rule igdiscover_db_sonarramesh:
 # above
 rule igdiscover_db_kimdb:
     output: expand("analysis/igdiscover/kimdb/mu/{segment}.fasta", segment=["V", "D", "J"])
+    conda: "envs/igseq.yaml"
     params: outdir="analysis/igdiscover/kimdb/mu"
     shell: "igseq vdj-gather kimdb -o {params.outdir}"
 
@@ -120,7 +121,7 @@ rule igdiscover_init:
         db_d="analysis/igdiscover/{ref}/{chain_type}/D.fasta",
         db_j="analysis/igdiscover/{ref}/{chain_type}/J.fasta",
         reads="analysis/samples-by-subject/igm/{subject}.{chain_type}.fastq.gz",
-    conda: "igdiscover.yml"
+    conda: "envs/igdiscover.yaml"
     params:
         stranded="true",
         iterations=5
@@ -148,7 +149,7 @@ rule igdiscover_run:
         r1="analysis/igdiscover/{ref}/{chain_type}/{subject}/reads.fastq.gz",
     log:
         conda="analysis/igdiscover/{ref}/{chain_type}/{subject}/igdiscover_run.conda_build.txt"
-    conda: "igdiscover.yml"
+    conda: "envs/igdiscover.yaml"
     threads: 20
     shell:
         """
@@ -188,7 +189,7 @@ rule custom_j_discovery:
         ratio=0.3
     log:
         conda="analysis/igdiscover/{ref}/{chain_type}/{subject}/custom_j_discovery/conda_build.txt"
-    conda: "igdiscover.yml"
+    conda: "envs/igdiscover.yaml"
     shell:
         """
             arg_j_cov=""
@@ -209,7 +210,7 @@ rule upstream:
     input: "analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/V.fasta"
     params:
         table="analysis/igdiscover/{ref}/{chain_type}/{subject}/final/filtered.tsv.gz"
-    conda: "gkhlab-igdiscover22.yml"
+    conda: "envs/gkhlab-igdiscover22.yaml"
     log:
         main="analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}/log.txt",
         conda="analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}/conda_build.txt"

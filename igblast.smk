@@ -50,7 +50,7 @@ rule igblast:
         species="rhesus"
     log:
         conda="analysis/igblast/{ref}/{path}.conda_build.txt"
-    conda: "igseq.yml"
+    conda: "envs/igseq.yaml"
     threads: 8
     # include special handling for xz-compressed FASTA I have for some older
     # output files.
