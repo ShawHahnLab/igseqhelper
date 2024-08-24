@@ -11,6 +11,8 @@ from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
 
+TARGET_METADATA = expand("metadata/{sheet}.csv", sheet=["specimens", "runs", "samples", "lineages", "isolates"])
+
 def download_metadata(path_yaml, path_out=None):
     """Download CSV from google sheets.
 
@@ -153,12 +155,7 @@ def load_csv(fp_in, key=None):
     return entries
 
 rule all_get_metadata:
-    input:
-       specimens="metadata/specimens.csv",
-       runs="metadata/runs.csv",
-       samples="metadata/samples.csv",
-       antibody_lineages="metadata/lineages.csv",
-       antibody_isolates="metadata/isolates.csv"
+    input: TARGET_METADATA
 
 def _setup_metadata(fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates):
     global SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES
@@ -192,3 +189,9 @@ rule get_metadata:
     input: "metadata/igseq.package.yaml"
     run:
         download_metadata(input[0], output[0])
+
+rule validate:
+    input:
+        sheets=TARGET_METADATA,
+        datapkg="metadata/igseq.package.yaml"
+    shell: "frictionless validate {input.datapkg}"
