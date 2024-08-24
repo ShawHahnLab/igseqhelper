@@ -2,15 +2,15 @@
 missingValues:
   - ''
 primaryKey: Sample
-#foreignKeys:
-#  - fields: Run
-#    reference:
-#      resource: runs
-#      fields: Run
-#  - fields: Specimen
-#    reference:
-#      resource: specimens
-#      fields: Specimen
+foreignKeys:
+  - fields: Run
+    reference:
+      resource: runs
+      fields: Run
+  - fields: Specimen
+    reference:
+      resource: specimens
+      fields: Specimen
 fields:
   - name: Sample
     title: Sample

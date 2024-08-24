@@ -1,0 +1,59 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: Lineage
+foreignKeys:
+  - fields: Subject
+    reference:
+      resource: subjects
+      fields: Subject
+fields:
+  - name: Lineage
+    title: Lineage
+    description: Unique identifier for a particular antibody lineage
+    type: string
+  - name: Subject
+    title: Subject
+    type: string
+  - name: LightLocus
+    title: Light Chain Locus
+    description: Either "IGK" or "IGL" for the light chain used for one lineage
+    type: string
+    constraints:
+      enum: [IGK, IGL]
+  - name: AltName
+    title: Alternative Name
+    description: Any other name each lineage is known by
+    type: string
+  - name: VH
+    title: Heavy chain V gene
+    description: Name of assigned heavy chain V gene, whether from generic germline reference or individualized
+    type: string
+  - name: DH
+    title: Heavy chain D gene
+    description: Name of assigned heavy chain D gene, whether from generic germline reference or individualized
+    type: string
+  - name: JH
+    title: Heavy chain J gene
+    description: Name of assigned heavy chain J gene, whether from generic germline reference or individualized
+    type: string
+  - name: VL
+    title: Light chain V gene
+    description: Name of assigned light chain V gene, whether from generic germline reference or individualized
+    type: string
+  - name: JL
+    title: Light chain J gene
+    description: Name of assigned light chain J gene, whether from generic germline reference or individualized
+    type: string
+  - name: Specificity
+    title: Antigen Specificity
+    description: A short signifier for the epitope targeted by each lineage, like "V2 apex" or "V3 glycan"
+    type: string
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each lineage
+    type: string
+  - name: Summary from Analysis
+    title: Summary from Analysis
+    description: A brief summary of any key findings
+    type: string

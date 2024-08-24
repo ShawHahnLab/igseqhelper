@@ -4,9 +4,16 @@ missingValues:
 primaryKey: Subject
 fields:
   - name: Subject
-    title: Unique identifier for each rhesus macaque
+    title: Subject
     type: string
-    description: Whatever identifier people are using for a given animal (witout the RM prefix we sometimes use)
+    description: Whatever identifier people are using for a given subject (witout the RM prefix we sometimes use for macaques)
+  - name: Species
+    title: Species
+    type: string
+    constraints:
+      enum:
+        - human
+        - rhesus
   - name: Virus
     title: Virus infecting each subject
     description: Whatever the general virus name is, like CH505 or Q23
