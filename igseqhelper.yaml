@@ -12,5 +12,6 @@ dependencies:
   - fastqc>=0.12
   - plotnine>=0.10
   - pylint>=2.17,<3
+  - frictionless>=5.17,<6
   # igseq
   - igseq=0.6.0rc1
