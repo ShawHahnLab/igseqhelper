@@ -53,11 +53,11 @@ def armadillo_setup_helper_rules():
         for chain in ["heavy", "light"]:
             seq_col = chain.capitalize() + "Seq"
             if attrs["IncludeInTracing"] == "Y" and attrs[seq_col]:
-                antibody_lineage = attrs["AntibodyLineage"]
+                antibody_lineage = attrs["Lineage"]
                 locus_chain = "heavy"
                 if chain == "light":
                     locus_chain = {"IGL": "lambda", "IGK": "kappa"}[
-                        attrs["AntibodyLineageAttrs"]["LightLocus"]]
+                        attrs["LineageAttrs"]["LightLocus"]]
                 chain_suffix = "" if chain == "heavy" else f" ({locus_chain})"
                 # whole bunch of ancX -> ancY pairs
                 rule:
@@ -182,7 +182,7 @@ rule armadillo_input_isolate:
                         anc])
                     f_from.write(f">{seqid}\n{rec.seq}\n")
         isol = ANTIBODY_ISOLATES[wildcards.antibody_isolate]
-        seqid = isol["AntibodyIsolate"]
+        seqid = isol["Isolate"]
         seq = isol["HeavySeq" if wildcards.locus_chain == "heavy" else "LightSeq"]
         with open(output.seq_to, "w") as f_to:
             f_to.write(f">{seqid}\n{seq}\n")

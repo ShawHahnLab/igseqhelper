@@ -138,7 +138,7 @@ rule sonar_gather_mature:
         seen = {""} # always skip empty entries
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
-                if seq_col == "LightSeq" and attrs["AntibodyLineageAttrs"]["LightLocus"] != light_locus:
+                if seq_col == "LightSeq" and attrs["LineageAttrs"]["LightLocus"] != light_locus:
                     # Skip light chain sequences that are for the other locus
                     # than whatever was amplified here
                     continue
@@ -147,8 +147,8 @@ rule sonar_gather_mature:
                     # itself
                     continue
                 seq = attrs[seq_col]
-                if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject and seq not in seen:
-                    f_out.write(f">{seqid} {attrs['AntibodyLineage']}\n")
+                if attrs["LineageAttrs"]["Subject"] == wildcards.subject and seq not in seen:
+                    f_out.write(f">{seqid} {attrs['Lineage']}\n")
                     f_out.write(attrs[seq_col]+"\n")
                     seen.add(seq)
 
@@ -164,7 +164,7 @@ rule sonar_gather_mature_by_lineage:
             seq_col = "HeavySeq"
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
-                if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col] \
+                if attrs["Lineage"] == wildcards.antibody_lineage and attrs[seq_col] \
                         and attrs.get("IncludeInOutput") == "Y":
                     f_out.write(f">{seqid}\n")
                     f_out.write(attrs[seq_col]+"\n")
@@ -333,9 +333,9 @@ rule sonar_list_members_for_lineage:
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
                 seq = attrs[seq_col]
-                if attrs["AntibodyLineageAttrs"]["Subject"] == wildcards.subject \
+                if attrs["LineageAttrs"]["Subject"] == wildcards.subject \
                     and seq not in seen and \
-                    attrs["AntibodyLineage"] == wildcards.antibody_lineage and \
+                    attrs["Lineage"] == wildcards.antibody_lineage and \
                     attrs["IncludeInTracing"] == "Y":
                         f_out.write(f"{seqid}\n")
                         seen.add(seq)
@@ -636,7 +636,7 @@ rule sonar_make_natives_table:
             # bulk-sequenced timepoints.  That'll require a bit of reorganizing
             # to how this is done, though.
             for seqid, attrs in ANTIBODY_ISOLATES.items():
-                if attrs["AntibodyLineage"] == wildcards.antibody_lineage and attrs[seq_col]:
+                if attrs["Lineage"] == wildcards.antibody_lineage and attrs[seq_col]:
                     tp = "wk" + attrs["Timepoint"]
                     if tp not in mabs:
                         mabs[tp] = []

@@ -390,7 +390,7 @@ def counts_by_specimen(input_csv, output_csv):
 def report_lineages_divergence_input(w):
     loci = ["IGH"]
     for attrs in ANTIBODY_LINEAGES.values():
-        if attrs["AntibodyLineage"] == w.antibody_lineage:
+        if attrs["Lineage"] == w.antibody_lineage:
             loci.append(attrs["LightLocus"])
             subject = attrs["Subject"]
             break
@@ -431,14 +431,14 @@ rule report_lineages_mabs:
                 lineterminator="\n")
             writer.writeheader()
             for attrs in ANTIBODY_ISOLATES.values():
-                if attrs["AntibodyLineage"] == wildcards.antibody_lineage:
+                if attrs["Lineage"] == wildcards.antibody_lineage:
                     for chain in ["heavy", "light"]:
                         seq = attrs[chain.capitalize() + "Seq"]
                         if seq:
                             writer.writerow({
                                 "timepoint": attrs["Timepoint"],
                                 "chain": chain,
-                                "sequence_id": attrs["AntibodyIsolate"] + f"_{chain}",
+                                "sequence_id": attrs["Isolate"] + f"_{chain}",
                                 "sequence": seq})
 
 ### SONAR Members and Ancestors
@@ -589,7 +589,7 @@ rule report_sonar_island_stats:
     run:
         # just calculate relative to the members of this lineage (for cases
         # where there's more than one)
-        mabs = [attrs["AntibodyIsolate"] for attrs in ANTIBODY_ISOLATES.values() if attrs["AntibodyLineage"] == wildcards.antibody_lineage]
+        mabs = [attrs["Isolate"] for attrs in ANTIBODY_ISOLATES.values() if attrs["Lineage"] == wildcards.antibody_lineage]
         fp_output = output[0]
         fp_input_iddiv = input.iddiv[0]
         fp_input_fasta = input.fasta[0]
@@ -695,7 +695,7 @@ rule report_sonar_members_table:
                 for record in SeqIO.parse(f_in, "fasta"):
                     rows.append({
                         "LineageMember": "",
-                        "AntibodyLineage": wildcards.antibody_lineage,
+                        "Lineage": wildcards.antibody_lineage,
                         "OriginalID": record.id,
                         "FirstOccurrence": "",
                         "Chain": chain,
@@ -722,7 +722,7 @@ rule report_sonar_members_table:
                 matches = sorted(matches)
                 if matches[0][1] != row["OriginalID"]:
                     row["FirstOccurrence"] = matches[0][1]
-        rows = sorted(rows, key=lambda row: (row["AntibodyLineage"], row["Chain"], row["Timepoint"], row["TimepointLabel"], row["LineageMember"]))
+        rows = sorted(rows, key=lambda row: (row["Lineage"], row["Chain"], row["Timepoint"], row["TimepointLabel"], row["LineageMember"]))
         with open(output[0], "wt") as f_out:
             writer = DictWriter(f_out, fieldnames=rows[0].keys(), lineterminator="\n")
             writer.writeheader()
@@ -795,7 +795,7 @@ rule report_sonar_igphyml_ancestors_table:
         chain = "heavy" if locus == "H" else "light"
         # names of the antibody isolates for this lineage, as ordered in the
         # metadata.   The IgPhyML output uses all caps.
-        isolates = {k.upper(): v for k, v in ANTIBODY_ISOLATES.items() if v["AntibodyLineage"] == wildcards.antibody_lineage}
+        isolates = {k.upper(): v for k, v in ANTIBODY_ISOLATES.items() if v["Lineage"] == wildcards.antibody_lineage}
         rows = []
         with open(input[0]) as f_in:
             for record in SeqIO.parse(f_in, "fasta"):
@@ -839,7 +839,7 @@ rule report_sonar_igphyml_ancestors_table:
                 # Append to one big list so we can sort it before writing
                 rows.append({
                     "InferredAncestor": name,
-                    "AntibodyLineage": wildcards.antibody_lineage,
+                    "Lineage": wildcards.antibody_lineage,
                     "TreeDepth": int(tree_index),
                     "Chain": chain,
                     "IsolateSubsetID": mask,
@@ -849,7 +849,7 @@ rule report_sonar_igphyml_ancestors_table:
         rows = sorted(rows, key=lambda r: (r["Timepoint"], r["TreeDepth"], r["IsolateSubsetID"]))
         with open(output[0], "wt") as f_out:
             fields = [
-                "InferredAncestor", "AntibodyLineage", "TreeDepth", "Chain",
+                "InferredAncestor", "Lineage", "TreeDepth", "Chain",
                 "IsolateSubsetID", "Timepoint", "OriginalID", "Sequence"]
             writer = DictWriter(f_out, fieldnames=fields, lineterminator="\n")
             writer.writeheader()
@@ -919,13 +919,13 @@ rule report_sonar_mabs:
                 lineterminator="\n")
             writer.writeheader()
             for attrs in ANTIBODY_ISOLATES.values():
-                if attrs["AntibodyLineage"] == wildcards.antibody_lineage:
+                if attrs["Lineage"] == wildcards.antibody_lineage:
                     seq = attrs[chain.capitalize() + "Seq"]
                     if seq:
                         writer.writerow({
                             "timepoint": attrs["Timepoint"],
                             "chain": chain,
-                            "sequence_id": attrs["AntibodyIsolate"],
+                            "sequence_id": attrs["Isolate"],
                             "sequence": seq})
 
 ### IgDiscover

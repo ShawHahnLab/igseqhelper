@@ -93,7 +93,7 @@ def load_samples(fp_in, specimens=None, runs=None):
 def load_antibody_lineages(fp_in):
     """Load antibody lineage CSV."""
     LOGGER.info("load_antibody_lineages: fp_in %s", fp_in)
-    lineages = load_csv(fp_in, "AntibodyLineage")
+    lineages = load_csv(fp_in, "Lineage")
     return lineages
 
 def load_antibody_isolates(fp_in, antibody_lineages=None):
@@ -105,11 +105,11 @@ def load_antibody_isolates(fp_in, antibody_lineages=None):
     """
     LOGGER.info("load_antibody_isolates: fp_in %s", fp_in)
     LOGGER.info("load_antibody_isolates: antibody_lineages %s...", str(antibody_lineages)[0:60])
-    isolates = load_csv(fp_in, "AntibodyIsolate")
+    isolates = load_csv(fp_in, "Isolate")
     if antibody_lineages:
         for isolate in isolates.values():
             _load_nested_items(
-                isolate, "AntibodyIsolate", antibody_lineages, "AntibodyLineage")
+                isolate, "Isolate", antibody_lineages, "Lineage")
     return isolates
 
 def _load_nested_items(entry, entrykey, others, key):
@@ -154,8 +154,8 @@ rule all_get_metadata:
        specimens="metadata/specimens.csv",
        runs="metadata/runs.csv",
        samples="metadata/samples.csv",
-       antibody_lineages="metadata/antibody_lineages.csv",
-       antibody_isolates="metadata/antibody_isolates.csv"
+       antibody_lineages="metadata/lineages.csv",
+       antibody_isolates="metadata/isolates.csv"
 
 def _setup_metadata(fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates):
     global SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES
@@ -173,8 +173,8 @@ try:
         "metadata/specimens.csv",
         "metadata/runs.csv",
         "metadata/samples.csv",
-        "metadata/antibody_lineages.csv",
-        "metadata/antibody_isolates.csv")
+        "metadata/lineages.csv",
+        "metadata/isolates.csv")
 except FileNotFoundError:
     print("Skipping metadata loading; be sure to run get_metadata rule.")
     SPECIMENS = {}
