@@ -15,11 +15,14 @@ def download_metadata(path_yaml, path_out=None):
     """Download CSV from google sheets.
 
     YAML like this:
-        metadata:
-          slug: 2PACX-1vRsc...
-          sheets:
-            samples: 1692570416
-            specimens: 1355081593
+          google_slug: 2PACX-1vRsc...
+          resources:
+            - name: subjects
+              path: subjects.csv
+              google_gid: 1234567890
+            - name: specimens
+              path: specimens.csv
+              google_gid: 9876543210
             ...
     Becomes:
          metadata/samples.csv
@@ -28,18 +31,18 @@ def download_metadata(path_yaml, path_out=None):
     """
     with open(path_yaml) as f_in:
         info = yaml.safe_load(f_in)
-    for key in info:
-        slug = info[key]["slug"]
-        sheets = info[key]["sheets"]
-        for sheet_name, gid in sheets.items():
-            url = f"https://docs.google.com/spreadsheets/d/e/{slug}/pub?gid={gid}&single=true&output=csv"
-            path = Path(key)/(sheet_name + ".csv")
-            if path_out is not None and str(path) == path_out:
-                with urllib.request.urlopen(url) as f_in, open(path, "wt") as f_out:
-                    reader = csv.reader(StringIO(f_in.read().decode("UTF8")))
-                    writer = csv.writer(f_out, lineterminator="\n")
-                    for row in reader:
-                        writer.writerow(row)
+    slug = info["google_slug"]
+    for res in info["resources"]:
+        gid = res["google_gid"]
+        url = f"https://docs.google.com/spreadsheets/d/e/{slug}/pub?gid={gid}&single=true&output=csv"
+        parent = Path(path_yaml).parent
+        path = parent / res["path"]
+        if path_out is not None and str(path) == path_out:
+            with urllib.request.urlopen(url) as f_in, open(path, "wt") as f_out:
+                reader = csv.reader(StringIO(f_in.read().decode("UTF8")))
+                writer = csv.writer(f_out, lineterminator="\n")
+                for row in reader:
+                    writer.writerow(row)
 
 def load_runs(fp_in):
     """Load run metadata CSV.
@@ -184,8 +187,8 @@ except FileNotFoundError:
     ANTIBODY_ISOLATES = {}
 
 rule get_metadata:
-    """Create CSV files from Google sheets based on metadata YAML."""
+    """Create CSV files from Google sheets based on frictionless data package YAML."""
     output: "metadata/{sheet}.csv"
-    input: "metadata.yml"
+    input: "metadata/igseq.package.yaml"
     run:
         download_metadata(input[0], output[0])
