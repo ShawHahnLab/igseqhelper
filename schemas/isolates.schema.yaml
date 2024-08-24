@@ -1,0 +1,78 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: Isolate
+foreignKeys:
+  - fields: Lineage
+    reference:
+      resource: lineages
+      fields: Lineage
+fields:
+  - name: Isolate
+    title: Isolate
+    description: Unique identifier for a particular isolate of a particular antibody lineage
+    type: string
+  - name: Lineage
+    title: Lineage
+    description: Unique identifier for a particular antibody lineage
+    type: string
+  - name: AltName
+    title: Alternative Name
+    description: Any other name each isolate is known by
+    type: string
+  - name: Timepoint
+    title: Timepoint
+    description: Time point as measured in weeks post-infection
+    type: integer
+  - name: IncludeInTracing
+    title: Include in Lineage Tracing?
+    description: Should this isolate be used to identify lineage members during lineage tracing?
+    type: boolean
+    trueValues: [ "Y" ]
+    falseValues: [ "", "N" ]
+  - name: IncludeInOutput
+    title: Include in Final Output?
+    description: Should this isolate be included in final output files?
+    type: boolean
+    trueValues: [ "Y" ]
+    falseValues: [ "", "N" ]
+  - name: HeavyAccession
+    title: Heavy Chain Accession
+    description: NCBI GenBank accession for heavy chain sequence, if the sequences have been deposited in GenBak
+    type: string
+    constraints:
+      pattern: "[A-Z0-9]+"
+  - name: LightAccession
+    title: Light Chain Accession
+    description: NCBI GenBank accession for light chain sequence, if the sequences have been deposited in GenBak
+    type: string
+    constraints:
+      pattern: "[A-Z0-9]+"
+  - name: HeavySeqOrig
+    title: Heavy Chain Sequence (Original)
+    description: Original, untrimmed version of the heavy chain sequence
+    type: string
+    constraints:
+      pattern: "[ACTGN]+"
+  - name: HeavySeq
+    title: Heavy Chain Sequence
+    description: VDJ-trimmed version of the heavy chain sequence
+    type: string
+    constraints:
+      pattern: "[ACTGN]+"
+  - name: LightSeqOrig
+    title: Light Chain Sequence (Original)
+    description: Original, untrimmed version of the light chain sequence
+    type: string
+    constraints:
+      pattern: "[ACTGN]+"
+  - name: LightSeq
+    title: Light Chain Sequence
+    description: VJ-trimmed version of the light chain sequence
+    type: string
+    constraints:
+      pattern: "[ACTGN]+"
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each isolate
+    type: string

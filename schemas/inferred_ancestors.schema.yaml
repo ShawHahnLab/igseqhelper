@@ -1,0 +1,56 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: InferredAncestor
+foreignKeys:
+  - fields: Lineage
+    reference:
+      resource: lineages
+      fields: Lineage
+fields:
+  - name: InferredAncestor
+    title: Inferred Ancestor
+    description: Unique identifier for a particular inferred ancestor of a particular antibody lineage
+    type: string
+  - name: Lineage
+    title: Lineage
+    description: Unique identifier for a particular antibody lineage
+    type: string
+  - name: TreeDepth
+    title: Tree Depth
+    description: Depth from root in corresponding tree from ancestor inference
+    type: integer
+  - name: Chain
+    title: Chain
+    descripion: Either "heavy" or "light" for the chain of the ancestor sequence inference
+    type: string
+    constraints:
+      enum: [heavy, light]
+  - name: IsolateSubsetID
+    title: Isolate Subset ID
+    description: A hexadecimal bitmask signifying which isolates are descendants of a particular inferred ancestor.  This now seems terribly over-engineered and brittle.
+    type: string
+    constraints:
+      pattern: "[0-9A-F]+"
+  - name: Timepoint
+    title: Timepoint
+    description: Earliest time point, in terms of weeks post-infection, represented by the clade below each inferred ancestor (or blank, for UCAs)
+    type: integer
+  - name: OriginalID
+    title: Original Inferred Ancestor ID
+    description: The original sequence ID as assigned from SONAR/IgPhyML or any other software.
+    type: string
+  - name: Sequence
+    title: Sequence
+    description: V(D)J sequence for the inferred ancestor
+      type; string
+    constraints:
+      pattern: "[ACTG]+"
+  - name: Who
+    title: Who?
+    description: Who inferred this ancestor sequence?
+    type: string
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each inferred ancestor sequence
+    type: string

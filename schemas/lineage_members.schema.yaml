@@ -1,0 +1,52 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: LineageMember
+foreignKeys:
+  - fields: Lineage
+    reference:
+      resource: lineages
+      fields: Lineage
+fields:
+  - name: LineageMember
+    title: Lineage Member
+    description: Unique identifier for a particular member (per chain) of a particular antibody lineage
+    type: string
+  - name: Lineage
+    title: Lineage
+    description: Unique identifier for a particular antibody lineage
+    type: string
+  - name: OriginalID
+    title: Original Lineage Member ID
+    description: The original idenfier as assigned from SONAR or any other software.  Not necessarily unique across all entries and could change in a later analysis that gives otherwise the same results.
+    type: string
+  - name: FirstOccurrence
+    title: First Occurrence
+    description: An OriginalID for when each sequence first appeared for its lineage, if repeated across timepoints
+    type: string
+  - name: Chain
+    title: Chain
+    descripion: Either "heavy" or "light" for the chain amplified in each sample where the member sequence was found
+    type: string
+    constraints:
+      enum: [heavy, light]
+  - name: Timepoint
+    title: Timepoint
+    description: Time point as measured in weeks post-infection
+    type: integer
+  - name: Member
+    title: Member of Lineage?
+    description: Is this entry actually a member of the relevant lineage?  (Allows tracking of non-lineage members in the context of a particular lineage.)
+    type: boolean
+    trueValues: [ "T" ]
+    falseValues: [ "F" ]
+  - name: Sequence
+    title: Sequence
+    description: V(D)J sequence
+    type: string
+    constraints:
+      pattern: "[ACTGN]+"
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each member sequence
+    type: string
