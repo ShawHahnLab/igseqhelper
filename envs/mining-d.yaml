@@ -1,23 +1,9 @@
 # conda environment YAML for MINING-D
+# See https://github.com/ShawHahnLab/MINING-D/tree/conda
 name: mining-d
 channels:
+  - ShawHahnLab
   - conda-forge
   - defaults
 dependencies:
-  ### Dependencies Listed in MINING-D README
-  # Python >=3.9 chokes on the star expression in:
-  # _action((*[d_list[node] for node in edge]), verbose=verbose)
-  # but that does seem to work if it's given as:
-  # _action(*[d_list[node] for node in edge], verbose=verbose)
-  # ...but then the older networkx has its own compatibility issues with newer
-  # Python.  We'll just stick with what the README specifies.
-  - python=3.6.5
-  - biopython
-  # The connected_component_subgraphs function used by the script was removed
-  # in networkx version 2.4
-  - networkx<2.4
-  - joblib
-  - numpy
-  - scipy
-  ### Not listed, but used for the CLI
-  - click
+  - mining-d

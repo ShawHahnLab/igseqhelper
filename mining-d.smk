@@ -86,7 +86,7 @@ rule miningd_run:
             echo "input seqs: $numseqs_in" >> {log.main}
             echo "num_k_mers: {params.num_k_mers}" >> {log.main}
             echo "p_val_th: {params.p_val_th}" >> {log.main}
-            python MINING-D/MINING_D.py -t {threads} \
+            MINING_D.py -t {threads} \
                 -n {params.num_k_mers} \
                 -p {params.p_val_th} \
                 -i {input} -o {output}
