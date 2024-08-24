@@ -1,0 +1,82 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: Sample
+#foreignKeys:
+#  - fields: Run
+#    reference:
+#      resource: runs
+#      fields: Run
+#  - fields: Specimen
+#    reference:
+#      resource: specimens
+#      fields: Specimen
+fields:
+  - name: Sample
+    title: Sample
+    description: Unique identifier for a particular sequenced sample from one specimen, amplified for one chain
+    type: string
+  - name: Run
+    title: Sequencing Run
+    description: The Illumina run ID for each sequenced sample
+    type: string
+  - name: Specimen
+    title: Specimen
+    description: Which specimen this sample was amplified and sequenced from
+    type: string
+  - name: BarcodeFwd
+    title: Forward Barcode
+    description: Integer identifier for the forward (inline) barcode; see "igseq show barcodes" command
+    type: integer
+  - name: BarcodeRev
+    title: Reverse Barcode
+    description: Integer identifier for the reverse (I1) barcode; see "igseq show barcodes" command
+    type: integer
+  - name: Chain
+    title: Chain
+    descripion: Either "heavy" or "light" for the chain amplified in each sample
+    type: string
+    constraints:
+      enum: [heavy, light]
+  - name:  Type
+    title: Chain Type
+    description: The specific amplified chain type, either kappa or lambda for light chain or the constant region (e.g. gamma) for heavy
+    type: string
+    constraints:
+      enum:
+        - kappa
+        - lambda
+        - gamma
+        - mu
+        # Not that we ever see these, but, for completeness:
+        - alpha
+        - delta
+        - epsilon
+  - name: FwdPrimer
+    title: Forward Primer
+    description: Sequence expected just after the barcode in R1.  Only needed if using custom amplification; if not given, the protocol's "5PIIA" RACE anchor sequence is used.
+    type: string
+  - name: Skip
+    title: Skip
+    description: Should this sample be ignored during analysis?
+    type: boolean
+    trueValues: [ "TRUE" ]
+    falseValues: [ "", "FALSE" ]
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each sample
+    type: string
+  - name: Summary from Analysis
+    title: Summary from Analysis
+    description: A brief summary of any key findings
+    type: string
+  - name: BioSample
+    title: BioSample
+    description: NCBI SRA BioSample Accession if the sample has been deposited in the SRA
+    type: string
+    constraints:
+      pattern: "SAMN[0-9]+"
+  - name: URL
+    title: Download URL
+    description: Direct download link for the sample's files, if available
+    type: string

@@ -1,0 +1,51 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: Specimen
+foreignKeys:
+  - fields: Subject
+    reference:
+      resource: subjects
+      fields: Subject
+fields:
+  - name: Specimen
+    title: Specimen
+    description: Each identifier signifies a particular batch of sorted cells
+    type: string
+  - name: Subject
+    title: Subject
+    description: Which subject this specimen was sampled from
+    type: string
+  - name: Timepoint
+    title: Timepoint
+    description: Time point as measured in weeks post-infection
+    type: integer
+  - name: CellCount
+    title: Cell count
+    type: integer
+  - name: CellType
+    title: Cell type
+    description: The cell type for each sort, e.g., IgG+ or IgD+IgM+
+    type: string
+  - name: Material
+    title: Material sampled
+    description: S=spleen, LN=lymph node, BM=bone marrow, PBMC=peripheral blood mononuclear cells.  Generally will be PBMCs
+    type: string
+    constraints:
+      enum:
+        - S
+        - LN
+        - BM
+        - PBMC
+  - name: SortDate
+    title: Sort Date
+    description: Date of the cell sort, as YYYY-MM-DD
+    type: date
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each specimen
+    type: string
+  - name: Summary from Analysis
+    title: Summary from Analysis
+    description: A brief summary of any key findings
+    type: string

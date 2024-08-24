@@ -1,0 +1,26 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: Subject
+fields:
+  - name: Subject
+    title: Unique identifier for each rhesus macaque
+    type: string
+    description: Whatever identifier people are using for a given animal (witout the RM prefix we sometimes use)
+  - name: Virus
+    title: Virus infecting each subject
+    description: Whatever the general virus name is, like CH505 or Q23
+    type: string
+  - name: VirusType
+    title: Type of virus
+    description: SHIV or SCIV or whatever type of virus (usually SHIV)
+    type: string
+    constraints:
+      enum:
+        - HIV
+        - SHIV
+        - SCIV
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each subject
+    type: string

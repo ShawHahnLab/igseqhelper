@@ -1,0 +1,30 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: Run
+fields:
+  - name: Run
+    title: Sequencing Run
+    description: Illumina sequencing run ID
+    type: string
+  - name: PhiX
+    title: PhiX Fraction
+    description: The fraction of the run's reads that should be PhiX genome (to ensure signal quality via nucleotide diversity)
+    type: number
+    constraints:
+      minimum: 0
+      maximum: 1
+  - name: Skip
+    title: Skip
+    description: Should this run be ignored during analysis?
+    type: boolean
+    trueValues: [ "TRUE" ]
+    falseValues: [ "", "FALSE" ]
+  - name: Protocol
+    title: Protocol
+    description: Library prep and sequencing protocol; "IgSeq" for the usual IgSeq library layout, or freeform text for anything else
+    type: string
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each sample
+    type: string
