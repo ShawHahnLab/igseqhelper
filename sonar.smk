@@ -268,6 +268,7 @@ rule sonar_module_1:
               echo "Cluster ID fract: {params.cluster_id_fract}"
               echo "Cluster min2: {params.cluster_min2}"
               echo
+              set -x
               sonar blast_V --lib germline/V.fasta --derep --threads {threads} 2>&1
               sonar blast_J {params.libd_arg} --jlib germline/J.fasta --noC --threads {threads} 2>&1
               sonar finalize --jmotif '{params.jmotif}' --threads {threads} 2>&1
@@ -341,6 +342,7 @@ rule sonar_module_2_id_div:
               echo "Reference antibodies: {input.mab} ($mab_seqs seqs)"
               echo "Gap setting: {params.gap}"
               mab={params.input_mab}
+              set -x
               sonar id-div -g "germline/V.fasta" -a "$mab" -t {threads} --gap {params.gap}
             ) | tee -a {log}
         """
@@ -589,6 +591,7 @@ rule sonar_module_3_igphyml_auto:
               echo "Project directory: $PWD"
               echo "Random seed: {params.seed}"
               echo "Given seq ID for tree root: {params.v_id}"
+              set -x
               sonar igphyml \
                   -v '{params.v_id}' \
                   --lib {params.input_germline_v} \
@@ -634,6 +637,7 @@ checkpoint sonar_module_3_igphyml_custom:
               echo "Random seed: {params.seed}"
               root=$(head -n 1 {input.alignment} | cut -c 2- | cut -f 1 -d ' ')
               echo "Detected seq ID for tree root from first FASTA record: $root"
+              set -x
               sonar igphyml --root "$root" -i {input.alignment} --seed {params.seed} {params.args} 2>&1
             ) | tee -a {log}
         """
