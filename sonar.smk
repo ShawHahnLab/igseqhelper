@@ -195,7 +195,8 @@ rule sonar_module_1_decompress:
 
 def input_sonar_germline(w):
     locus = {"kappa": "IGK", "lambda": "IGL"}.get(w.chain_type, "IGH")
-    return {seg: f"analysis/germline/{w.subject}.{locus}/{seg}.fasta" for seg in ["V", "D", "J"]}
+    segs = ["V", "D", "J"] if locus == "IGH" else ["V", "J"]
+    return {seg: f"analysis/germline/{w.subject}.{locus}/{seg}.fasta" for seg in segs}
 
 rule sonar_module_1:
     output:
@@ -206,7 +207,7 @@ rule sonar_module_1:
         # them, but it requires them to be plaintext.
         unpack(input_sonar_germline),
         reads="analysis/samples-by-specimen/{specimen}.{chain_type}"
-    log: (WD_SONAR/"log.txt").resolve()
+    log: WD_SONAR/"log.txt"
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -231,31 +232,47 @@ rule sonar_module_1:
         # indicating the start of FWR4 on the J gene.  Defaults to either TGGGG
         # for heavy chains or TT[C|T][G|A]G for light chains; set manually for
         # custom light chain libraries or for species with a different motif.")
-        libv_arg=lambda w, input: "--lib " + str(Path(input.V).resolve()),
-        libd_arg=lambda w, input: "D" in input and "--dlib " + str(Path(input.D).resolve()) or "--noD",
-        libj_arg=lambda w, input: "--jlib " + str(Path(input.J).resolve()),
+        libd_arg=lambda w, input: "--dlib germline/D.fasta" if "D" in dict(input) else "--noD",
+        input_v=lambda w, input: Path(input.V),
+        input_d=lambda w, input: Path(input.D) if "D" in dict(input) else "",
+        input_j=lambda w, input: Path(input.J),
+        input_v_full=lambda w, input: Path(input.V).resolve(),
+        input_d_full=lambda w, input: Path(input.D).resolve() if "D" in dict(input) else "",
+        input_j_full=lambda w, input: Path(input.J).resolve(),
         jmotif=lambda w: JMOTIF[w.chain_type]
     shell:
         """
             for fqgz in {input.reads}/*.fastq.gz; do
                 zcat $fqgz > {params.wd_sonar}/$(basename ${{fqgz%.gz}})
             done
-            cd {params.wd_sonar}
-            date | tee -a {log}
-            echo "$(which sonar): $(sonar --version)" | tee -a {log}
-            echo "Running sonar module 1" | tee -a {log}
-            echo "Project directory: $PWD" | tee -a {log}
-            echo "germline V: {input.V}" | tee -a {log}
-            echo "germline D: {input.D}" | tee -a {log}
-            echo "germline J: {input.J}" | tee -a {log}
-            echo "J motif: {params.jmotif}" | tee -a {log}
-            echo "Cluster ID fract: {params.cluster_id_fract}" | tee -a {log}
-            echo "Cluster min2: {params.cluster_min2}" | tee -a {log}
-            echo | tee -a {log}
-            sonar blast_V {params.libv_arg} --derep --threads {threads} 2>&1 | tee -a {log}
-            sonar blast_J {params.libd_arg} {params.libj_arg} --noC --threads {threads} 2>&1 | tee -a {log}
-            sonar finalize --jmotif '{params.jmotif}' --threads {threads} 2>&1 | tee -a {log}
-            sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2} 2>&1 | tee -a {log}
+            mkdir -p {params.wd_sonar}/germline
+            cp {input.V} {input.J} {params.wd_sonar}/germline
+            if [[ "{params.input_d}" != "" ]]; then
+                cp {params.input_d} {params.wd_sonar}/germline
+            fi
+            (
+              cd {params.wd_sonar}
+              date
+              echo "Running SONAR Module 1"
+              echo
+              echo "$(which sonar): $(sonar --version)"
+              echo "Project directory: $PWD"
+              echo "germline V: {params.input_v} -> {params.input_v_full}"
+              if [[ "{params.input_d}" != "" ]]; then
+                echo "germline D: {params.input_d} -> {params.input_d_full}"
+              else
+                echo "germline D: (No D)"
+              fi
+              echo "germline J: {params.input_j} -> {params.input_j_full}"
+              echo "J motif: {params.jmotif}"
+              echo "Cluster ID fract: {params.cluster_id_fract}"
+              echo "Cluster min2: {params.cluster_min2}"
+              echo
+              sonar blast_V --lib germline/V.fasta --derep --threads {threads} 2>&1
+              sonar blast_J {params.libd_arg} --jlib germline/J.fasta --noC --threads {threads} 2>&1
+              sonar finalize --jmotif '{params.jmotif}' --threads {threads} 2>&1
+              sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2} 2>&1
+            ) | tee -a {log}
         """
 
 rule alternate_iddiv_with_igblast:
@@ -298,9 +315,9 @@ rule sonar_module_2_id_div:
         unpack(input_sonar_germline),
         fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
         mab=WD_SONAR / "mab/mab.fasta"
+    log: WD_SONAR/"log.id-div.txt"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
-        input_v=lambda w, input: Path(input.V).resolve(),
         input_mab=lambda w, input: Path(input.mab).resolve(),
         # either "mismatch" (the default) or "ignore".  Note that this is used
         # for both identity and divergence calculations, and while ignoring
@@ -313,10 +330,19 @@ rule sonar_module_2_id_div:
     threads: 4
     shell:
         """
-            cd {params.wd_sonar}
-            libv={params.input_v}
-            mab={params.input_mab}
-            sonar id-div -g "$libv" -a "$mab" -t {threads} --gap {params.gap}
+            (
+              cd {params.wd_sonar}
+              date
+              echo "Running SONAR Module 2 id-div"
+              echo
+              echo "$(which sonar): $(sonar --version)"
+              echo "Project directory: $PWD"
+              mab_seqs=$(grep -c "^>" {parmas.input_mab})
+              echo "Reference antibodies: {input.mab} ($mab_seqs seqs)"
+              echo "Gap setting: {params.gap}"
+              mab={params.input_mab}
+              sonar id-div -g "germline/V.fasta" -a "$mab" -t {threads} --gap {params.gap}
+            ) | tee -a {log}
         """
 
 rule sonar_list_members_for_lineage:
@@ -535,7 +561,7 @@ rule sonar_module_3_igphyml_auto:
         unpack(input_sonar_germline),
         collected="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
         natives="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/mab/mab.{antibody_lineage}.fasta"
-    log: Path("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/log.txt").resolve()
+    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/log.txt"
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -554,19 +580,22 @@ rule sonar_module_3_igphyml_auto:
             # SONAR to crash when it sees the non-empty stderr.
             # So yeah let's just unset the LANG.
             unset LANG
-            cd {params.wd_sonar}
-            date | tee -a {log}
-            echo "$(which sonar): $(sonar --version)" | tee -a {log}
-            echo "Running sonar igphyml with automatic alignment" | tee -a {log}
-            echo "Project directory: $PWD" | tee -a {log}
-            echo "Random seed: {params.seed}" | tee -a {log}
-            echo "Given seq ID for tree root: {params.v_id}" | tee -a {log}
-            sonar igphyml \
-                -v '{params.v_id}' \
-                --lib {params.input_germline_v} \
-                --natives {params.input_natives} \
-                --seed {params.seed} \
-                {params.args} 2>&1 | tee -a {log}
+            (
+              cd {params.wd_sonar}
+              date
+              echo "Running SONAR Module 3 igphyml with automatic alignment"
+              echo
+              echo "$(which sonar): $(sonar --version)"
+              echo "Project directory: $PWD"
+              echo "Random seed: {params.seed}"
+              echo "Given seq ID for tree root: {params.v_id}"
+              sonar igphyml \
+                  -v '{params.v_id}' \
+                  --lib {params.input_germline_v} \
+                  --natives {params.input_natives} \
+                  --seed {params.seed} \
+                  {params.args} 2>&1
+            ) | tee -a {log}
         """
 
 # (Setting this up as a checkpoint means we can have downstream rules structured
@@ -584,7 +613,7 @@ checkpoint sonar_module_3_igphyml_custom:
         stats="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/logs/longitudinal-custom-{antibody_lineage}_igphyml_stats.txt"
     input:
         alignment=Path("analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.fa").resolve()
-    log: Path("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/log.txt").resolve()
+    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/log.txt"
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
@@ -595,15 +624,18 @@ checkpoint sonar_module_3_igphyml_custom:
         """
             # See sonar_module_3_igphyml_auto about LANG
             unset LANG
-            cd {params.wd_sonar}
-            date | tee -a {log}
-            echo "$(which sonar): $(sonar --version)" | tee -a {log}
-            echo "Running sonar igphyml with custom alignment" | tee -a {log}
-            echo "Project directory: $PWD" | tee -a {log}
-            echo "Random seed: {params.seed}" | tee -a {log}
-            root=$(head -n 1 {input.alignment} | cut -c 2- | cut -f 1 -d ' ')
-            echo "Detected seq ID for tree root from first FASTA record: $root" | tee -a {log}
-            sonar igphyml --root "$root" -i {input.alignment} --seed {params.seed} {params.args} 2>&1 | tee -a {log}
+            (
+              cd {params.wd_sonar}
+              date
+              echo "Running SONAR Module 3 igphyml with custom alignment"
+              echo
+              echo "$(which sonar): $(sonar --version)"
+              echo "Project directory: $PWD"
+              echo "Random seed: {params.seed}"
+              root=$(head -n 1 {input.alignment} | cut -c 2- | cut -f 1 -d ' ')
+              echo "Detected seq ID for tree root from first FASTA record: $root"
+              sonar igphyml --root "$root" -i {input.alignment} --seed {params.seed} {params.args} 2>&1
+            ) | tee -a {log}
         """
 
 rule sonar_make_natives_table:
@@ -617,7 +649,7 @@ rule sonar_make_natives_table:
         # we don't actually need the files here but this has the logic to name
         # the timepoints
         tp_fastas=sonar_module_3_collect_inputs
-    log: Path("analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}{antibody_lineage}/natives.tab.log")
+    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}{antibody_lineage}/log.sonar_make_natives_table.txt"
     wildcard_constraints:
         thing="custom-|",
         antibody_lineage="(?!custom-)[^/]+"
