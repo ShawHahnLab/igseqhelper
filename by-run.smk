@@ -33,6 +33,8 @@ def run_merge_input(w):
         if attrs["Run"] == w.run:
             for suffix in suffixes:
                 targets.append(f"analysis/merge/{{run}}/{sample}.{suffix}")
+    if not targets:
+        raise ValueError(f"No samples for run {w.run}")
     return targets
 
 rule run_merge:
