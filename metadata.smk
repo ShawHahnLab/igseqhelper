@@ -11,7 +11,10 @@ from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
 
-TARGET_METADATA = expand("metadata/{sheet}.csv", sheet=["specimens", "runs", "samples", "lineages", "isolates"])
+with open("metadata/igseq.package.yaml") as f_in:
+    METAMETADATA = yaml.safe_load(f_in)
+
+TARGET_METADATA = ["metadata/" + resource["path"] for resource in METAMETADATA["resources"]]
 
 def download_metadata(path_yaml, path_out=None):
     """Download CSV from google sheets.
