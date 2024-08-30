@@ -26,5 +26,9 @@ fields:
     type: string
   - name: Comments
     title: Comments
-    description: Freeform comments about each sample
+    description: Freeform comments about each run
+    type: string
+  - name: Summary from Analysis
+    title: Summary from Analysis
+    description: A brief summary of any key findings
     type: string
