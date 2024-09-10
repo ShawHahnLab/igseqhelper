@@ -53,7 +53,7 @@ AVAILABLE_IGDISCOVER = dict(zip(
     glob_wildcards("analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/{segment}.fasta")))
 
 AVAILABLE_MININGD = filter_wildcards_by_metadata(dict(zip(
-    ["subject"], glob_wildcards("analysis/mining-d/{subject}.output.fasta"))))
+    ["subject"], glob_wildcards("analysis/mining-d/{subject}.output.default.fasta"))))
 
 TARGET_REPORT_COUNTS = expand("analysis/reporting/counts/counts_by_{thing}.csv", thing=["sample", "run", "specimen"])
 TARGET_REPORT_SONAR_ISLAND_SUMMARIES = expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/island_stats_summary.csv", zip, **AVAILABLE_SONAR_ISLANDS)
@@ -1069,5 +1069,5 @@ rule report_miningd_refs:
 
 rule report_miningd_output:
     output: "analysis/reporting/mining-d/{subject}/{subject}.fasta"
-    input: "analysis/mining-d/{subject}.output.fasta"
+    input: "analysis/mining-d/{subject}.output.default.fasta"
     shell: "cp {input} {output}"
