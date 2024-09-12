@@ -22,9 +22,9 @@ def input_for_igdiscover_as_germline(w):
     chain_type = {"IGH": "mu", "IGK": "kappa", "IGL": "lambda"}[w.locus]
     ref = "kimdb" if w.locus == "IGH" else "sonarramesh"
     targets = {
-        "V": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}/final/database/V.fasta",
-        "D": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}/final/database/D.fasta",
-        "J": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}/custom_j_discovery/J.fasta",
+        "V": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}.1iter/final/database/V.fasta",
+        "D": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}.1iter/final/database/D.fasta",
+        "J": f"analysis/igdiscover/{ref}/{chain_type}/{w.subject}.1iter/custom_j_discovery/J.fasta",
         }
     return targets
 
@@ -113,8 +113,8 @@ rule catsubjects:
 # SNAKEMAKES ON SNAKEMAKES
 rule igdiscover_init:
     output:
-        yaml="analysis/igdiscover/{ref}/{chain_type}/{subject}/igdiscover.yaml",
-        reads="analysis/igdiscover/{ref}/{chain_type}/{subject}/reads.fastq.gz",
+        yaml="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/igdiscover.yaml",
+        reads="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/reads.fastq.gz",
     input:
         # IgDiscover always wants a "D" even for light
         db_v="analysis/igdiscover/{ref}/{chain_type}/V.fasta",
@@ -123,8 +123,7 @@ rule igdiscover_init:
         reads="analysis/samples-by-subject/igm/{subject}.{chain_type}.fastq.gz",
     conda: "envs/igdiscover.yaml"
     params:
-        stranded="true",
-        iterations=5
+        stranded="true"
     shell:
         """
             rmdir $(dirname {output.yaml})
@@ -134,21 +133,21 @@ rule igdiscover_init:
                 $(dirname {output.yaml})
             # This is a sloppy way of handling the YAML!  Re-work this probably
             # by parsing in Python and writing back out.
-            sed -i 's/^iterations: 1$/iterations: {params.iterations}/' {output.yaml}
+            sed -i 's/^iterations: 1$/iterations: {wildcards.num}/' {output.yaml}
             sed -i 's/^stranded: false$/stranded: {params.stranded}/' {output.yaml}
         """
 
 rule igdiscover_run:
     output:
-        stats="analysis/igdiscover/{ref}/{chain_type}/{subject}/stats/stats.json",
-        db_v="analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/V.fasta",
-        db_d="analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/D.fasta",
-        db_j="analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/J.fasta"
+        stats="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/stats/stats.json",
+        db_v="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/final/database/V.fasta",
+        db_d="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/final/database/D.fasta",
+        db_j="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/final/database/J.fasta"
     input:
-        yaml="analysis/igdiscover/{ref}/{chain_type}/{subject}/igdiscover.yaml",
-        r1="analysis/igdiscover/{ref}/{chain_type}/{subject}/reads.fastq.gz",
+        yaml="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/igdiscover.yaml",
+        r1="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/reads.fastq.gz",
     log:
-        conda="analysis/igdiscover/{ref}/{chain_type}/{subject}/igdiscover_run.conda_build.txt"
+        conda="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/igdiscover_run.conda_build.txt"
     conda: "envs/igdiscover.yaml"
     threads: 20
     shell:
@@ -174,21 +173,21 @@ rule igdiscover_run:
 #                        "NAME*ALLELE". Default: 0.2
 rule custom_j_discovery:
     output:
-        tab="analysis/igdiscover/{ref}/{chain_type}/{subject}/custom_j_discovery/J.tab",
-        fasta="analysis/igdiscover/{ref}/{chain_type}/{subject}/custom_j_discovery/J.fasta"
+        tab="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/custom_j_discovery/J.tab",
+        fasta="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/custom_j_discovery/J.fasta"
     input:
         # (This command actually uses iteration-01's J.fasta and
         # filtered.tsv.gz but I don't have those listed as part of the
         # input/output paths in all this.  So I'll just request the output of
         # my igdiscover rule.)
-        db_j="analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/J.fasta",
+        db_j="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/final/database/J.fasta",
     params:
-        db_j="analysis/igdiscover/{ref}/{chain_type}/{subject}/iteration-01/database/J.fasta",
-        tab="analysis/igdiscover/{ref}/{chain_type}/{subject}/iteration-01/filtered.tsv.gz",
+        db_j="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/iteration-01/database/J.fasta",
+        tab="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/iteration-01/filtered.tsv.gz",
         jcov=100,
         ratio=0.3
     log:
-        conda="analysis/igdiscover/{ref}/{chain_type}/{subject}/custom_j_discovery/conda_build.txt"
+        conda="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/custom_j_discovery/conda_build.txt"
     conda: "envs/igdiscover.yaml"
     shell:
         """
@@ -206,14 +205,14 @@ rule custom_j_discovery:
 
 rule upstream:
     """Derive a consensus sequence for the upstream portion (UTR+Leader) of each V gene."""
-    output: "analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}/upstream.fasta"
-    input: "analysis/igdiscover/{ref}/{chain_type}/{subject}/final/database/V.fasta"
+    output: "analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}.{num}iter/upstream.fasta"
+    input: "analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/final/database/V.fasta"
     params:
-        table="analysis/igdiscover/{ref}/{chain_type}/{subject}/final/filtered.tsv.gz"
+        table="analysis/igdiscover/{ref}/{chain_type}/{subject}.{num}iter/final/filtered.tsv.gz"
     conda: "envs/gkhlab-igdiscover22.yaml"
     log:
-        main="analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}/log.txt",
-        conda="analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}/conda_build.txt"
+        main="analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}.{num}iter/log.txt",
+        conda="analysis/igdiscover-upstream/{ref}.{chain_type}.{subject}.{num}iter/conda_build.txt"
     shell:
         """
             conda list --explicit > {log.conda}

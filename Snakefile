@@ -20,6 +20,7 @@ wildcard_constraints:
     antibody_lineage=r"[-_A-Za-z0-9\.]+",
     # other flow control
     compressed="((?!xz$).)*",
+    num="[0-9]+", # integer
     ext="[^/]+", # file extension (limited to one directory)
     thing="[^/]+", # any match limited to one directory
     name="[^/]+", # ditto
