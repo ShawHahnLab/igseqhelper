@@ -338,7 +338,7 @@ rule sonar_module_2_id_div:
               echo
               echo "$(which sonar): $(sonar --version)"
               echo "Project directory: $PWD"
-              mab_seqs=$(grep -c "^>" {parmas.input_mab})
+              mab_seqs=$(grep -c "^>" {params.input_mab})
               echo "Reference antibodies: {input.mab} ($mab_seqs seqs)"
               echo "Gap setting: {params.gap}"
               mab={params.input_mab}
