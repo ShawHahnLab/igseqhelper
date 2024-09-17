@@ -151,6 +151,10 @@ rule sonar_gather_mature:
                     f_out.write(f">{seqid} {attrs['Lineage']}\n")
                     f_out.write(attrs[seq_col]+"\n")
                     seen.add(seq)
+        if seen == {""}:
+            raise ValueError(
+                f"No sequences found for subject {wildcards.subject} "
+                f"and chain type {wildcards.chain_type}")
 
 # I think this only comes up for including sequences for IgPhyML.  In this case
 # we *will* keep duplicates so all mAb sequences will be in the tree, excluding
