@@ -52,6 +52,10 @@ fields:
         - alpha
         - delta
         - epsilon
+  - name: RunPortion
+    title: Run Portion
+    description: A number signifying the proportion of material for this sample versus the others in the same run.  For example, a run with two samples with values of 1 and 2 would mean one third for one sample and two-thirds for the other.
+    type: number
   - name: FwdPrimer
     title: Forward Primer
     description: Sequence expected just after the barcode in R1.  Only needed if using custom amplification; if not given, the protocol's "5PIIA" RACE anchor sequence is used.
