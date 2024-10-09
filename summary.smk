@@ -62,6 +62,8 @@ def summary_setup_subject_helper_rules():
     # note which subjects have IgM reads sequenced for which chain
     m_subjects = {"mu": set(), "kappa": set(), "lambda": set()}
     for sample, attrs in SAMPLES.items():
+        if "SpecimenAttrs" not in attrs:
+            continue
         if attrs["Run"] and "IgM" in attrs["SpecimenAttrs"]["CellType"]:
             m_subjects[attrs["Type"]].add(attrs["SpecimenAttrs"]["Subject"])
     # organize by locus rather than chain type
