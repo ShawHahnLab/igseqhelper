@@ -85,28 +85,28 @@ def sonar_setup_helper_rules():
             continue
         # Automatic gathering and alignment across timepoints
         subject, chain_type = key
-        targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{lineage}/output/longitudinal-{lineage}_igphyml.tree",
+        targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{lineage}/output/longitudinal.auto.{lineage}_igphyml.tree",
             subject=subject, chain_type=chain_type, lineage=lineages)
         rule:
             f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, all lineages"
             name: f"sonar_3_{subject}_{chain_type}"
             input: targets
         for lineage in lineages:
-            targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{lineage}/output/longitudinal-{lineage}_igphyml.tree",
+            targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{lineage}/output/longitudinal.auto.{lineage}_igphyml.tree",
                 subject=subject, chain_type=chain_type, lineage=lineage)
             rule:
                 f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, lineage {lineage}"
                 name: f"sonar_3_{subject}_{chain_type}_{lineage}"
                 input: targets
         # Manually-prepared custom alignment input
-        targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{lineage}/output/longitudinal-custom-{lineage}_igphyml.tree",
+        targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal.custom.{lineage}/output/longitudinal.custom.{lineage}_igphyml.tree",
             subject=subject, chain_type=chain_type, lineage=lineages)
         rule:
             f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, all lineages, custom input"
             name: f"sonar_3_{subject}_{chain_type}_custom"
             input: targets
         for lineage in lineages:
-            targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{lineage}/output/longitudinal-custom-{lineage}_igphyml.tree",
+            targets = expand("analysis/sonar/{subject}.{chain_type}/longitudinal.custom.{lineage}/output/longitudinal.custom.{lineage}_igphyml.tree",
                 subject=subject, chain_type=chain_type, lineage=lineage)
             rule:
                 f"SONAR Module 3 (longitudinal analysis and tree) for subject {subject} and chain type {chain_type}, lineage {lineage}, custom input"
@@ -219,8 +219,8 @@ rule sonar_module_1:
         # 97% similarity was used in the SONAR vignette and Chaim says was more
         # appropriate back in the days of 454 sequencing, but they typically
         # use 99% now with the higher-quality Illumina sequencing.
-        cluster_id_fract=.99,
-        cluster_min2=2,
+        cluster_id_fract=config.get("sonar_cluster_id_fract", 0.99),
+        cluster_min2=config.get("sonar_cluster_min2", 2),
         # What we give for the V(D)J command-line argments and the J motif
         # depends on which chain we're doing.  We could handle this during the
         # rule itself with a run: directive but then it won't let us use
@@ -523,12 +523,12 @@ def sonar_module_3_collect_param_seqs(_, input):
 
 rule sonar_module_3_collect:
     output:
-        collected="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa"
+        collected="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/sequences/nucleotide/longitudinal.{word}.{antibody_lineage}-collected.fa"
     input: unpack(sonar_module_3_collect_inputs)
     singularity: "docker://jesse08/sonar"
     threads: 4
     params:
-        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}", **w),
+        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}", **w),
         seqs=sonar_module_3_collect_param_seqs
     shell:
         """
@@ -537,6 +537,8 @@ rule sonar_module_3_collect:
         """
 
 def sonar_module_3_igphyml_param_v_id(wildcards):
+    if dict(wildcards).get("word") == "custom":
+        return ""
     key_default = "germline_v"
     key = "germline_v_{subject}_{chain_type}_{antibody_lineage}".format(**wildcards)
     v_call = config.get(key, config.get(key_default))
@@ -550,83 +552,51 @@ def sonar_module_3_igphyml_param_v_id(wildcards):
         raise ValueError("No V assigned for %s" % wildcards)
     return v_call
 
-# If a custom alignment is present and the pattern matches
-# "longitudinal-custom-{antibody_lineage}", prefer the custom rule.  Otherwise,
-# automatic.
-ruleorder: sonar_module_3_igphyml_custom > sonar_module_3_igphyml_auto
-
-rule sonar_module_3_igphyml_auto:
-    """SONAR 3: Run phylogenetic analysis with automatic alignment and generate tree across specimens."""
-    output:
-        tree="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree",
-        inferred_nucl="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa",
-        inferred_prot="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/amino_acid/longitudinal-{antibody_lineage}_inferredAncestors.fa",
-        stats="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/logs/longitudinal-{antibody_lineage}_igphyml_stats.txt",
-        afa="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/work/phylo/longitudinal-{antibody_lineage}_aligned.afa"
-    input:
-        unpack(input_sonar_germline),
-        collected="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa",
-        natives="analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/mab/mab.{antibody_lineage}.fasta"
-    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/log.txt"
-    singularity: "docker://jesse08/sonar"
-    threads: 4
-    params:
-        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}", **w),
-        input_germline_v=lambda w, input: Path(input.V).resolve(),
-        input_natives=lambda w, input: Path(input.natives).resolve(),
-        v_id=sonar_module_3_igphyml_param_v_id,
-        seed=123, # 123 is SONAR's default for igphyml --r_seed
-        args="-f"
-    shell:
-        """
-            # Singularity passes through environment variables by default,
-            # which in my setup includes LANG=en_US.UTF-8 which is unrecognized
-            # by the container, which then causes a few warnings to be written
-            # to stderr by a perl script called by SONAR, which then triggers
-            # SONAR to crash when it sees the non-empty stderr.
-            # So yeah let's just unset the LANG.
-            unset LANG
-            (
-              cd {params.wd_sonar}
-              date
-              echo "Running SONAR Module 3 igphyml with automatic alignment"
-              echo
-              echo "$(which sonar): $(sonar --version)"
-              echo "Project directory: $PWD"
-              echo "Random seed: {params.seed}"
-              echo "Given seq ID for tree root: {params.v_id}"
-              set -x
-              sonar igphyml \
-                  -v '{params.v_id}' \
-                  --lib {params.input_germline_v} \
-                  --natives {params.input_natives} \
-                  --seed {params.seed} \
-                  {params.args} 2>&1
-            ) | tee -a {log}
-        """
+def input_for_sonar_module_3_igphyml(w):
+    proj = "longitudinal.{word}.{antibody_lineage}"
+    sonar_dir = "analysis/sonar/{subject}.{chain_type}/" + proj + "/"
+    if w.word== "auto":
+        targets = input_sonar_germline(w)
+        targets.update({
+            "collected": sonar_dir + "output/sequences/nucleotide/" + proj + "-collected.fa",
+            "natives": sonar_dir + "mab/mab.{antibody_lineage}.fasta"
+        })
+    else:
+        targets = {
+            "alignment": "analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.{word}.fa"
+        }
+    return targets
 
 # (Setting this up as a checkpoint means we can have downstream rules structured
 # according to the contents of these output files, for example, what ancestor
 # sequences are inferred.)
-checkpoint sonar_module_3_igphyml_custom:
-    """SONAR 3: Run phylogenetic analysis with custom alignment and generate tree across specimens.
+checkpoint sonar_module_3_igphyml:
+    """SONAR 3: Run IgPhyML with auto or custom alignment and generate tree across specimens.
 
-    This will given the first sequence ID in the alignment as the --root for sonar igphyml.
+    For the automatic alignment case ("auto" as the keyword before the lineage
+    name), this will build a tree with the appropriate germline V sequence for
+    the lineage included and will root the tree on that V sequence.
+
+    For the custom alignment case (any other keyword), this will given the
+    first sequence ID in the alignment as the --root for sonar igphyml.
     """
     output:
-        tree="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/longitudinal-custom-{antibody_lineage}_igphyml.tree",
-        inferred_nucl="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/nucleotide/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa",
-        inferred_prot="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/amino_acid/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa",
-        stats="analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/logs/longitudinal-custom-{antibody_lineage}_igphyml_stats.txt"
-    input:
-        alignment=Path("analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.fa").resolve()
-    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/log.txt"
+        tree="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/longitudinal.{word}.{antibody_lineage}_igphyml.tree",
+        inferred_nucl="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/sequences/nucleotide/longitudinal.{word}.{antibody_lineage}_inferredAncestors.fa",
+        inferred_prot="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/sequences/amino_acid/longitudinal.{word}.{antibody_lineage}_inferredAncestors.fa",
+        stats="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/logs/longitudinal.{word}.{antibody_lineage}_igphyml_stats.txt"
+    input: unpack(input_for_sonar_module_3_igphyml)
+    log: "analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/log.txt"
     singularity: "docker://jesse08/sonar"
-    threads: 4
     params:
-        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}", **w),
-        seed=123,
-        args="-f"
+        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}", **w),
+        seed=config.get("sonar_igphyml_seed", 123),
+        aln_type=lambda w: "auto" if w.word == "auto" else "custom",
+        args="-f",
+        input_germline_v=lambda w, input: Path(input.V).resolve() if w.word == "auto" else "",
+        input_natives=lambda w, input: Path(input.natives).resolve() if w.word == "auto" else "",
+        input_alignment=lambda w, input: Path(input.alignment).resolve() if w.word != "auto" else "",
+        v_id=sonar_module_3_igphyml_param_v_id,
     shell:
         """
             # See sonar_module_3_igphyml_auto about LANG
@@ -634,33 +604,41 @@ checkpoint sonar_module_3_igphyml_custom:
             (
               cd {params.wd_sonar}
               date
-              echo "Running SONAR Module 3 igphyml with custom alignment"
+              echo "Running SONAR Module 3 igphyml"
               echo
+              echo "Alignment type: {params.aln_type}"
               echo "$(which sonar): $(sonar --version)"
               echo "Project directory: $PWD"
               echo "Random seed: {params.seed}"
-              root=$(head -n 1 {input.alignment} | cut -c 2- | cut -f 1 -d ' ')
-              echo "Detected seq ID for tree root from first FASTA record: $root"
-              set -x
-              sonar igphyml --root "$root" -i {input.alignment} --seed {params.seed} {params.args} 2>&1
+              if [[ {params.aln_type} == "auto" ]]; then
+                echo "Germline V ID for root: {params.v_id}"
+                echo "Germline V library: {params.input_germline_v}"
+                echo "Natives FASTA: {params.input_natives}"
+                set -x
+                sonar igphyml \
+                    -v '{params.v_id}' \
+                    --lib {params.input_germline_v} \
+                    --natives {params.input_natives} \
+                    --seed {params.seed} \
+                    {params.args} 2>&1
+              else
+                root=$(head -n 1 {params.input_alignment} | cut -c 2- | cut -f 1 -d ' ')
+                echo "Detected seq ID for tree root from first FASTA record: $root"
+                set -x
+                sonar igphyml --root "$root" -i {params.input_alignment} --seed {params.seed} {params.args} 2>&1
+              fi
+
             ) | tee -a {log}
         """
 
 rule sonar_make_natives_table:
     output:
-        # "thing" wildcard can be either "" (for regular automatic alignment)
-        # or "custom-" (for manually-prepped alignment with custom root on
-        # top).  We need to separate that part out from the lineage info itself
-        # so the lineage name can be used to gather the relevant mAb sequences.
-        table="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}{antibody_lineage}/natives.tab"
+        table="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/natives.tab"
     params:
         # we don't actually need the files here but this has the logic to name
         # the timepoints
         tp_fastas=sonar_module_3_collect_inputs
-    log: "analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}{antibody_lineage}/log.sonar_make_natives_table.txt"
-    wildcard_constraints:
-        thing="custom-|",
-        antibody_lineage="(?!custom-)[^/]+"
+    log: "analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/log.sonar_make_natives_table.txt"
     run:
         keys = list(dict(params.tp_fastas).keys())
         mabs = {}
@@ -696,13 +674,13 @@ rule sonar_module_3_draw_tree:
     output:
         # here "thing" can include the lineage field since the lineage isn't
         # directly used at this point
-        tree_img="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/output/longitudinal-{thing}_igphyml.tree{suffix,.*}.pdf"
+        tree_img="analysis/sonar/{subject}.{chain_type}/longitudinal{thing}/output/longitudinal{thing}_igphyml.tree{suffix,.*}.pdf"
     input:
-        tree="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/output/longitudinal-{thing}_igphyml.tree",
-        natives_tab="analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}/natives{suffix}.tab"
+        tree="analysis/sonar/{subject}.{chain_type}/longitudinal{thing}/output/longitudinal{thing}_igphyml.tree",
+        natives_tab="analysis/sonar/{subject}.{chain_type}/longitudinal{thing}/natives{suffix}.tab"
     singularity: "docker://jesse08/sonar"
     params:
-        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal-{thing}", **w),
+        wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal{thing}", **w),
         # (Jumping through some hoops to run inside of the SONAR project
         # directory to avoid leaving things like SONAR_command_history.log
         # lying around at the top level)

@@ -337,7 +337,7 @@ rule report_sonar_igphyml_collected:
     """
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_collected.fa"
     input:
-        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}-collected.fa")
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{antibody_lineage}/output/sequences/nucleotide/longitudinal.auto.{antibody_lineage}-collected.fa")
     # Using igseq convert here and elsewhere instead of just cp to unwrap any
     # of these that are wrapped
     shell: "igseq convert {input} {output}"
@@ -433,35 +433,35 @@ rule report_sonar_igphyml_ancestors:
     """Copy SONAR module 3 inferred ancestors FASTA."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.fa"
     input:
-        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/sequences/nucleotide/longitudinal-{antibody_lineage}_inferredAncestors.fa")
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{antibody_lineage}/output/sequences/nucleotide/longitudinal.auto.{antibody_lineage}_inferredAncestors.fa")
     shell: "igseq convert {input} {output}"
 
 rule report_sonar_igphyml_ancestors_custom:
     """Copy SONAR module 3 (custom alignment) inferred ancestors FASTA."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.custom.fa"
     input:
-        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{antibody_lineage}/output/sequences/nucleotide/longitudinal-custom-{antibody_lineage}_inferredAncestors.fa")
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal.custom.{antibody_lineage}/output/sequences/nucleotide/longitudinal.custom.{antibody_lineage}_inferredAncestors.fa")
     shell: "igseq convert {input} {output}"
 
 rule report_sonar_igphyml_alignment:
     """Copy SONAR module 3 alignment FASTA."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_aligned.fa"
     input:
-        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/work/phylo/longitudinal-{antibody_lineage}_aligned.afa")
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{antibody_lineage}/work/phylo/longitudinal.auto.{antibody_lineage}_aligned.afa")
     shell: "igseq convert {input} {output}"
 
 rule report_sonar_igphyml_tree_pdf:
     """Copy SONAR module 3 tree PDF."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_tree.pdf"
     input:
-        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree.pdf")
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{antibody_lineage}/output/longitudinal.auto.{antibody_lineage}_igphyml.tree.pdf")
     shell: "cp {input} {output}"
 
 rule report_sonar_igphyml_tree:
     """Copy SONAR module 3 newick tree file."""
     output: "analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_tree.tree"
     input:
-        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/output/longitudinal-{antibody_lineage}_igphyml.tree")
+        lambda w: input_helper_sonar(w, "analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{antibody_lineage}/output/longitudinal.auto.{antibody_lineage}_igphyml.tree")
     shell: "cp {input} {output}"
 
 rule report_sonar_mabs:

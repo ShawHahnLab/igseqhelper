@@ -21,6 +21,7 @@ wildcard_constraints:
     # other flow control
     compressed="((?!xz$).)*",
     num="[0-9]+", # integer
+    word="[A-Za-z]+", # just letters
     ext="[^/]+", # file extension (limited to one directory)
     thing="[^/]+", # any match limited to one directory
     name="[^/]+", # ditto

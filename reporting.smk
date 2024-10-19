@@ -41,7 +41,7 @@ AVAILABLE_SONAR_ISLANDS = filter_wildcards_by_metadata(dict(zip(
 
 AVAILABLE_SONAR_ANCESTORS = filter_wildcards_by_metadata(dict(zip(
     ["subject", "chain_type", "antibody_lineage", "dummy"],
-    glob_wildcards("analysis/sonar/{subject}.{chain_type}/longitudinal-{antibody_lineage}/"
+    glob_wildcards("analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{antibody_lineage}/"
         "output/sequences/nucleotide/longitudinal-{dummy}_inferredAncestors.fa"))))
 
 AVAILABLE_IGDISCOVER = dict(zip(

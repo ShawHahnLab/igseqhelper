@@ -130,8 +130,8 @@ def input_for_armadillo_input_ancs(w):
     # isotype assumed)
     chain_type = "gamma" if w.locus_chain == "heavy" else w.locus_chain
     subject = ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"]
-    return (f"analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{w.antibody_lineage}"
-        f"/output/sequences/nucleotide/longitudinal-custom-{w.antibody_lineage}_inferredAncestors.fa")
+    return (f"analysis/sonar/{subject}.{chain_type}/longitudinal.custom.{w.antibody_lineage}"
+        f"/output/sequences/nucleotide/longitudinal.custom.{w.antibody_lineage}_inferredAncestors.fa")
 
 rule armadillo_input_ancs:
     """ARMADiLLO input: pair of inferred ancestors leading toward a particular isolate in the tree"""
@@ -160,8 +160,8 @@ rule armadillo_input_ancs:
 def input_for_armadillo_input_isolate(w):
     chain_type = "gamma" if w.locus_chain == "heavy" else w.locus_chain
     subject = ANTIBODY_LINEAGES[w.antibody_lineage]["Subject"]
-    return (f"analysis/sonar/{subject}.{chain_type}/longitudinal-custom-{w.antibody_lineage}"
-        f"/output/sequences/nucleotide/longitudinal-custom-{w.antibody_lineage}_inferredAncestors.fa")
+    return (f"analysis/sonar/{subject}.{chain_type}/longitudinal.custom.{w.antibody_lineage}"
+        f"/output/sequences/nucleotide/longitudinal.custom.{w.antibody_lineage}_inferredAncestors.fa")
 
 rule armadillo_input_isolate:
     """ARMADiLLO input: earliest inferred ancestor and a specific mature isolate"""
