@@ -162,7 +162,11 @@ rule demux:
         """
 
 rule getreads:
-    output: directory("analysis/reads/{run}")
+    output:
+        outdir=directory("analysis/reads/{run}"),
+        r1="analysis/reads/{run}/Undetermined_S0_L001_R1_001.fastq.gz",
+        i1="analysis/reads/{run}/Undetermined_S0_L001_I1_001.fastq.gz",
+        r2="analysis/reads/{run}/Undetermined_S0_L001_R2_001.fastq.gz"
     input: ancient("/seq/runs/{run}")
     log:
         conda="analysis/reads/{run}/conda_build.txt"
