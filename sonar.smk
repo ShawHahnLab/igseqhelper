@@ -584,7 +584,9 @@ checkpoint sonar_module_3_igphyml:
         tree="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/longitudinal.{word}.{antibody_lineage}_igphyml.tree",
         inferred_nucl="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/sequences/nucleotide/longitudinal.{word}.{antibody_lineage}_inferredAncestors.fa",
         inferred_prot="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/sequences/amino_acid/longitudinal.{word}.{antibody_lineage}_inferredAncestors.fa",
-        stats="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/logs/longitudinal.{word}.{antibody_lineage}_igphyml_stats.txt"
+        stats="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/logs/longitudinal.{word}.{antibody_lineage}_igphyml_stats.txt",
+        # alignment produced here if word=auto, just copied from input (so the output is consistent) otherwise
+        alignment="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/work/phylo/longitudinal.{word}.{antibody_lineage}_aligned.afa"
     input: unpack(input_for_sonar_module_3_igphyml)
     log: "analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/log.txt"
     singularity: "docker://jesse08/sonar"
@@ -596,6 +598,7 @@ checkpoint sonar_module_3_igphyml:
         input_germline_v=lambda w, input: Path(input.V).resolve() if w.word == "auto" else "",
         input_natives=lambda w, input: Path(input.natives).resolve() if w.word == "auto" else "",
         input_alignment=lambda w, input: Path(input.alignment).resolve() if w.word != "auto" else "",
+        output_alignment=lambda w, output: Path(output.alignment).resolve(),
         v_id=sonar_module_3_igphyml_param_v_id,
     shell:
         """
@@ -626,6 +629,7 @@ checkpoint sonar_module_3_igphyml:
                 echo "Detected seq ID for tree root from first FASTA record: $root"
                 set -x
                 sonar igphyml --root "$root" -i {params.input_alignment} --seed {params.seed} {params.args} 2>&1
+                cp {params.input_alignment} {params.output_alignment}
               fi
 
             ) | tee -a {log}
