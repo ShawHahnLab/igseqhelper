@@ -56,8 +56,11 @@ def armadillo_setup_helper_rules():
                 antibody_lineage = attrs["Lineage"]
                 locus_chain = "heavy"
                 if chain == "light":
-                    locus_chain = {"IGL": "lambda", "IGK": "kappa"}[
-                        attrs["LineageAttrs"]["LightLocus"]]
+                    try:
+                        locus_chain = {"IGL": "lambda", "IGK": "kappa"}[
+                            attrs["LineageAttrs"]["LightLocus"]]
+                    except KeyError:
+                        continue
                 chain_suffix = "" if chain == "heavy" else f" ({locus_chain})"
                 # whole bunch of ancX -> ancY pairs
                 rule:
