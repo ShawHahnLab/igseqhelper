@@ -49,6 +49,10 @@ fields:
     title: Antigen Specificity
     description: A short signifier for the epitope targeted by each lineage, like "V2 apex" or "V3 glycan"
     type: string
+  - name: GermlineComments
+    title: Germline Comments
+    description: Freeform comments about the germline assignments for each lineage
+    type: string
   - name: Comments
     title: Comments
     description: Freeform comments about each lineage
