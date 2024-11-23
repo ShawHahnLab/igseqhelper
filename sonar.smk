@@ -555,7 +555,7 @@ def sonar_module_3_igphyml_param_v_id(wildcards):
 def input_for_sonar_module_3_igphyml(w):
     proj = "longitudinal.{word}.{antibody_lineage}"
     sonar_dir = "analysis/sonar/{subject}.{chain_type}/" + proj + "/"
-    if w.word== "auto":
+    if w.word == "auto":
         targets = input_sonar_germline(w)
         targets.update({
             "collected": sonar_dir + "output/sequences/nucleotide/" + proj + "-collected.fa",
