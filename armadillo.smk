@@ -3,6 +3,21 @@ Rules for running ARMADiLLO to infer mutation probabilities, mainly between
 inferred ancestors.
 
 https://armadillo.dhvi.duke.edu/info
+
+The basic layout is:
+
+    analysis/armadillo/{category}.{locus_chain}/{case}/{case}.tiles.html
+
+With the sequences to use as the UCA and the mutated antibody provided in:
+
+    analysis/armadillo/{category}.{locus_chain}/{case}/from.fasta
+    analysis/armadillo/{category}.{locus_chain}/{case}/{case}.fasta
+
+Automatically-handled category and case can be:
+
+    category                     case            description
+    ancs.{lineage}.{isolate}     {anc1}.{anc2}   all ancX/ancY pairs leading toward one isolate
+    isolate.{lineage}.{isolate}  anc1.{isolate}  just anc1 and one isolate
 """
 
 from functools import partial
@@ -16,9 +31,10 @@ def parse_anc_id(txt):
 def input_for_armadillo_by_ancs(w, antibody_lineage, antibody_isolate, locus_chain):
     subject = ANTIBODY_LINEAGES[antibody_lineage]["Subject"]
     chain_type = "gamma" if locus_chain == "heavy" else locus_chain
-    path_ancs = checkpoints.sonar_module_3_igphyml_custom.get(
+    path_ancs = checkpoints.sonar_module_3_igphyml.get(
         subject=subject,
         chain_type=chain_type,
+        word="custom",
         antibody_lineage=antibody_lineage).output.inferred_nucl
     ancs = []
     for rec in SeqIO.parse(path_ancs, "fasta"):
