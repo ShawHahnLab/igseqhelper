@@ -32,7 +32,7 @@ rule fastqc:
     input: "analysis/{path}.fastq.gz"
     threads: 8
     params:
-        nogroup_arg = "--nogroup" if "fastqc_nogroup" in config else ""
+        nogroup_arg = "--nogroup" if not "fastqc_group" in config else ""
     shell: "fastqc -t {threads} {input} -o $(dirname {output.html}) {params.nogroup_arg}"
 
 rule fastqc_extract_quals:
