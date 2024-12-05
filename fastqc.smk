@@ -31,7 +31,9 @@ rule fastqc:
         zip="analysis/fastqc/{path}_fastqc.zip"
     input: "analysis/{path}.fastq.gz"
     threads: 8
-    shell: "fastqc -t {threads} {input} -o $(dirname {output.html})"
+    params:
+        nogroup_arg = "--nogroup" if "fastqc_nogroup" in config else ""
+    shell: "fastqc -t {threads} {input} -o $(dirname {output.html}) {params.nogroup_arg}"
 
 rule fastqc_extract_quals:
     """Extract a FastQC per-base quality summary table as CSV"""
