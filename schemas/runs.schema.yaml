@@ -7,6 +7,9 @@ fields:
     title: Sequencing Run
     description: Illumina sequencing run ID
     type: string
+  - name: SequencerModel
+    title: Sequencer Model
+    description: Model name of the sequencer used (MiSeq, NextSeq, ...)
   - name: PhiX
     title: PhiX Fraction
     description: The fraction of the run's reads that should be PhiX genome (to ensure signal quality via nucleotide diversity)
