@@ -83,9 +83,10 @@ def load_samples(fp_in, specimens=None, runs=None):
             v["BarcodeFwd"] and v["BarcodeRev"] and v["Run"]}
     if len(noblanks) < len(samples):
         LOGGER.warning("Blanks in BarcodeFwd/BarcodeRev/Run columns")
-    unique_keys = {(row["BarcodeFwd"], row["BarcodeRev"], row["Run"]) for row in noblanks.values()}
+    locus = {"kappa": "IGK", "lambda": "IGL"}
+    unique_keys = {(row["BarcodeFwd"], row["BarcodeRev"], row["Run"], locus.get(row["Type"], "IGH")) for row in noblanks.values()}
     if len(unique_keys) != len(noblanks.values()):
-        msg = "Duplicate entries in CSV %s for BarcodeFwd/BarcodeRev/Run combinations" % fp_in
+        msg = "Duplicate entries in CSV %s for BarcodeFwd/BarcodeRev/Run/Locus combinations" % fp_in
         LOGGER.critical(msg)
         raise ValueError(msg)
     for sample in samples.values():

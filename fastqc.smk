@@ -1,3 +1,5 @@
+RUNS_FOR_IGSEQ = [runid for runid in RUNS if "IgSeq" in RUNS[runid]["Protocol"]]
+
 rule fastqc_merge:
     input: expand("analysis/fastqc/merge/{run}/{sample}_fastqc.html", zip, run=[attrs["Run"] for attrs in SAMPLES.values() if attrs["Run"]], sample=[attrs["Sample"] for attrs in SAMPLES.values() if attrs["Run"]])
 

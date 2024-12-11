@@ -4,7 +4,7 @@ os.environ["PATH"] += f":{BASEDIR}/scripts"
 
 wildcard_constraints:
     # project metadata
-    sample="[-A-Za-z0-9]+",
+    sample="[-_A-Za-z0-9]+",
     specimen="[A-Za-z0-9]+",
     subject="[A-Za-z0-9]+",
     run="[-_A-Za-z0-9]+",
@@ -22,6 +22,7 @@ wildcard_constraints:
     compressed="((?!xz$).)*",
     num="[0-9]+", # integer
     word="[A-Za-z]+", # just letters
+    suffix=r"\.?[^/.]*", # dot-whatever, which can be empty
     ext="[^/]+", # file extension (limited to one directory)
     thing="[^/]+", # any match limited to one directory
     name="[^/]+", # ditto
@@ -29,6 +30,7 @@ wildcard_constraints:
 
 include: "metadata.smk"
 include: "by-run.smk"
+include: "by-run-locus-demux.smk"
 include: "mining-d.smk"
 include: "igdiscover.smk"
 include: "sonar.smk"

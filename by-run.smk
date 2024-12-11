@@ -1,88 +1,15 @@
-# demux any run that gets a mention in the samples table
-# (not using the simpler RUNS.keys because some runs we have an entry for
-# aren't used in the demux step)
-RUNS_FOR_SAMPLES = set([attrs["Run"] for attrs in SAMPLES.values() if attrs["Run"]])
+from collections import defaultdict
 
-# do early steps on any run that's labeled IgSeq
-RUNS_FOR_IGSEQ = [runid for runid in RUNS if "IgSeq" in RUNS[runid]["Protocol"]]
-
-rule all_igblast_merge:
-    input: expand("analysis/igblast/merge/{run}.done", run=RUNS_FOR_SAMPLES)
-
-rule all_merge:
-    input: expand("analysis/merge/{run}.done", run=RUNS_FOR_SAMPLES)
-
-rule all_trim:
-    input: expand("analysis/trim/{run}.done", run=RUNS_FOR_SAMPLES)
-
-rule all_demux:
-    input: expand("analysis/demux/{run}", run=RUNS_FOR_SAMPLES)
-
-rule all_phix:
-    input: expand("analysis/phix/{run}/phix.bam", run=RUNS_FOR_IGSEQ)
-
-rule all_getreads:
-    input: expand("analysis/reads/{run}", run=RUNS_FOR_IGSEQ)
-
-### By-pair rules grouped by run
-
-def run_merge_input(w):
-    targets = []
-    suffixes = ["fastq.gz", "merge.counts.csv", "pear.log"]
-    for sample, attrs in SAMPLES.items():
-        if attrs["Run"] == w.run:
-            for suffix in suffixes:
-                targets.append(f"analysis/merge/{{run}}/{sample}.{suffix}")
-    if not targets:
-        raise ValueError(f"No samples for run {w.run}")
-    return targets
-
-rule run_merge:
-    output: "analysis/merge/{run}.done"
-    input: run_merge_input
-    shell: "touch {output}"
-
-def run_trim_input(w):
-    targets = []
-    suffixes = ["R1.fastq.gz", "R2.fastq.gz", "cutadapt1.json", "cutadapt2.json", "trim.counts.csv"]
-    for sample, attrs in SAMPLES.items():
-        if attrs["Run"] == w.run:
-            for suffix in suffixes:
-                targets.append(f"analysis/trim/{{run}}/{sample}.{suffix}")
-    return targets
-
-rule run_trim:
-    output: "analysis/trim/{run}.done"
-    input: run_trim_input 
-    shell: "touch {output}"
-
-### By-pair rules
-
-rule merged_igblast:
+rule merge:
     output:
-        tsv="analysis/igblast/merge/{run}/{sample}.tsv.gz"
+        fqgz="analysis/merge/{run}{suffix}/{sample}.fastq.gz",
+        counts="analysis/merge/{run}{suffix}/{sample}.merge.counts.csv",
+        log="analysis/merge/{run}{suffix}/{sample}.pear.log"
     input:
-        fqgz="analysis/merge/{run}/{sample}.fastq.gz"
+        r1="analysis/trim/{run}{suffix}/{sample}.R1.fastq.gz",
+        r2="analysis/trim/{run}{suffix}/{sample}.R2.fastq.gz"
     log:
-        conda="analysis/igblast/merge/{run}/{sample}.tsv.gz.conda_build.txt"
-    conda: "envs/igseq.yaml"
-    threads: 4
-    shell:
-        """
-            conda list --explicit > {log.conda}
-            igseq igblast -r rhesus/imgt -t {threads} -Q {input.fqgz} --outfmt 19 | gzip > {output}
-        """
-
-rule pair_merge:
-    output:
-        fqgz="analysis/merge/{run}/{sample}.fastq.gz",
-        counts="analysis/merge/{run}/{sample}.merge.counts.csv",
-        log="analysis/merge/{run}/{sample}.pear.log"
-    input:
-        r1="analysis/trim/{run}/{sample}.R1.fastq.gz",
-        r2="analysis/trim/{run}/{sample}.R2.fastq.gz"
-    log:
-        conda="analysis/merge/{run}/{sample}.fastq.gz.conda_build.txt"
+        conda="analysis/merge/{run}{suffix}/{sample}.fastq.gz.conda_build.txt"
     conda: "envs/igseq.yaml"
     threads: 4
     shell:
@@ -91,52 +18,82 @@ rule pair_merge:
             igseq merge -t {threads} {input.r1} {input.r2}
         """
 
-def pair_trim_input(w):
+def input_for_trim(w):
     # special case for already-prepared files from elsewhere
     if w.run == "external":
         return []
+    # special case for multiple samples for one barcode pair
+    # (see by-run-locus-demux.smk)
+    if w.suffix == ".grouped":
+        return {
+            "demux": "analysis/demux/{run}{suffix}",
+            "samples": "analysis/demux/{run}.samples_grouped.csv"}
     # The usual case
     for samp, attrs in SAMPLES.items():
         if samp == w.sample:
             runid = attrs["Run"]
             if runid == w.run:
                 return {
-                "demux": "analysis/demux/{run}",
+                "demux": "analysis/demux/{run}{suffix}",
                 "samples": ancient("metadata/samples.csv")}
             else:
                 raise ValueError(f"Sample {w.sample} has run {runid}, not {w.run}")
     raise ValueError(f"Sample {w.sample} not found for run {w.run}")
 
-rule pair_trim:
+rule trim:
     output:
-        r1="analysis/trim/{run}/{sample}.R1.fastq.gz",
-        r2="analysis/trim/{run}/{sample}.R2.fastq.gz",
-        report1="analysis/trim/{run}/{sample}.cutadapt1.json",
-        report2="analysis/trim/{run}/{sample}.cutadapt2.json",
-        counts="analysis/trim/{run}/{sample}.trim.counts.csv"
-    input: unpack(pair_trim_input)
+        r1="analysis/trim/{run}{suffix}/{sample}.R1.fastq.gz",
+        r2="analysis/trim/{run}{suffix}/{sample}.R2.fastq.gz",
+        report1="analysis/trim/{run}{suffix}/{sample}.cutadapt1.json",
+        report2="analysis/trim/{run}{suffix}/{sample}.cutadapt2.json",
+        counts="analysis/trim/{run}{suffix}/{sample}.trim.counts.csv"
+    input: unpack(input_for_trim)
     log:
-        conda="analysis/trim/{run}/{sample}.trim.conda_build.txt"
+        main="analysis/trim/{run}{suffix}/{sample}.log.txt",
+        conda="analysis/trim/{run}{suffix}/{sample}.trim.conda_build.txt"
     conda: "envs/igseq.yaml"
     threads: 4
+    params:
+        species=config.get("species", "rhesus"),
+        min_length=config.get("trim_min_length", 50),
+        qual_cutoff=config.get("trim_qual_cutoff", 15),
+        nextseq_qual_cutoff=config.get("trim_nextseq_qual_cutoff", 15),
+        is_nextseq=lambda w: RUNS[w.run].get("SequencerModel") == "NextSeq"
     shell:
         """
             conda list --explicit > {log.conda}
-            igseq trim -t {threads} \
-                --samples {input.samples} \
-                --species rhesus \
-                {input.demux}/{wildcards.sample}.R1.fastq.gz \
-                {input.demux}/{wildcards.sample}.R2.fastq.gz
+            nextseq_args=""
+            if [[ "{params.is_nextseq}" == "True" ]]; then
+                nextseq_args="--nextseq-trim {params.nextseq_qual_cutoff}"
+            fi
+            (
+              date
+              echo "Species: {params.species}"
+              echo "Min trimmed length: {params.min_length}"
+              echo "Quality cutoff: {params.qual_cutoff}"
+              echo "NextSeq quality cutoff: {params.nextseq_qual_cutoff}"
+              echo "Is NextSeq: {params.is_nextseq}"
+            ) >> {log.main}
+            (
+              igseq trim -t {threads} \
+                  --min-length {params.min_length} \
+                  --quality-cutoff {params.qual_cutoff} \
+                  --samples {input.samples} \
+                  --species {params.species} \
+                  {input.demux}/{wildcards.sample}.R1.fastq.gz \
+                  {input.demux}/{wildcards.sample}.R2.fastq.gz \
+                  $nextseq_args 2>&1
+            ) | tee -a {log.main}
         """
 
-rule pair_phix:
+rule phix:
     output:
-        bam="analysis/phix/{run}/phix.bam",
-        counts="analysis/phix/{run}/phix.counts.csv"
+        bam="analysis/phix/{run}{suffix}/phix.bam",
+        counts="analysis/phix/{run}{suffix}/phix.counts.csv"
     input:
-        demux="analysis/demux/{run}"
+        demux="analysis/demux/{run}{suffix}"
     log:
-        conda="analysis/phix/{run}/conda_build.txt"
+        conda="analysis/phix/{run}{suffix}/conda_build.txt"
     conda: "envs/igseq.yaml"
     threads: 4
     shell:
@@ -147,19 +104,53 @@ rule pair_phix:
 
 ### By-run rules
 
-rule demux:
-    output: directory("analysis/demux/{run}")
-    input:
-        reads="analysis/reads/{run}",
-        samples=ancient("metadata/samples.csv")
-    log:
-        conda="analysis/demux/{run}/conda_build.txt"
-    conda: "envs/igseq.yaml"
-    shell:
-        """
-            conda list --explicit > {log.conda}
-            igseq demux --samples {input.samples} --details {output}/details.csv.gz {input.reads}
-        """
+def make_run_rules():
+    """Generate dynamic per-sequencing-run rules where applicable
+
+    Demultiplexing creates varying output files on a per-run basis, so to have
+    the individual files available as outputs in the workflow, we can use a
+    separate rule per run.  (The alternative would be a Snakemake checkpoint,
+    but why re-infer the whole DAG only after running the rule when we actually
+    do know up-front what the outputs are?)"""
+    by_run = defaultdict(list)
+    for samp_attrs in SAMPLES.values():
+        if samp_attrs["Run"]:
+            by_run[samp_attrs["Run"]].append(samp_attrs)
+    for runid, samp_attrs_list in by_run.items():
+        samp_names = [samp["Sample"] for samp in samp_attrs_list]
+        bc_pairs = [(samp["BarcodeFwd"], samp["BarcodeRev"]) for samp in samp_attrs_list]
+        if len(bc_pairs) == len(set(bc_pairs)):
+            # The regular case; run igseq demux with the samples CSV as-is
+            # (For the alternate case, where we have fewer unique barcode pairs
+            # than samples, see by-run-locus-demux.smk)
+            rule:
+                name: f"demux_{runid}"
+                output:
+                    outdir=directory(f"analysis/demux/{runid}"),
+                    fqgz=expand("analysis/demux/{run}/{samp}.{rp}.fastq.gz", run=runid, samp=samp_names, rp=["R1", "R2"])
+                input:
+                    reads=f"analysis/reads/{runid}",
+                    samples=ancient("metadata/samples.csv")
+                log:
+                    conda=f"analysis/demux/{runid}/conda_build.txt"
+                conda: "envs/igseq.yaml"
+                shell:
+                    """
+                        conda list --explicit > {log.conda}
+                        igseq demux --samples {input.samples} --details {output.outdir}/details.csv.gz {input.reads}
+                    """
+            # These are just helpers to group outputs from other rules by run ID
+            rule:
+                name: f"merge_{runid}"
+                input: expand("analysis/merge/{run}/{sample}.fastq.gz", run=runid, sample=samp_names)
+            rule:
+                name: f"trim_{runid}"
+                input: expand("analysis/trim/{run}/{sample}.{rp}.fastq.gz", run=runid, sample=samp_names, rp=["R1", "R2"])
+        rule:
+            name: f"getreads_{runid}"
+            input: f"analysis/reads/{runid}"
+
+make_run_rules()
 
 rule getreads:
     output:

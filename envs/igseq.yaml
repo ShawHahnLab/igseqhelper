@@ -6,4 +6,4 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - igseq=0.6.0
+  - igseq=0.7.0rc1
