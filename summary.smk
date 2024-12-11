@@ -13,7 +13,7 @@ def set_chain_type(w):
     else:
         raise ValueError(f"Can't find lineage {antibody_lineage}")
     w["chain_type"] = "gamma"
-    if w["chain"] != "heavy":
+    if w["chain"] != "heavy" and attrs["LightLocus"]:
         w["chain_type"] = {"IGK": "kappa", "IGL": "lambda"}[attrs["LightLocus"]]
     return w
 
