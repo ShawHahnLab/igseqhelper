@@ -22,8 +22,18 @@ fields:
     type: string
   - name: Timepoint
     title: Timepoint
-    description: Time point as measured in weeks post-infection
+    description: Time point as measured in weeks post-infection (or immunization, if noted separately for the subject)
     type: integer
+  - name: Material
+    title: Material sampled
+    description: S=spleen, LN=lymph node, BM=bone marrow, PBMC=peripheral blood mononuclear cells.  Generally will be PBMCs
+    type: string
+    constraints:
+      enum:
+        - S
+        - LN
+        - BM
+        - PBMC
   - name: IncludeInTracing
     title: Include in Lineage Tracing?
     description: Should this isolate be used to identify lineage members during lineage tracing?
