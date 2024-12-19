@@ -127,7 +127,9 @@ def make_run_rules():
                 name: f"demux_{runid}"
                 output:
                     outdir=directory(f"analysis/demux/{runid}"),
-                    fqgz=expand("analysis/demux/{run}/{samp}.{rp}.fastq.gz", run=runid, samp=samp_names, rp=["R1", "R2"])
+                    fqgz=expand(
+                        "analysis/demux/{run}/{samp}.{rp}.fastq.gz",
+                        run=runid, samp=samp_names, rp=["R1", "R2", "I1"])
                 input:
                     reads=f"analysis/reads/{runid}",
                     samples=ancient("metadata/samples.csv")
@@ -141,11 +143,20 @@ def make_run_rules():
                     """
             # These are just helpers to group outputs from other rules by run ID
             rule:
+                name: f"phix_{runid}"
+                input: expand("analysis/phix/{run}/phix.bam", run=runid)
+            rule:
                 name: f"merge_{runid}"
-                input: expand("analysis/merge/{run}/{sample}.fastq.gz", run=runid, sample=samp_names)
+                input:
+                    fqgz=expand(
+                        "analysis/merge/{run}/{sample}.fastq.gz",
+                        run=runid, sample=samp_names)
             rule:
                 name: f"trim_{runid}"
-                input: expand("analysis/trim/{run}/{sample}.{rp}.fastq.gz", run=runid, sample=samp_names, rp=["R1", "R2"])
+                input:
+                    fqgz=expand(
+                        "analysis/trim/{run}/{sample}.{rp}.fastq.gz",
+                        run=runid, sample=samp_names, rp=["R1", "R2"])
         rule:
             name: f"getreads_{runid}"
             input: f"analysis/reads/{runid}"
