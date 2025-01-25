@@ -6,12 +6,14 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  # general
+  ### General workflow tools
   - snakemake>=7.32,<8
+  - pylint>=2.17,<3
+  - frictionless>=5.17,<6
+  ### Specific analysis helper tools
   - seqmagick>=0.8,<1
   - fastqc>=0.12
   - plotnine>=0.10
-  - pylint>=2.17,<3
-  - frictionless>=5.17,<6
-  # igseq
-  - igseq=0.6.0
+  - openpyxl>=3.1,<4
+  ### igseq
+  - igseq=0.7.0rc1
