@@ -138,6 +138,8 @@ rule sonar_gather_mature:
         seen = {""} # always skip empty entries
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
+                if "LineageAttrs" not in attrs:
+                    continue
                 if seq_col == "LightSeq" and attrs["LineageAttrs"]["LightLocus"] != light_locus:
                     # Skip light chain sequences that are for the other locus
                     # than whatever was amplified here
@@ -213,7 +215,7 @@ rule sonar_module_1:
         reads="analysis/samples-by-specimen/{specimen}.{chain_type}"
     log: WD_SONAR/"log.txt"
     singularity: "docker://jesse08/sonar"
-    threads: 4
+    threads: 14
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
         # 97% similarity was used in the SONAR vignette and Chaim says was more
@@ -276,7 +278,7 @@ rule sonar_module_1:
               sonar blast_V --lib germline/V.fasta --derep --threads {threads} 2>&1
               sonar blast_J {params.libd_arg} --jlib germline/J.fasta --noC --threads {threads} 2>&1
               sonar finalize --jmotif '{params.jmotif}' --threads {threads} 2>&1
-              sonar cluster_sequences --id {params.cluster_id_fract} --min2 {params.cluster_min2} 2>&1
+              sonar cluster_sequences --threads {threads} --id {params.cluster_id_fract} --min2 {params.cluster_min2} 2>&1
             ) | tee -a {log}
         """
 
@@ -332,7 +334,7 @@ rule sonar_module_2_id_div:
         # in CDR3 alignments) that I think make gap=ignore infeasible to use.
         gap="mismatch"
     singularity: "docker://jesse08/sonar"
-    threads: 4
+    threads: 14
     shell:
         """
             (
@@ -364,6 +366,8 @@ rule sonar_list_members_for_lineage:
         seen = {""} # same logic as for sonar_gather_mature
         with open(output[0], "wt") as f_out:
             for seqid, attrs in ANTIBODY_ISOLATES.items():
+                if "LineageAttrs" not in attrs:
+                    continue
                 seq = attrs[seq_col]
                 if attrs["LineageAttrs"]["Subject"] == wildcards.subject \
                     and seq not in seen and \
@@ -371,6 +375,10 @@ rule sonar_list_members_for_lineage:
                     attrs["IncludeInTracing"] == "Y":
                         f_out.write(f"{seqid}\n")
                         seen.add(seq)
+        if seen == {""}:
+            raise ValueError(
+                f"No antibody isolates found for lineage {wildcards.antibody_lineage}")
+
 
 # NOTE this step is interactive over X11
 ##
@@ -526,7 +534,6 @@ rule sonar_module_3_collect:
         collected="analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/sequences/nucleotide/longitudinal.{word}.{antibody_lineage}-collected.fa"
     input: unpack(sonar_module_3_collect_inputs)
     singularity: "docker://jesse08/sonar"
-    threads: 4
     params:
         wd_sonar=lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}", **w),
         seqs=sonar_module_3_collect_param_seqs
@@ -674,7 +681,21 @@ rule sonar_make_natives_table:
                     else:
                         f_out.write(f"{key}\t\t\n")
 
+# https://github.com/snakemake/snakemake/issues/1866#issuecomment-1252628886
+# (see below)
+if "xvfb" not in workflow.global_resources:
+    workflow.global_resources["xvfb"] = 1
+
 rule sonar_module_3_draw_tree:
+    # If I try to run more than one of these in parallel they sometimes crash
+    # with "xvfb-run: error: Xvfb failed to start" errors.  Presumably Xvfb
+    # (used under the hood for the tree rendering for some reason) is stepping
+    # on its own toes if one user starts up multiple instances at a time, but I
+    # haven't bothered to find out why.  Instead I'll just ensure that
+    # Snakemake only runs one at any given time since this is such a quick
+    # operation.
+    resources:
+        xvfb=1
     output:
         # here "thing" can include the lineage field since the lineage isn't
         # directly used at this point
