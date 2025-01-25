@@ -37,8 +37,8 @@ def divide(val1, val2, fmt="{:.2f}"):
 def counts_by_sample(csv_out):
     fieldnames = [
         "Run", "Subject", "Specimen", "CellType", "Type", "Sample",
-        "CountsDemux", "CountsTrim", "CountsMerge",
-        "CellCount", "RatioDemux", "RatioMerge"]
+        "CountsDemux", "CountsTrim", "CountsMerge", "CountsFilt",
+        "CellCount", "RatioDemux", "RatioMerge", "RatioFilt"]
     demux = {}
     phix = {}
     rows_out = []
@@ -67,6 +67,7 @@ def counts_by_sample(csv_out):
                     phix[attrs["Run"]] = rows
             samp_trim = report_counts_for(samp, attrs["Run"], "trim")
             samp_merge = report_counts_for(samp, attrs["Run"], "merge")
+            samp_filt = report_counts_for(samp, attrs["Run"], "filt")
             row = {
                 "Run": attrs["Run"],
                 "Subject": attrs["SpecimenAttrs"]["Subject"],
@@ -77,9 +78,11 @@ def counts_by_sample(csv_out):
                 "CountsDemux": samp_demux,
                 "CountsTrim": samp_trim,
                 "CountsMerge": samp_merge,
+                "CountsFilt": samp_filt,
                 "CellCount": attrs["SpecimenAttrs"]["CellCount"],
                 "RatioDemux": divide(samp_demux, attrs["SpecimenAttrs"]["CellCount"]),
-                "RatioMerge": divide(samp_merge, attrs["SpecimenAttrs"]["CellCount"])
+                "RatioMerge": divide(samp_merge, attrs["SpecimenAttrs"]["CellCount"]),
+                "RatioFilt": divide(samp_filt, attrs["SpecimenAttrs"]["CellCount"])
                 }
             rows_out.append(row)
         # write per-run info
@@ -208,13 +211,15 @@ def counts_by_specimen(input_csv, output_csv):
                         "CellType": row["CellType"],
                         "CellCount": row["CellCount"],
                         "Type": row["Type"],
-                        "DemuxSeqs": [], "TrimSeqs": [], "MergeSeqs": []}
+                        "DemuxSeqs": [], "TrimSeqs": [], "MergeSeqs": [], "FiltSeqs": []}
                 if row["CountsDemux"]:
                     spec_info[key]["DemuxSeqs"].append(int(row["CountsDemux"]))
                 if row["CountsTrim"]:
                     spec_info[key]["TrimSeqs"].append(int(row["CountsTrim"]))
                 if row["CountsMerge"]:
                     spec_info[key]["MergeSeqs"].append(int(row["CountsMerge"]))
+                if row["CountsFilt"]:
+                    spec_info[key]["FiltSeqs"].append(int(row["CountsFilt"]))
                 # These take a while to crunch through so I'm doing that in a
                 # separate rule, but still not explicitly giving it as input so
                 # this rule will only use whatever's already on disk
@@ -224,7 +229,8 @@ def counts_by_specimen(input_csv, output_csv):
                         reader = DictReader(f_in_sonar)
                         spec_info[key].update(next(reader))
     fieldnames = ["Subject", "Specimen", "CellType", "Type",
-        "DemuxSeqs", "TrimSeqs", "MergeSeqs", "CellCount", "RatioDemux", "RatioMerge",
+        "DemuxSeqs", "TrimSeqs", "MergeSeqs", "FiltSeqs",
+        "CellCount", "RatioDemux", "RatioMerge", "RatioFilt",
         "SONARReads", "SONARGoodReads", "SONARClusteredReads", "SONARClusteredUnique",
         "LineageMembers"]
     rows = []
@@ -232,8 +238,10 @@ def counts_by_specimen(input_csv, output_csv):
         row["DemuxSeqs"] = sum(row["DemuxSeqs"]) if row["DemuxSeqs"] else ""
         row["TrimSeqs"] = sum(row["TrimSeqs"]) if row["TrimSeqs"] else ""
         row["MergeSeqs"] = sum(row["MergeSeqs"]) if row["MergeSeqs"] else ""
+        row["FiltSeqs"] = sum(row["FiltSeqs"]) if row["FiltSeqs"] else ""
         row["RatioDemux"] = divide(row["DemuxSeqs"], row["CellCount"])
         row["RatioMerge"] = divide(row["MergeSeqs"], row["CellCount"])
+        row["RatioFilt"] = divide(row["FiltSeqs"], row["CellCount"])
         rows.append(row)
     rows = sorted(rows, key=lambda row: [row.get(field, "") for field in fieldnames])
     with open(output_csv, "wt") as f_out:

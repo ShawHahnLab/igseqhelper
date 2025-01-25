@@ -1,5 +1,25 @@
 from collections import defaultdict
 
+rule filt:
+    output:
+        fqgz="analysis/filt/{run}/{sample}.fastq.gz",
+        counts="analysis/filt/{run}/{sample}.filt.counts.csv"
+    input:
+        fqgz="analysis/merge/{run}/{sample}.fastq.gz"
+    log:
+        main="analysis/filt/{run}/{sample}.log.txt",
+        conda="analysis/filt/{run}/{sample}.fastq.gz.conda_build.txt"
+    params:
+        qmin=10
+    conda: "envs/igseq.yaml"
+    shell:
+        """
+            conda list --explicit > {log.conda}
+            date >> {log.main}
+            echo "Quality minimum: {params.qmin}" >> {log.main}
+            fastq_qual_min.py {input.fqgz} {output.fqgz} --countsfile {output.counts} -Q {params.qmin} 2>&1 | tee -a {log.main}
+        """
+
 rule merge:
     output:
         fqgz="analysis/merge/{run}{suffix}/{sample}.fastq.gz",
@@ -58,7 +78,7 @@ rule trim:
         min_length=config.get("trim_min_length", 50),
         qual_cutoff=config.get("trim_qual_cutoff", 15),
         nextseq_qual_cutoff=config.get("trim_nextseq_qual_cutoff", 15),
-        is_nextseq=lambda w: RUNS[w.run].get("SequencerModel") == "NextSeq"
+        is_nextseq=lambda w: RUNS.get(w.run, {}).get("SequencerModel") == "NextSeq"
     shell:
         """
             conda list --explicit > {log.conda}
@@ -131,7 +151,9 @@ def make_run_rules():
                         "analysis/demux/{run}/{samp}.{rp}.fastq.gz",
                         run=runid, samp=samp_names, rp=["R1", "R2", "I1"])
                 input:
-                    reads=f"analysis/reads/{runid}",
+                    reads=expand(
+                        "analysis/reads/{run}/Undetermined_S0_L001_{rp}_001.fastq.gz",
+                        run=runid, rp=["I1", "R1", "R2"]),
                     samples=ancient("metadata/samples.csv")
                 log:
                     conda=f"analysis/demux/{runid}/conda_build.txt"
@@ -150,6 +172,12 @@ def make_run_rules():
                 input:
                     fqgz=expand(
                         "analysis/merge/{run}/{sample}.fastq.gz",
+                        run=runid, sample=samp_names)
+            rule:
+                name: f"filt_{runid}"
+                input:
+                    fqgz=expand(
+                        "analysis/filt/{run}/{sample}.fastq.gz",
                         run=runid, sample=samp_names)
             rule:
                 name: f"trim_{runid}"
@@ -182,9 +210,9 @@ rule getreads:
 
 ### Samples grouped by subject or specimen
 # Each directory will contain a set of symbolic links pointing to the
-# individual merged sample files
+# individual sample files
 
-def grouped_samples_input(w, pattern="analysis/merge/{runid}/{samp}.fastq.gz"):
+def grouped_samples_input(w, pattern="analysis/filt/{runid}/{samp}.fastq.gz"):
     targets = []
     # clumsy way of matching e.g. "igg" to "IgG+CD20+"
     def cellmatch(ct_query, ct_ref):
