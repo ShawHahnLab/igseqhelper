@@ -164,27 +164,45 @@ def make_run_rules():
                         igseq demux --samples {input.samples} --details {output.outdir}/details.csv.gz {input.reads}
                     """
             # These are just helpers to group outputs from other rules by run ID
+            phix_targets = expand(
+                "analysis/phix/{run}/phix.bam", run=runid)
+            merge_targets = expand(
+                "analysis/merge/{run}/{sample}.fastq.gz", run=runid, sample=samp_names)
+            filt_targets = expand(
+                "analysis/filt/{run}/{sample}.fastq.gz",
+                run=runid, sample=samp_names)
+            trim_targets = expand(
+                "analysis/trim/{run}/{sample}.{rp}.fastq.gz",
+                run=runid, sample=samp_names, rp=["R1", "R2"])
+            fastqc_args = {
+                "prefix": "analysis/fastqc",
+                "run": runid,
+                "sample": samp_names,
+                "rp": ["I1", "R1", "R2"],
+                "suffix": "_fastqc.quals.csv"}
+            fastqc_targets = \
+                expand("{prefix}/reads/{run}/Undetermined_S0_L001_{rp}_001{suffix}", **fastqc_args) + \
+                expand("{prefix}/demux/{run}/{sample}.{rp}{suffix}", **fastqc_args)
+            fastqc_args["rp"] = ["R1", "R2"] # (no I1 for the rest)
+            fastqc_targets += \
+                expand("{prefix}/trim/{run}/{sample}.{rp}{suffix}", **fastqc_args) + \
+                expand("{prefix}/merge/{run}/{sample}{suffix}", **fastqc_args) + \
+                expand("{prefix}/filt/{run}/{sample}{suffix}", **fastqc_args)
+            rule:
+                name: f"proc_{runid}"
+                input: phix_targets + trim_targets + merge_targets + filt_targets + fastqc_targets
             rule:
                 name: f"phix_{runid}"
-                input: expand("analysis/phix/{run}/phix.bam", run=runid)
-            rule:
-                name: f"merge_{runid}"
-                input:
-                    fqgz=expand(
-                        "analysis/merge/{run}/{sample}.fastq.gz",
-                        run=runid, sample=samp_names)
-            rule:
-                name: f"filt_{runid}"
-                input:
-                    fqgz=expand(
-                        "analysis/filt/{run}/{sample}.fastq.gz",
-                        run=runid, sample=samp_names)
+                input: phix_targets
             rule:
                 name: f"trim_{runid}"
-                input:
-                    fqgz=expand(
-                        "analysis/trim/{run}/{sample}.{rp}.fastq.gz",
-                        run=runid, sample=samp_names, rp=["R1", "R2"])
+                input: trim_targets
+            rule:
+                name: f"merge_{runid}"
+                input: merge_targets
+            rule:
+                name: f"filt_{runid}"
+                input: filt_targets
         rule:
             name: f"getreads_{runid}"
             input: f"analysis/reads/{runid}"

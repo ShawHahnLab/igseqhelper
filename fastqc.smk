@@ -21,10 +21,19 @@ def fastqc_setup_helper_rules():
             f"FastQC for demuxed reads for run {run}"
             name: f"fastqc_demux_{run}"
             input: expand("analysis/fastqc/demux/{run}/{sample}.{rp}{suffix}", **args)
+        args["rp"] = ["R1", "R2"] # from here on, no I1
+        rule:
+            f"FastQC for trimmed reads for run {run}"
+            name: f"fastqc_trim_{run}"
+            input: expand("analysis/fastqc/trim/{run}/{sample}.{rp}{suffix}", **args)
         rule:
             f"FastQC for merged reads for run {run}"
             name: f"fastqc_merge_{run}"
             input: expand("analysis/fastqc/merge/{run}/{sample}{suffix}", **args)
+        rule:
+            f"FastQC for quality-filtered reads for run {run}"
+            name: f"fastqc_filt_{run}"
+            input: expand("analysis/fastqc/filt/{run}/{sample}{suffix}", **args)
 fastqc_setup_helper_rules()
 
 rule fastqc:
