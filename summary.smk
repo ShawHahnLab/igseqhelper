@@ -101,9 +101,9 @@ rule summary_tree:
     input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal.auto.{antibody_lineage}/output/longitudinal.auto.{antibody_lineage}_igphyml.{ext}", **set_chain_type(w))
     shell: "cp {input} {output}"
 
-rule summary_tree_custom:
-    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_igphyml.custom.{ext}"
-    input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal.custom.{antibody_lineage}/output/longitudinal.custom.{antibody_lineage}_igphyml.{ext}", **set_chain_type(w))
+rule summary_tree_other:
+    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_igphyml.{word}.{ext}"
+    input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/longitudinal.{word}.{antibody_lineage}_igphyml.{ext}", **set_chain_type(w))
     shell: "cp {input} {output}"
 
 # Using `igseq convert` for FASTA files to ensure we get unwrapped versions
@@ -113,9 +113,9 @@ rule summary_aln_auto:
     conda: "envs/igseq.yaml"
     shell: "igseq convert {input} {output}"
     
-rule summary_aln_custom:
-    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_aligned.custom.afa"
-    input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/alignment.custom.{antibody_lineage}.fa", **set_chain_type(w))
+rule summary_aln_other:
+    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_aligned.{word}.afa"
+    input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/alignment.{antibody_lineage}.{word}.fa", **set_chain_type(w))
     conda: "envs/igseq.yaml"
     shell: "igseq convert {input} {output}"
 
@@ -131,9 +131,9 @@ rule summary_ancestors_auto:
     conda: "envs/igseq.yaml"
     shell: "igseq convert {input} {output}"
 
-rule summary_ancestors_custom:
-    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.custom.fa"
-    input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal.custom.{antibody_lineage}/output/sequences/nucleotide/longitudinal.custom.{antibody_lineage}_inferredAncestors.fa", **set_chain_type(w))
+rule summary_ancestors_other:
+    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.{word}.fa"
+    input: lambda w: expand("analysis/sonar/{subject}.{chain_type}/longitudinal.{word}.{antibody_lineage}/output/sequences/nucleotide/longitudinal.{word}.{antibody_lineage}_inferredAncestors.fa", **set_chain_type(w))
     conda: "envs/igseq.yaml"
     shell: "igseq convert {input} {output}"
 
@@ -143,9 +143,9 @@ rule summary_ancestors_common:
     conda: "envs/igseq.yaml"
     shell: "igseq convert {input} {output}"
 
-rule summary_ancestors_custom_common:
-    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.custom.common.fa"
-    input: lambda w: expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.custom.common.fa", **set_chain_type(w))
+rule summary_ancestors_other_common:
+    output: "summary/{subject}/{antibody_lineage}/{antibody_lineage}_{chain}_inferredAncestors.{word}.common.fa"
+    input: lambda w: expand("analysis/reporting/sonar/{antibody_lineage}.{chain_type}/igphyml_ancestors.{word}.common.fa", **set_chain_type(w))
     conda: "envs/igseq.yaml"
     shell: "igseq convert {input} {output}"
 
