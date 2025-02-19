@@ -10,7 +10,7 @@ rule filt:
         main="analysis/filt/{run}/{sample}.log.txt",
         conda="analysis/filt/{run}/{sample}.fastq.gz.conda_build.txt"
     params:
-        qmin=10
+        qmin=config.get("filt_qmin", 10)
     conda: "envs/igseq.yaml"
     shell:
         """
