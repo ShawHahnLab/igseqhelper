@@ -1,5 +1,21 @@
 from collections import defaultdict
 
+def params_for_filt(w):
+    """Parameters for the filt rule"""
+    # quality minimum across bases for a given read
+    # in order of increasing priority:
+    # 1. default here: 10
+    # 2. value from config option
+    # 3. per-run setting
+    qmin_for_run = RUNS.get(w.run, {}).get("QMin")
+    qmin_from_config = config.get("filt_qmin")
+    qmin = 10
+    if qmin_from_config is not None:
+        qmin = qmin_from_config
+    if qmin_for_run:
+        qmin = qmin_for_run
+    return {"qmin": qmin}
+
 rule filt:
     output:
         fqgz="analysis/filt/{run}/{sample}.fastq.gz",
@@ -9,15 +25,15 @@ rule filt:
     log:
         main="analysis/filt/{run}/{sample}.log.txt",
         conda="analysis/filt/{run}/{sample}.fastq.gz.conda_build.txt"
-    params:
-        qmin=config.get("filt_qmin", 10)
+    # see snakemake #1171 about the params[0] thing
+    params: params_for_filt
     conda: "envs/igseq.yaml"
     shell:
         """
             conda list --explicit > {log.conda}
             date >> {log.main}
-            echo "Quality minimum: {params.qmin}" >> {log.main}
-            fastq_qual_min.py {input.fqgz} {output.fqgz} --countsfile {output.counts} -Q {params.qmin} 2>&1 | tee -a {log.main}
+            echo "Quality minimum: {params[0][qmin]}" >> {log.main}
+            fastq_qual_min.py {input.fqgz} {output.fqgz} --countsfile {output.counts} -Q {params[0][qmin]} 2>&1 | tee -a {log.main}
         """
 
 rule merge:
