@@ -155,7 +155,7 @@ rule sonar_gather_mature:
                     seen.add(seq)
         if seen == {""}:
             raise ValueError(
-                f"No sequences found for subject {wildcards.subject} "
+                f"No isolate sequences found for subject {wildcards.subject} "
                 f"and chain type {wildcards.chain_type}")
 
 # I think this only comes up for including sequences for IgPhyML.  In this case
