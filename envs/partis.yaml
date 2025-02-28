@@ -1,0 +1,44 @@
+# conda environment file for partis
+# mostly adapted from the partis Dockerfile
+# Still needs the varous dev tools installed at the OS-level and the partis
+# software itself supplied separately
+name: partis
+channels:
+  - conda-forge
+# (Just roughly bounding the min and max versions for these packages to
+# hopefully make the dependency resolution less of a slog, and avoid running
+# into breaking changes down the road, though as to what partis' actual
+# requirements are for these I'm not sure.)
+dependencies:
+  # The Python version in the latest Docker image is 3.9 as of 2024-08-15.
+  - conda-forge::python=3.9
+  - conda-forge::biopython>=1.76,<=1.84
+  - conda-forge::pandas>=2.2,<3
+  - conda-forge::psutil>=6.0,<7
+  - bioconda::pysam>=0.22,<1
+  - conda-forge::scons>=4.7,<5
+  - conda-forge::seaborn>=0.13,<1
+  - conda-forge::zlib>=1.3,<2
+  - conda-forge::pyyaml>=6.0
+  - conda-forge::scikit-learn>=1.5,<2
+  - conda-forge::mafft>=7.526,<8 # also in biocore channel
+  - conda-forge::circlify>=0.15
+  - conda-forge::ete3>=3.1 # also in etetoolkit channel
+  # Dockerfile installs these via pip, but they're also available in bioconda
+  # and conda-forge
+  - bioconda::dendropy
+  - conda-forge::colored-traceback
+  - conda-forge::python-levenshtein
+  - conda-forge::joypy
+  # Optional, but needed for the simulation features (see docs/install.md)
+  # Note warnings there about conda screwing with the compiler setup though.
+  # Probably related to all the stuff that ends up in
+  # $CONDA_PREFIX/etc/conda/activate.d
+  # (I have it working now, possibly because of the channel priority handling
+  # giving a compatible set of packages with conda-forge's sysroot_linux-64,
+  # but see pkgs.txt for the exact list of what packages that includes)
+  - conda-forge::r
+  - conda-forge::r-treesim
+  - conda-forge::r-geiger
+  - conda-forge::r-mass
+  # TODO also need TreeSimGM, I think, but I don't see it in the conda channels
