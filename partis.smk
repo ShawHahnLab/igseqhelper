@@ -154,7 +154,9 @@ rule partis_partition_airr:
 def input_for_partis_seq_lineage_info(w):
     # always required the final AIRR table as input
     path = Path(expand("analysis/partis/{subject}.{chain_type}", **w)[0])
-    targets = {"airr": path/"partitions.airr.tsv"}
+    targets = {
+        "airr": path/"partitions.airr.tsv",
+        "isolates": ancient("metadata/isolates.csv")}
     # If there's a CSV provided with NGS sequence lineage info, use that also,
     # so we can assign custom lineage IDs to NGS seqs
     path_annotations = path/"ngs_lineages.csv"
@@ -169,105 +171,15 @@ rule partis_seq_lineage_info:
     output: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
     input: unpack(input_for_partis_seq_lineage_info)
     run:
-        # if given, load NGS sequence ID -> attributes including Lineage name
-        ngs_annots = {}
         if "ngs_annots" in dict(input):
-            with open(input.ngs_annots) as f_in:
-                for row in DictReader(f_in):
-                    # In case this is a multi-subject CSV, skip rows for any other subjects
-                    if "Subject" in row and row["Subject"] and row["Subject"] != wildcards.subject:
-                        continue
-                    ngs_annots[row["sequence_id"]] = row
-        # clone ID -> AIRR rows (need all to decide what to keep later)
-        clones = defaultdict(list)
-        # clone IDs of interest for our isolates
-        cloneids = set()
-        with open(input.airr) as f_in:
-            for row in DictReader(f_in, delimiter="\t"):
-                clones[row["clone_id"]].append(row)
-                if row["sequence_id"] in ANTIBODY_ISOLATES:
-                    cloneids.add(row["clone_id"])
-        # include everything that's listed under any of those clone IDs of
-        # interest.  Each sequence can have one clone ID from partis and one
-        # (if it's in our isolate metadata) Lineage assigned from us.
-        out = []
-        for cloneid, rows in clones.items():
-            if cloneid in cloneids:
-                # keep all for this clone
-                for row in rows:
-                    timepoint_seqid = re.match("wk([0-9]+)-.*", row["sequence_id"])
-                    if timepoint_seqid:
-                        timepoint_seqid = timepoint_seqid.group(1)
-                    # Is sequence from isolates?
-                    isol_attrs = ANTIBODY_ISOLATES.get(row["sequence_id"], {})
-                    category = "isolate" if isol_attrs else "ngs"
-                    timepoint = isol_attrs.get("Timepoint", timepoint_seqid)
-                    lineage = isol_attrs.get("Lineage")
-                    # Or, do we have NGS seq annotations for it?
-                    if row["sequence_id"] in ngs_annots:
-                        attrs = ngs_annots[row["sequence_id"]]
-                        # sanity check with sequence content if present
-                        if attrs.get("sequence") and attrs["sequence"] != row["sequence"]:
-                            raise ValueError
-                        if not lineage:
-                            lineage = attrs.get("Lineage")
-                    row_out = {
-                        "sequence_id": row["sequence_id"],
-                        "sequence": row["sequence"],
-                        "timepoint": timepoint,
-                        "category": category,
-                        "partis_clone_id": row["clone_id"],
-                        "lineage": lineage}
-                    out.append(row_out)
-        with open(output[0], "wt") as f_out:
-            writer = DictWriter(
-                f_out,
-                ["sequence_id", "sequence", "timepoint", "category", "partis_clone_id", "lineage"],
-                lineterminator="\n")
-            writer.writeheader()
-            writer.writerows(out)
-
-rule partis_seq_lineage_info2:
-    # group seq_lineag rows by lineage(s)
-    # should be part of the first one, really, but leaving separate for now
-    output: "analysis/partis/{subject}.{chain_type}/seq_lineages2.csv"
-    input: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
-    run:
-        lineage_clones = defaultdict(set) # lineage -> set of clone IDs
-        clone_lineages = defaultdict(set) # clone ID -> set of lineages
-        with open(input[0]) as f_in:
-            seq_info = list(DictReader(f_in))
-        # what clones are associated with what lineage?
-        for row in seq_info:
-            clone_lineages[row["partis_clone_id"]].add(row["lineage"])
-            lineage_clones[row["lineage"]].add(row["partis_clone_id"])
-            #if row["partis_clone_id"] and row["lineage"]:
-            #    clone_lineages[row["partis_clone_id"]].add(row["lineage"])
-            #    lineage_clones[row["lineage"]].add(row["partis_clone_id"])
-        for row in seq_info:
-            # group rows by lineage involved for that clone ID.  Hopefully just
-            # one!  But for any edge cases with more than one, we'll note the
-            # combo as a single string.  For rows that don't have the lineage
-            # defined, leave that empty string out.
-            lineages = ({row["lineage"]} | set(clone_lineages[row["partis_clone_id"]])) - {""}
-            #lineages = {lineage for lineage in lineages if lineage}
-            row["lineage_group"] = "/".join(sorted(lineages))
-        seq_info.sort(key = lambda row: (
-            row["partis_clone_id"] == "",
-            row["lineage_group"],
-            row["lineage"],
-            row["partis_clone_id"],
-            row["sequence_id"]))
-        keys = ["lineage_group", "sequence_id", "sequence", "timepoint", "category", "partis_clone_id", "lineage"]
-        with open(output[0], "w") as f_out:
-            writer = DictWriter(f_out, keys, lineterminator="\n")
-            writer.writeheader()
-            writer.writerows(seq_info)
+            shell("partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates} -n {input.ngs_annots}")
+        else:
+            shell("partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates}")
 
 rule partis_lineages:
     # summarize per-lineage-group
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
-    input: "analysis/partis/{subject}.{chain_type}/seq_lineages2.csv"
+    input: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
     run:
         with open(input[0]) as f_in:
             seq_info = list(DictReader(f_in))
