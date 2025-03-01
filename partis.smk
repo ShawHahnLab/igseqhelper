@@ -71,8 +71,9 @@ rule partis_cache_params:
         main="analysis/partis/{subject}.{chain_type}/cache_params.log.txt",
         conda="analysis/partis/{subject}.{chain_type}/cache_params.conda_build.txt"
     params:
-        locus="igh",
-        species="macaque",
+        locus=lambda w: {"kappa": "igk", "lambda": "igl"}.get(w.chain_type, "igh"),
+        species=config.get("partis_species", "macaque"),
+        seed=config.get("partis_random_seed", 1),
         # I have the dependencies provided via conda but the actual partis
         # install still lives in a big ball of stuff in one directory,
         # unfortunately.  The first like of the shell commands will ensure this
@@ -90,7 +91,7 @@ rule partis_cache_params:
               echo "species: {params.species}"
             ) >> {log.main}
             {params.partis}/bin/partis cache-parameters --n-procs {threads} \
-              --locus {params.locus} --species {params.species} \
+              --random-seed {params.seed} --locus {params.locus} --species {params.species} \
               --infname {input} --parameter-dir {output} 2>&1 | tee -a {log.main}
         """
 
@@ -104,8 +105,9 @@ rule partis_partition:
         main="analysis/partis/{subject}.{chain_type}/partition.log.txt",
         conda="analysis/partis/{subject}.{chain_type}/partition.conda_build.txt"
     params:
-        locus="igh",
-        species="macaque",
+        locus=lambda w: {"kappa": "igk", "lambda": "igl"}.get(w.chain_type, "igh"),
+        species=config.get("partis_species", "macaque"),
+        seed=config.get("partis_random_seed", 1),
         partis=os.getenv("PARTIS_HOME", "")
     conda: "envs/partis.yaml"
     threads: 14
@@ -119,8 +121,8 @@ rule partis_partition:
               echo "locus: {params.locus}"
               echo "species: {params.species}"
             ) >> {log.main}
-            {params.partis}/bin/partis partition --n-procs {threads} \
-              --no-naive-vsearch --locus {params.locus} --species {params.species} \
+            {params.partis}/bin/partis partition --n-procs {threads} --no-naive-vsearch \
+              --random-seed {params.seed} --locus {params.locus} --species {params.species} \
               --infname {input.fasta} --parameter-dir {input.params_dir} --outfname {output} 2>&1 | tee -a {log.main}
         """
 
