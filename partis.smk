@@ -149,7 +149,7 @@ rule partis_partition_airr:
             {params.partis}/bin/parse-output.py --airr-output {input} {output} 2>&1 | tee -a {log.main}
         """
 
-###
+### Below is really reporting logic, but, no time for proper organization here
 
 def input_for_partis_seq_lineage_info(w):
     if w.chain_type in ("kappa", "lambda"):
