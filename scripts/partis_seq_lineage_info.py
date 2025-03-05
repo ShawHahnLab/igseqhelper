@@ -5,20 +5,34 @@ Report sequences with partis clones overlapping with our isolates.
 """
 
 import re
+import gzip
 import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
 
-def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None, *, keep_all=False):
-    # isolate -> atributes
-    with open(isol_annots, encoding="ASCII") as f_in:
-        isolates = {row["Isolate"]: row for row in DictReader(f_in)}
-    # if given, load NGS sequence ID -> attributes including Lineage name
+def _load_ngs_annots(csv_ngs_annots):
     ngs_annots = {}
     if csv_ngs_annots:
         with open(csv_ngs_annots, encoding="ASCII") as f_in:
             for row in DictReader(f_in):
                 ngs_annots[row["sequence_id"]] = row
+    return ngs_annots
+
+def _load_igblast_airr(airr_path):
+    if airr_path:
+        with gzip.open(airr_path, "rt", encoding="ASCII") as f_in:
+            return {row["sequence_id"]: row for row in DictReader(f_in, delimiter="\t")}
+    return {}
+
+def partis_seq_lineage_info(airr_in, csv_out, isol_annots,
+        csv_ngs_annots=None, airr_in_igblast=None, *, keep_all=False):
+    # isolate -> atributes
+    with open(isol_annots, encoding="ASCII") as f_in:
+        isolates = {row["Isolate"]: row for row in DictReader(f_in)}
+    # if given, load NGS sequence ID -> attributes including Lineage name
+    ngs_annots = _load_ngs_annots(csv_ngs_annots)
+    # if given, load IgBLAST AIRR as dictionary by sequence ID
+    igblast = _load_igblast_airr(airr_in_igblast)
     # clone ID -> AIRR rows (need all to decide what to keep later)
     clones = defaultdict(list)
     # clone IDs of interest for our isolates
@@ -39,7 +53,12 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None, 
                 timepoint_seqid = re.match("wk([0-9]+)-.*", row["sequence_id"])
                 if timepoint_seqid:
                     timepoint_seqid = timepoint_seqid.group(1)
-                v_family = re.match("(IG[HKL]V[0-9]+)", row["v_call"])
+                # if there are IgBLAST-provided annotations, use those, but if
+                # not, use what's already in this row.  Note this will also use
+                # the sequence from IgBLAST if available since partis seems to
+                # pad it with N for some reason
+                annots = igblast.get(row["sequence_id"], row)
+                v_family = re.match("(IG[HKL]V[0-9]+)", annots["v_call"])
                 v_family = v_family.group(1) if v_family else ""
                 # Is sequence from isolates?
                 isol_attrs = isolates.get(row["sequence_id"], {})
@@ -56,12 +75,12 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None, 
                         lineage = attrs.get("Lineage")
                 row_out = {
                     "sequence_id": row["sequence_id"],
-                    "sequence": row["sequence"],
+                    "sequence": annots["sequence"],
                     "v_family": v_family,
-                    "v_identity": row["v_identity"],
-                    "d_call": row["d_call"],
-                    "junction_aa": row["junction_aa"],
-                    "junction_aa_length": len(row["junction_aa"]),
+                    "v_identity": annots["v_identity"],
+                    "d_call": annots["d_call"],
+                    "junction_aa": annots["junction_aa"],
+                    "junction_aa_length": len(annots["junction_aa"]),
                     "timepoint": timepoint,
                     "category": category,
                     "partis_clone_id": row["clone_id"] or "",
@@ -108,23 +127,26 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None, 
         "category",
         "partis_clone_id",
         "lineage"]
-    with open(csv_out, "w") as f_out:
+    with open(csv_out, "w", encoding="ASCII") as f_out:
         writer = DictWriter(f_out, keys, lineterminator="\n")
         writer.writeheader()
         writer.writerows(out)
 
 def main():
+    """CLI for seq_lineage_info"""
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg("input", help="Partis AIRR TSV with clone_id")
     arg("output", help="CSV to write with summary sequence and lineage information")
     arg("-i", "--isolates", help="CSV with Isolate info")
     arg("-n", "--ngs-annotations", help="optional CSV with Lineage info for known NGS sequences")
+    arg("-A", "--igblast-airr", help="optional AIRR tsv.gz from IgBLAST to prefer for annotations")
     arg("-a", "--all", action="store_true",
         help="keep all sequences or only those belonging to clones that also include isolates?")
     args = parser.parse_args()
     partis_seq_lineage_info(
-        args.input, args.output, args.isolates, args.ngs_annotations, keep_all=args.all)
+        args.input, args.output, args.isolates,
+        args.ngs_annotations, args.igblast_airr, keep_all=args.all)
 
 if __name__ == "__main__":
     main()

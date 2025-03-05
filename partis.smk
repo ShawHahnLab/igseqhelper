@@ -152,10 +152,15 @@ rule partis_partition_airr:
 ###
 
 def input_for_partis_seq_lineage_info(w):
+    if w.chain_type in ("kappa", "lambda"):
+        raise ValueError("light chain not supported")
     # always required the final AIRR table as input
     path = Path(expand("analysis/partis/{subject}.{chain_type}", **w)[0])
+    # ...and IgBLAST's AIRR too
+    igblast_path = Path(expand("analysis/igblast/custom-{subject}.IGH/partis/{subject}.{chain_type}", **w)[0])
     targets = {
         "airr": path/"partitions.airr.tsv",
+        "airr_igblast": igblast_path/"combined.fasta.tsv.gz",
         "isolates": ancient("metadata/isolates.csv")}
     # If there's a CSV provided with NGS sequence lineage info, use that also,
     # so we can assign custom lineage IDs to NGS seqs
@@ -171,10 +176,10 @@ rule partis_seq_lineage_info:
     output: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
     input: unpack(input_for_partis_seq_lineage_info)
     run:
+        cmd = "partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates} -A {input.airr_igblast} --all"
         if "ngs_annots" in dict(input):
-            shell("partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates} -n {input.ngs_annots} --all")
-        else:
-            shell("partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates} --all")
+            cmd += " -n {input.ngs_annots}"
+        shell(cmd)
 
 rule partis_lineages:
     # summarize per-lineage-group, one row per group+timepoint+category
@@ -217,7 +222,10 @@ rule partis_lineages:
                 juncts = None
                 if lineage_group:
                     v_family = "/".join(sorted({row["v_family"] for row in rows}))
-                    d_call = "/".join(sorted({row["d_call"] for row in rows}))
+                    d_call = set()
+                    for row in rows:
+                        d_call = d_call | set(re.split("[/,]", row["d_call"]))
+                    d_call = "/".join(sorted(d_call - {""}))
                     junction_aa_length_min = min(int(row["junction_aa_length"]) for row in rows)
                     junction_aa_length_max = max(int(row["junction_aa_length"]) for row in rows)
                     juncts = [(float(row["v_identity"]) if row["v_identity"] else 0, row["junction_aa"]) for row in rows]
@@ -285,14 +293,24 @@ rule partis_lineages_summary:
         # define output rows
         out = []
         for group, rows in groups.items():
-            # V family across everything (should only be one!)
-            v_family = "/".join(sorted({row["v_family"] for row in rows if row["v_family"]}))
             # D call(s) across everything (parsing and re-formatting any with
-            # more than one to properly handle ["X/Y", "X"] -> "X/Y")
+            # more than one to properly handle ["X/Y", "X"] -> "X/Y").  If
+            # there are more than four, throw up our hands and just put "???"
             d_call = set()
             for row in rows:
                 d_call = d_call | set(row["d_call"].split("/"))
-            d_call = "/".join(sorted(d_call))
+            d_call = d_call - {""}
+            if len(d_call) > 4:
+                d_call = "???"
+            else:
+                d_call = "/".join(sorted(d_call))
+            # V family across everything (should only be one!  but if not, same
+            # idea as for D, just no upper limit.)
+            v_family = set()
+            for row in rows:
+                v_family = v_family | set(row["v_family"].split("/"))
+            v_family = v_family - {""}
+            v_family = "/".join(sorted(v_family))
             # Minimum and maximum junction AA length across all sequences
             # across all categories and timepoints
             junction_aa_length_min = min(int(row["junction_aa_length_min"]) for row in rows)
