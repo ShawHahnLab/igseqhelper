@@ -172,60 +172,158 @@ rule partis_seq_lineage_info:
     input: unpack(input_for_partis_seq_lineage_info)
     run:
         if "ngs_annots" in dict(input):
-            shell("partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates} -n {input.ngs_annots}")
+            shell("partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates} -n {input.ngs_annots} --all")
         else:
-            shell("partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates}")
+            shell("partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates} --all")
 
 rule partis_lineages:
-    # summarize per-lineage-group
+    # summarize per-lineage-group, one row per group+timepoint+category
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
     input: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
     run:
+        cols = [
+            "lineage_group",
+            "v_family",
+            "v_identity_min",
+            "v_identity_max",
+            "d_call",
+            "junction_aa_v_min",
+            "junction_aa_v_max",
+            "junction_aa_length_min",
+            "junction_aa_length_max",
+            "timepoint",
+            "category",
+            "total"]
         with open(input[0]) as f_in:
             seq_info = list(DictReader(f_in))
         groups = defaultdict(list)
         for row in seq_info:
+            # group rows by lineage group, including those with none assigned
+            # (in case all sequences were included in the input CSV)
             groups[row["lineage_group"]].append(row)
-        timepoints = set()
-        categories = set()
-        keys_out = set()
         out = []
         for lineage_group, rows in groups.items():
-            # tally seqs per category and timepoint
-            totals = defaultdict(int)
+            # within each lineage group, group rows by timepoint and category
+            chunk = defaultdict(list)
             for row in rows:
                 timepoint = int(row["timepoint"])
                 category = row["category"]
-                timepoints.add(timepoint)
-                categories.add(category)
-                key = (category, timepoint)
-                totals[key] += 1
-            # flatten into one dictionary per lineage group
-            row_out = {"lineage_group": lineage_group}
-            per_category_totals = defaultdict(int)
-            for category, timepoint in totals:
-                key_out = f"{category}_wk{timepoint}"
-                keys_out.add(key_out)
-                per_category_totals[category] += totals[(category, timepoint)]
-                row_out[key_out] = totals[(category, timepoint)]
-            for category, num in per_category_totals.items():
-                row_out[f"{category}_total"] = num
-            out.append(row_out)
-        # sort output rows by decreasing totals
+                chunk[(timepoint, category)].append(row)
+            for key, rows in chunk.items():
+                v_family = ""
+                d_call = ""
+                junction_aa_length_min = min(int(row["junction_aa_length"]) for row in rows)
+                junction_aa_length_max = max(int(row["junction_aa_length"]) for row in rows)
+                juncts = None
+                if lineage_group:
+                    v_family = "/".join(sorted({row["v_family"] for row in rows}))
+                    d_call = "/".join(sorted({row["d_call"] for row in rows}))
+                    junction_aa_length_min = min(int(row["junction_aa_length"]) for row in rows)
+                    junction_aa_length_max = max(int(row["junction_aa_length"]) for row in rows)
+                    juncts = [(float(row["v_identity"]) if row["v_identity"] else 0, row["junction_aa"]) for row in rows]
+                    juncts.sort()
+                # set up output per group+timepoint+category
+                out.append({
+                    "lineage_group": lineage_group,
+                    "v_family": v_family,
+                    "v_identity_min": f"{juncts[0][0]:.2f}" if juncts else "",
+                    "v_identity_max": f"{juncts[-1][0]:.2f}" if juncts else "",
+                    "d_call": d_call,
+                    "junction_aa_v_min": juncts[0][1] if juncts else "",
+                    "junction_aa_v_max": juncts[-1][1] if juncts else "",
+                    "junction_aa_length_min": junction_aa_length_min,
+                    "junction_aa_length_max": junction_aa_length_max,
+                    "timepoint": key[0],
+                    "category": key[1],
+                    "total": len(rows)})
+        # total counts per lineage goup across timepoints and categories
+        totals = defaultdict(int)
+        for row in out:
+            totals[row["lineage_group"]] += row["total"]
+        # sort by lineage group by decreasing total count, then by increasing
+        # timepoint, then by category
         def sorter(row):
-            total = sum(num or 0 for key, num in row.items() if key.endswith("_total"))
-            return (-total, row["lineage_group"])
+            return (
+                -totals[row["lineage_group"]],
+                row["lineage_group"],
+                row["timepoint"],
+                row["category"])
         out.sort(key=sorter)
-        # figure out output columns and their order
+        with open(output[0], "w") as f_out:
+            writer = DictWriter(f_out, cols, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(out)
+
+rule partis_lineages_summary:
+    # summarize per-lineage-group, wide format with one row per group
+    output: "analysis/partis/{subject}.{chain_type}/lineage_groups_summary.csv"
+    input: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
+    run:
+        with open(input[0]) as f_in:
+            info = list(DictReader(f_in))
+        # define categories, timepoints, output columns
+        categories = sorted({row["category"] for row in info})
+        timepoints = sorted({int(row["timepoint"]) for row in info})
         cols = ["lineage_group"]
-        for timepoint in sorted(timepoints):
-            if timepoint != "total":
-                for category in sorted(categories):
-                    key_out = f"{category}_wk{timepoint}"
-                    if key_out in keys_out:
-                        cols.append(key_out)
-        for category in sorted(categories):
-            cols.append(f"{category}_total")
+        for category in categories:
+            for timepoint in timepoints:
+                cols.append(f"total_{category}_wk{timepoint}")
+            cols.append(f"total_{category}")
+        cols += [
+            "v_family",
+            "v_identity_min",
+            "v_identity_max",
+            "d_call",
+            "junction_aa_v_min",
+            "junction_aa_v_max",
+            "junction_aa_length_min",
+            "junction_aa_length_max"]
+        # group by lineage group
+        groups = defaultdict(list)
+        for row in info:
+            groups[row["lineage_group"]].append(row)
+        # define output rows
+        out = []
+        for group, rows in groups.items():
+            # V family across everything (should only be one!)
+            v_family = "/".join(sorted({row["v_family"] for row in rows if row["v_family"]}))
+            # D call(s) across everything (parsing and re-formatting any with
+            # more than one to properly handle ["X/Y", "X"] -> "X/Y")
+            d_call = set()
+            for row in rows:
+                d_call = d_call | set(row["d_call"].split("/"))
+            d_call = "/".join(sorted(d_call))
+            # Minimum and maximum junction AA length across all sequences
+            # across all categories and timepoints
+            junction_aa_length_min = min(int(row["junction_aa_length_min"]) for row in rows)
+            junction_aa_length_max = max(int(row["junction_aa_length_max"]) for row in rows)
+            # The pair of junction AA sequences associated with the lowest V
+            # identity and the highest V identity across all sequences across
+            # all categories and timepoints
+            juncts_min = [(float(row["v_identity_min"]) if row["v_identity_min"] else 0, row["junction_aa_v_min"]) for row in rows]
+            juncts_min.sort()
+            juncts_max= [(float(row["v_identity_max"]) if row["v_identity_max"] else 0, row["junction_aa_v_max"]) for row in rows]
+            juncts_max.sort(reverse=True)
+            row_out = {
+                "lineage_group": group,
+                "v_family": v_family,
+                "v_identity_min": juncts_min[0][0],
+                "v_identity_max": juncts_max[0][0],
+                "d_call": d_call,
+                "junction_aa_v_min": juncts_min[0][1],
+                "junction_aa_v_max": juncts_max[0][1],
+                "junction_aa_length_min": junction_aa_length_min,
+                "junction_aa_length_max": junction_aa_length_max,
+                }
+            totals = defaultdict(int)
+            for row in rows:
+                category = row["category"]
+                timepoint = row["timepoint"]
+                row_out[f"total_{category}_wk{timepoint}"] = int(row["total"])
+                totals[category] += int(row["total"])
+            for category in categories:
+                row_out[f"total_{category}"] = totals[category]
+            out.append(row_out)
         with open(output[0], "w") as f_out:
             writer = DictWriter(f_out, cols, lineterminator="\n")
             writer.writeheader()

@@ -9,7 +9,7 @@ import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
 
-def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None):
+def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None, *, keep_all=False):
     # isolate -> atributes
     with open(isol_annots, encoding="ASCII") as f_in:
         isolates = {row["Isolate"]: row for row in DictReader(f_in)}
@@ -33,12 +33,14 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None):
     # (if it's in our isolate metadata) Lineage assigned from us.
     out = []
     for cloneid, rows in clones.items():
-        if cloneid in cloneids:
-            # keep all for this clone
+        if cloneid in cloneids or keep_all:
+            # keep all for this clone, or everything if specified
             for row in rows:
                 timepoint_seqid = re.match("wk([0-9]+)-.*", row["sequence_id"])
                 if timepoint_seqid:
                     timepoint_seqid = timepoint_seqid.group(1)
+                v_family = re.match("(IG[HKL]V[0-9]+)", row["v_call"])
+                v_family = v_family.group(1) if v_family else ""
                 # Is sequence from isolates?
                 isol_attrs = isolates.get(row["sequence_id"], {})
                 category = "isolate" if isol_attrs else "ngs"
@@ -55,6 +57,11 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None):
                 row_out = {
                     "sequence_id": row["sequence_id"],
                     "sequence": row["sequence"],
+                    "v_family": v_family,
+                    "v_identity": row["v_identity"],
+                    "d_call": row["d_call"],
+                    "junction_aa": row["junction_aa"],
+                    "junction_aa_length": len(row["junction_aa"]),
                     "timepoint": timepoint,
                     "category": category,
                     "partis_clone_id": row["clone_id"] or "",
@@ -82,6 +89,7 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None):
         #lineages = {lineage for lineage in lineages if lineage}
         row["lineage_group"] = "/".join(sorted(lineages))
     out.sort(key = lambda row: (
+        row["lineage_group"] == "",
         row["partis_clone_id"] == "",
         row["lineage_group"],
         row["lineage"],
@@ -91,6 +99,11 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots, csv_ngs_annots=None):
         "lineage_group",
         "sequence_id",
         "sequence",
+        "v_family",
+        "v_identity",
+        "d_call",
+        "junction_aa",
+        "junction_aa_length",
         "timepoint",
         "category",
         "partis_clone_id",
@@ -107,8 +120,11 @@ def main():
     arg("output", help="CSV to write with summary sequence and lineage information")
     arg("-i", "--isolates", help="CSV with Isolate info")
     arg("-n", "--ngs-annotations", help="optional CSV with Lineage info for known NGS sequences")
+    arg("-a", "--all", action="store_true",
+        help="keep all sequences or only those belonging to clones that also include isolates?")
     args = parser.parse_args()
-    partis_seq_lineage_info(args.input, args.output, args.isolates, args.ngs_annotations)
+    partis_seq_lineage_info(
+        args.input, args.output, args.isolates, args.ngs_annotations, keep_all=args.all)
 
 if __name__ == "__main__":
     main()
