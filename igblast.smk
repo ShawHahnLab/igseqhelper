@@ -79,3 +79,31 @@ rule igblast_ref_germline:
     run:
         link_target = relative_link_target(params.germline_dir, output[0])
         Path(output[0]).symlink_to(link_target)
+
+def igblast_setup_sonar_helper_rules():
+    """Define per-subject SONAR igblast rules dynamically"""
+    # for each subject, take all specimens that include at least one sample for
+    # the applicable locus.  note that this spans all cell types so it'll
+    # include IgM+/IgD+ too.
+    groups = defaultdict(list)
+    for samp_attrs in SAMPLES.values():
+        if samp_attrs["Skip"]:
+            continue
+        subject = samp_attrs["SpecimenAttrs"]["Subject"]
+        locus = {"kappa": "IGK", "lambda": "IGL"}.get(samp_attrs["Type"], "IGH")
+        groups[(subject, locus)].append((samp_attrs["Type"], samp_attrs["Specimen"]))
+    for key, pairs in groups.items():
+        subject, locus = key
+        chain_types = [pair[0] for pair in pairs]
+        specimens = [pair[1] for pair in pairs]
+        targets = expand(
+            (f"analysis/igblast/custom-{subject}.{locus}/"
+            f"sonar/{subject}.{{chain_type}}/{{specimen}}/"
+            f"output/sequences/nucleotide/{{specimen}}_goodVJ_unique.fa.tsv.gz"),
+            zip, chain_type=chain_types, specimen=specimens)
+        rule:
+            f"IgBLAST SONAR goodVJ unique FASTAs for one subject+locus using personal germline reference"
+            name: f"igblast_sonar_{subject}_{locus}"
+            input: targets
+
+igblast_setup_sonar_helper_rules()
