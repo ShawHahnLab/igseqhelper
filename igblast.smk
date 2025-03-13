@@ -53,18 +53,23 @@ rule igblast:
     conda: "envs/igseq.yaml"
     threads: 8
     # include special handling for xz-compressed FASTA I have for some older
-    # output files.
+    # output files.  Also handle empty files (igseq's igblast wrapper, as of
+    # 0.7.0rc1, will hang if given empty input.)
     shell:
         """
             conda list --explicit > {log.conda}
             if [[ {input.query} =~ \.fa\.xz$ ]]; then
-                xzcat {input.query} | igseq igblast --input-format fa -Q - \
-                    -t {threads} -S {params.species} -r {params.ref} \
-                    -outfmt {params.outfmt} | gzip > {output}
+              xzcat {input.query} | igseq igblast --input-format fa -Q - \
+                  -t {threads} -S {params.species} -r {params.ref} \
+                  -outfmt {params.outfmt} | gzip > {output}
             else
+              if [[ -s {input.query} ]]; then
                 igseq igblast -Q {input.query} \
                     -t {threads} -S {params.species} -r {params.ref} \
                     -outfmt {params.outfmt} | gzip > {output}
+              else
+                touch {output}
+              fi
             fi
         """
 
@@ -89,7 +94,10 @@ def igblast_setup_sonar_helper_rules():
     for samp_attrs in SAMPLES.values():
         if samp_attrs["Skip"]:
             continue
-        subject = samp_attrs["SpecimenAttrs"]["Subject"]
+        spec_attrs = samp_attrs.get("SpecimenAttrs")
+        if not spec_attrs:
+            continue
+        subject = spec_attrs["Subject"]
         locus = {"kappa": "IGK", "lambda": "IGL"}.get(samp_attrs["Type"], "IGH")
         groups[(subject, locus)].append((samp_attrs["Type"], samp_attrs["Specimen"]))
     for key, pairs in groups.items():
