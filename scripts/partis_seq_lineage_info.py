@@ -10,6 +10,13 @@ import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
 
+def _load_isol_annots(csv_isol_annots):
+    isolates = {}
+    if csv_isol_annots:
+        with open(csv_isol_annots, encoding="ASCII") as f_in:
+            isolates = {row["Isolate"]: row for row in DictReader(f_in)}
+    return isolates
+
 def _load_ngs_annots(csv_ngs_annots):
     ngs_annots = {}
     if csv_ngs_annots:
@@ -24,15 +31,7 @@ def _load_igblast_airr(airr_path):
             return {row["sequence_id"]: row for row in DictReader(f_in, delimiter="\t")}
     return {}
 
-def partis_seq_lineage_info(airr_in, csv_out, isol_annots,
-        csv_ngs_annots=None, airr_in_igblast=None, *, keep_all=False):
-    # isolate -> atributes
-    with open(isol_annots, encoding="ASCII") as f_in:
-        isolates = {row["Isolate"]: row for row in DictReader(f_in)}
-    # if given, load NGS sequence ID -> attributes including Lineage name
-    ngs_annots = _load_ngs_annots(csv_ngs_annots)
-    # if given, load IgBLAST AIRR as dictionary by sequence ID
-    igblast = _load_igblast_airr(airr_in_igblast)
+def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
     # clone ID -> AIRR rows (need all to decide what to keep later)
     clones = defaultdict(list)
     # clone IDs of interest for our isolates
@@ -86,10 +85,9 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots,
                     "partis_clone_id": row["clone_id"] or "",
                     "lineage": lineage or ""}
                 out.append(row_out)
+    return out
 
-    # below was previously in separate rule
-
-
+def _assign_lineage_groups(out):
     lineage_clones = defaultdict(set) # lineage -> set of clone IDs
     clone_lineages = defaultdict(set) # clone ID -> set of lineages
     # what clones are associated with what lineage?
@@ -107,6 +105,15 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots,
         lineages = ({row["lineage"]} | set(clone_lineages[row["partis_clone_id"]])) - {""}
         #lineages = {lineage for lineage in lineages if lineage}
         row["lineage_group"] = "/".join(sorted(lineages))
+
+def partis_seq_lineage_info(airr_in, csv_out, isol_annots=None,
+        csv_ngs_annots=None, airr_in_igblast=None, *, keep_all=False):
+    """Report sequences with partis clones overlapping with our isolates"""
+    isolates = _load_isol_annots(isol_annots) # isolate names -> attrs
+    ngs_annots = _load_ngs_annots(csv_ngs_annots) # seq ID -> custom attrs incl. Lineage
+    igblast = _load_igblast_airr(airr_in_igblast) # seq ID -> IgBLAST attrs
+    out = _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all)
+    _assign_lineage_groups(out)
     out.sort(key = lambda row: (
         row["lineage_group"] == "",
         row["partis_clone_id"] == "",
