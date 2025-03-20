@@ -50,10 +50,18 @@ rule partis_isolates_fasta:
         seq_col = "LightSeq" if wildcards.chain_type in ["kappa", "lambda"] else "HeavySeq"
         with open(output[0], "w") as f_out:
             for isolate_attrs in ANTIBODY_ISOLATES.values():
-                if isolate_attrs["LineageAttrs"]["Subject"] == wildcards.subject and isolate_attrs[seq_col]:
-                    seqid = isolate_attrs["Isolate"]
-                    seq = isolate_attrs[seq_col]
-                    f_out.write(f">{seqid}\n{seq}\n")
+                if isolate_attrs[seq_col]:
+                    lineage_attrs = isolate_attrs.get("LineageAttrs", {})
+                    isolate_prefix = re.sub("-.*", "", isolate_attrs["Isolate"])
+                    subject = lineage_attrs.get("Subject")
+                    # include an isolate for this subject if the metadata
+                    # specifically links the two, or failing that, if the
+                    # isolate name begins with the subject name
+                    if (subject and subject == wildcards.subject) or \
+                            (not subject and isolate_prefix == wildcards.subject):
+                        seqid = isolate_attrs["Isolate"]
+                        seq = isolate_attrs[seq_col]
+                        f_out.write(f">{seqid}\n{seq}\n")
 
 rule partis_combo_fasta:
     """Combined isolate+NGS seqs for partis"""
@@ -83,7 +91,10 @@ rule partis_cache_params:
     threads: 14
     shell:
         """
-            [ -n "{params.partis}" ]
+            if [[ ! -n "{params.partis}" ]]; then
+              echo "Need path to partis install"
+              exit 1
+            fi
             (
               date
               echo "PARTIS_HOME: {params.partis}"
@@ -114,7 +125,10 @@ rule partis_partition:
     threads: 14
     shell:
         """
-            [ -n "{params.partis}" ]
+            if [[ ! -n "{params.partis}" ]]; then
+              echo "Need path to partis install"
+              exit 1
+            fi
             conda list --explicit > {log.conda}
             (
               date
@@ -140,7 +154,10 @@ rule partis_partition_airr:
     conda: "envs/partis.yaml"
     shell:
         """
-            [ -n "{params.partis}" ]
+            if [[ ! -n "{params.partis}" ]]; then
+              echo "Need path to partis install"
+              exit 1
+            fi
             conda list --explicit > {log.conda}
             (
               date
