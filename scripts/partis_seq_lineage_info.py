@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Report sequences with partis clones overlapping with our isolates.
+Report sequence and lineage info from partis, merging metadata for our seqs+isolates.
 """
 
 import re
