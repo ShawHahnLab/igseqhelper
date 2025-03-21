@@ -20,6 +20,8 @@ def partis_lineages_summary(csv_in, csv_out):
         for timepoint in timepoints:
             cols.append(f"total_{category}_wk{timepoint}")
         cols.append(f"total_{category}")
+        cols.append(f"earliest_{category}")
+    cols.append("earliest")
     cols += [
         "v_family",
         "v_identity_min",
@@ -81,13 +83,18 @@ def partis_lineages_summary(csv_in, csv_out):
             "junction_aa_length_max": junction_aa_length_max,
             }
         totals = defaultdict(int)
+        times = defaultdict(list)
         for row in rows:
             category = row["category"]
-            timepoint = row["timepoint"]
+            timepoint = int(row["timepoint"])
             row_out[f"total_{category}_wk{timepoint}"] = int(row["total"])
             totals[category] += int(row["total"])
+            times[category].append(timepoint)
         for category in categories:
             row_out[f"total_{category}"] = totals[category]
+            row_out[f"earliest_{category}"] = min(times[category]) if times[category] else None
+        mins = [min(vals) for vals in times.values() if vals]
+        row_out["earliest"] = min(mins) if mins else None
         out.append(row_out)
     with open(csv_out, "w", encoding="ASCII") as f_out:
         writer = DictWriter(f_out, cols, lineterminator="\n")
