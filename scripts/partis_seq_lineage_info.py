@@ -68,8 +68,10 @@ def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
                 if row["sequence_id"] in ngs_annots:
                     attrs = ngs_annots[row["sequence_id"]]
                     # sanity check with sequence content if present
-                    if attrs.get("sequence") and attrs["sequence"] != row["sequence"]:
-                        raise ValueError
+                    if attrs.get("sequence") and \
+                            annots.get("sequence") and \
+                            attrs["sequence"] != annots["sequence"]:
+                        raise ValueError(f"Sequence mismatch for {row['sequence_id']}")
                     if not lineage:
                         lineage = attrs.get("Lineage")
                 row_out = {
@@ -88,23 +90,32 @@ def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
     return out
 
 def _assign_lineage_groups(out):
-    lineage_clones = defaultdict(set) # lineage -> set of clone IDs
     clone_lineages = defaultdict(set) # clone ID -> set of lineages
-    # what clones are associated with what lineage?
     for row in out:
         clone_lineages[row["partis_clone_id"]].add(row["lineage"])
-        lineage_clones[row["lineage"]].add(row["partis_clone_id"])
-        #if row["partis_clone_id"] and row["lineage"]:
-        #    clone_lineages[row["partis_clone_id"]].add(row["lineage"])
-        #    lineage_clones[row["lineage"]].add(row["partis_clone_id"])
+    # Clone IDs that include sequences without a lineage assigned will be used
+    # to gather up *all* sequences referencing that clone ID, across whatever
+    # lineages do happen to be assigned, into one lineage group.
     for row in out:
-        # group rows by lineage involved for that clone ID.  Hopefully just
-        # one!  But for any edge cases with more than one, we'll note the
-        # combo as a single string.  For rows that don't have the lineage
-        # defined, leave that empty string out.
-        lineages = ({row["lineage"]} | set(clone_lineages[row["partis_clone_id"]])) - {""}
-        #lineages = {lineage for lineage in lineages if lineage}
-        row["lineage_group"] = "/".join(sorted(lineages))
+        lins = clone_lineages[row["partis_clone_id"]]
+        row["lineage_group"] = ""
+        if lins == {""}:
+            # if no lineages were assigned to any of the sequences with this
+            # clone ID assigned, just label it by the clone ID (if there is
+            # one; really weird-looking sequences may not get one assigned)
+            if row["partis_clone_id"]:
+                row["lineage_group"] = "partis-" + row["partis_clone_id"]
+        elif "" in lins:
+            # otherwise, if it's a mix of assigned and blank lineages, use this
+            # clone ID to group by all observed lineage names for this clone.
+            # (Wait, should I also span across other clone IDs that overlap by
+            # lineage name, too?  Not sure.)
+            lineages = set(clone_lineages[row["partis_clone_id"]]) - {""}
+            row["lineage_group"] = "/".join(sorted(lineages))
+        else:
+            # otherwise just use this row's one lineage as its group name,
+            # ignoring partis' grouping
+            row["lineage_group"] = row["lineage"]
 
 def partis_seq_lineage_info(airr_in, csv_out, isol_annots=None,
         csv_ngs_annots=None, airr_in_igblast=None, *, keep_all=False):
