@@ -40,12 +40,12 @@ def partis_lineages_summary(csv_in, csv_out):
     for group, rows in groups.items():
         # D call(s) across everything (parsing and re-formatting any with
         # more than one to properly handle ["X/Y", "X"] -> "X/Y").  If
-        # there are more than four, throw up our hands and just put "???"
+        # there are more than ten, throw up our hands and just put "???"
         d_call = set()
         for row in rows:
             d_call = d_call | set(row["d_call"].split("/"))
         d_call = d_call - {""}
-        if len(d_call) > 4:
+        if len(d_call) > 10:
             d_call = "???"
         else:
             d_call = "/".join(sorted(d_call))
