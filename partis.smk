@@ -28,7 +28,15 @@ def input_for_partis_ngs_fasta(w):
         chain_type = w.chain_type,
         specimen = [attrs["Specimen"] for attrs in specs_here])
     targets = {label: target for label, target in zip(labels, targets)}
+    targets["excludes"] = f"analysis/partis/{w.subject}.{w.chain_type}/ngs.excludes.fasta"
     return targets
+
+rule partis_ngs_fasta_excludes:
+    """Placeholder for excludes from NGS sequences given to partis"""
+    # partis crashes sometimes with really weird input sequences.  Use this to
+    # exclude them.
+    output: "analysis/partis/{subject}.{chain_type}/ngs.excludes.fasta"
+    shell: "touch {output}"
 
 rule partis_ngs_fasta:
     """Cross-timepoint NGS seqs for partis"""
@@ -36,12 +44,24 @@ rule partis_ngs_fasta:
     input: unpack(input_for_partis_ngs_fasta)
     run:
         seq_col = "LightSeq" if wildcards.chain_type in ["kappa", "lambda"] else "HeavySeq"
+        excludes = {rec.id: str(rec.seq) for rec in SeqIO.parse(input.excludes, "fasta")}
         with open(output[0], "w") as f_out:
             for label, fasta in input.items():
+                # Tried to have a separate input for the excludes, but
+                # Snakemake says "Cannot combine named input file (name
+                # timepoints) with unpack()", so evidently I need a workaround:
+                # just skip excludes as it's handled above, and these should
+                # all be the per-timepoint SONAR FASTA inputs
+                if label == "excludes":
+                    continue
                 for rec in SeqIO.parse(fasta, "fasta"):
                     rec.description = ""
                     rec.id = label + "-" + rec.id
-                    SeqIO.write(rec, f_out, "fasta-2line")
+                    if rec.id in excludes:
+                        if excludes[rec.id] != str(rec.seq):
+                            raise ValueError(f"Seq ID/content mismatch from excludes: {rec.id}")
+                    else:
+                        SeqIO.write(rec, f_out, "fasta-2line")
 
 rule partis_isolates_fasta:
     """Cross-lineage isolate seqs for partis"""
@@ -200,10 +220,10 @@ rule partis_lineages:
     """Summarize partis info per-lineage-group, one row per group+timepoint+category"""
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
     input: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
-    shell: "python partis_lineages.py {input} {output}"
+    shell: "partis_lineages.py {input} {output}"
 
 rule partis_lineages_summary:
     """Summarize partis info per-lineage-group further, one row per lineage group"""
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups_summary.csv"
     input: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
-    shell: "python partis_lineages_summary.py {input} {output}"
+    shell: "partis_lineages_summary.py {input} {output}"
