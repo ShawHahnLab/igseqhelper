@@ -28,15 +28,7 @@ def input_for_partis_ngs_fasta(w):
         chain_type = w.chain_type,
         specimen = [attrs["Specimen"] for attrs in specs_here])
     targets = {label: target for label, target in zip(labels, targets)}
-    targets["excludes"] = f"analysis/partis/{w.subject}.{w.chain_type}/ngs.excludes.fasta"
     return targets
-
-rule partis_ngs_fasta_excludes:
-    """Placeholder for excludes from NGS sequences given to partis"""
-    # partis crashes sometimes with really weird input sequences.  Use this to
-    # exclude them.
-    output: "analysis/partis/{subject}.{chain_type}/ngs.excludes.fasta"
-    shell: "touch {output}"
 
 rule partis_ngs_fasta:
     """Cross-timepoint NGS seqs for partis"""
@@ -44,24 +36,12 @@ rule partis_ngs_fasta:
     input: unpack(input_for_partis_ngs_fasta)
     run:
         seq_col = "LightSeq" if wildcards.chain_type in ["kappa", "lambda"] else "HeavySeq"
-        excludes = {rec.id: str(rec.seq) for rec in SeqIO.parse(input.excludes, "fasta")}
         with open(output[0], "w") as f_out:
             for label, fasta in input.items():
-                # Tried to have a separate input for the excludes, but
-                # Snakemake says "Cannot combine named input file (name
-                # timepoints) with unpack()", so evidently I need a workaround:
-                # just skip excludes as it's handled above, and these should
-                # all be the per-timepoint SONAR FASTA inputs
-                if label == "excludes":
-                    continue
                 for rec in SeqIO.parse(fasta, "fasta"):
                     rec.description = ""
                     rec.id = label + "-" + rec.id
-                    if rec.id in excludes:
-                        if excludes[rec.id] != str(rec.seq):
-                            raise ValueError(f"Seq ID/content mismatch from excludes: {rec.id}")
-                    else:
-                        SeqIO.write(rec, f_out, "fasta-2line")
+                    SeqIO.write(rec, f_out, "fasta-2line")
 
 rule partis_isolates_fasta:
     """Cross-lineage isolate seqs for partis"""
@@ -91,10 +71,43 @@ rule partis_combo_fasta:
         ngs="analysis/partis/{subject}.{chain_type}/ngs.fasta"
     shell: "cat {input} > {output}"
 
+rule partis_excludes:
+    """Gather sequences to exclude from partis parameter caching"""
+    output: "analysis/partis/{subject}.{chain_type}/excludes.fasta"
+    input: "analysis/igblast/custom-{subject}.IGH/partis/{subject}.{chain_type}/combined.fasta.tsv.gz"
+    run:
+        excludes = []
+        with gzip.open(input[0], "rt") as f_in:
+            for row in DictReader(f_in, delimiter="\t"):
+                vseq = row["v_sequence_alignment"].replace("-", "")
+                if len(vseq) < 250 and (row["complete_vdj"] == "T" or not row["junction"]):
+                    excludes.append(row)
+        with open(output[0], "w") as f_out:
+            for row in excludes:
+                seqid = row["sequence_id"]
+                seq = row["sequence"]
+                f_out.write(f">{seqid}\n{seq}\n")
+
+rule partis_cache_params_fasta:
+    """Make a version of the repertoire NGS FASTA for use with partis cache-parameters"""
+    output: "analysis/partis/{subject}.{chain_type}/ngs.filt.fasta"
+    input:
+        fasta_ngs="analysis/partis/{subject}.{chain_type}/ngs.fasta",
+        fasta_excludes="analysis/partis/{subject}.{chain_type}/excludes.fasta"
+    run:
+        excludes = {rec.id: str(rec.seq) for rec in SeqIO.parse(input.fasta_excludes, "fasta")}
+        with open(output[0], "w") as f_out:
+            for rec in SeqIO.parse(input.fasta_ngs, "fasta"):
+                if rec.id in excludes:
+                    if str(rec.seq) != excludes[rec.id]:
+                        raise ValueError
+                else:
+                    f_out.write(f">{rec.id}\n{rec.seq}\n")
+
 rule partis_cache_params:
     """Run partis cache-parameters on a cross-timepoint NGS FASTA"""
     output: directory("analysis/partis/{subject}.{chain_type}/params")
-    input: "analysis/partis/{subject}.{chain_type}/ngs.fasta"
+    input: "analysis/partis/{subject}.{chain_type}/ngs.filt.fasta"
     log:
         main="analysis/partis/{subject}.{chain_type}/cache_params.log.txt",
         conda="analysis/partis/{subject}.{chain_type}/cache_params.conda_build.txt"
