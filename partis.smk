@@ -104,10 +104,24 @@ rule partis_cache_params_fasta:
                 else:
                     f_out.write(f">{rec.id}\n{rec.seq}\n")
 
+rule partis_germline_kimdb_igh:
+    """Prep partis germline dir from KIMDB sequences"""
+    output:
+        out_dir="analysis/partis/germlines/kimdb/igh",
+        v="analysis/partis/germlines/kimdb/igh/ighv.fasta",
+        d="analysis/partis/germlines/kimdb/igh/ighd.fasta",
+        j="analysis/partis/germlines/kimdb/igh/ighj.fasta",
+        # CSV of positions of codons for conserved AAs around CDR3
+        extras="analysis/partis/germlines/kimdb/igh/extras.csv"
+    threads: 8
+    shell: "partis_germline_kimdb.py {output.out_dir} -t {threads}"
+
 rule partis_cache_params:
     """Run partis cache-parameters on a cross-timepoint NGS FASTA"""
     output: directory("analysis/partis/{subject}.{chain_type}/params")
-    input: "analysis/partis/{subject}.{chain_type}/ngs.filt.fasta"
+    input:
+        seqs="analysis/partis/{subject}.{chain_type}/ngs.filt.fasta",
+        germline="analysis/partis/germlines/kimdb"
     log:
         main="analysis/partis/{subject}.{chain_type}/cache_params.log.txt",
         conda="analysis/partis/{subject}.{chain_type}/cache_params.conda_build.txt"
@@ -133,11 +147,13 @@ rule partis_cache_params:
               echo "PARTIS_HOME: {params.partis}"
               echo "locus: {params.locus}"
               echo "species: {params.species}"
+              echo "germline: {input.germline}"
               echo "random seed: {params.seed}"
             ) >> {log.main}
             {params.partis}/bin/partis cache-parameters --n-procs {threads} \
+              --initial-germline-dir {input.germline} \
               --random-seed {params.seed} --locus {params.locus} --species {params.species} \
-              --infname {input} --parameter-dir {output} 2>&1 | tee -a {log.main}
+              --infname {input.seqs} --parameter-dir {output} 2>&1 | tee -a {log.main}
         """
 
 rule partis_partition:
