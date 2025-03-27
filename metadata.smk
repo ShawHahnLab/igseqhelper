@@ -56,7 +56,7 @@ def load_runs(fp_in):
     """
     LOGGER.info("load_runs: fp_in %s", fp_in)
     runs = load_csv(fp_in, "Run")
-    runs = {k: v for k, v in runs.items() if v["Skip"] != "TRUE"}
+    runs = {k: v for k, v in runs.items() if v.get("Skip") != "TRUE"}
     return runs
 
 def load_specimens(fp_in):
@@ -78,7 +78,7 @@ def load_samples(fp_in, specimens=None, runs=None):
     LOGGER.info("load_samples: specimens %s...", str(specimens)[0:60])
     LOGGER.info("load_samples: runs %s...", str(runs)[0:60])
     samples = load_csv(fp_in, "Sample")
-    samples = {k: v for k, v in samples.items() if v["Skip"] != "TRUE"}
+    samples = {k: v for k, v in samples.items() if v.get("Skip") != "TRUE"}
     noblanks = {k: v for k, v in samples.items() if \
             v["BarcodeFwd"] and v["BarcodeRev"] and v["Run"]}
     if len(noblanks) < len(samples):
@@ -115,6 +115,7 @@ def load_antibody_isolates(fp_in, antibody_lineages=None):
     LOGGER.info("load_antibody_isolates: fp_in %s", fp_in)
     LOGGER.info("load_antibody_isolates: antibody_lineages %s...", str(antibody_lineages)[0:60])
     isolates = load_csv(fp_in, "Isolate")
+    isolates = {k: v for k, v in isolates.items() if v.get("Skip") != "TRUE"}
     if antibody_lineages:
         for isolate in isolates.values():
             _load_nested_items(
