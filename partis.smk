@@ -104,24 +104,38 @@ rule partis_cache_params_fasta:
                 else:
                     f_out.write(f">{rec.id}\n{rec.seq}\n")
 
-rule partis_germline_kimdb_igh:
-    """Prep partis germline dir from KIMDB sequences"""
+def input_for_partis_germline(w):
+    locus = w.locus_lower.upper()
+    return {
+        key: f"analysis/germline/{w.subject}.{locus}/{key}.fasta" for key in ("V", "D", "J")}
+
+rule partis_germline:
+    """Prep partis germline dir from per-subject germline files"""
+    # This is just a bit of reformatting of the per-subject IgDiscover-based
+    # germline files we have from elsewhere
     output:
-        out_dir="analysis/partis/germlines/kimdb/igh",
-        v="analysis/partis/germlines/kimdb/igh/ighv.fasta",
-        d="analysis/partis/germlines/kimdb/igh/ighd.fasta",
-        j="analysis/partis/germlines/kimdb/igh/ighj.fasta",
+        out_dir=directory("analysis/partis/germlines/{subject}/{locus_lower}"),
+        v="analysis/partis/germlines/{subject}/{locus_lower}/{locus_lower}v.fasta",
+        # D is created by the script only for heavy; the D input will be
+        # ignored for light chains
+        j="analysis/partis/germlines/{subject}/{locus_lower}/{locus_lower}j.fasta",
         # CSV of positions of codons for conserved AAs around CDR3
-        extras="analysis/partis/germlines/kimdb/igh/extras.csv"
-    threads: 8
-    shell: "partis_germline_kimdb.py {output.out_dir} -t {threads}"
+        extras="analysis/partis/germlines/{subject}/{locus_lower}/extras.csv"
+    input: unpack(input_for_partis_germline)
+    params:
+        out_parent="analysis/partis/germlines/{subject}"
+    shell: "partis_germline.py {wildcards.locus_lower} {input.V} {input.D} {input.J} {params.out_parent}"
+
+def input_for_partis_cache_params(w):
+    locus = {"kappa": "igk", "lambda": "igl"}.get(w.chain_type, "igh")
+    return {
+        "seqs": f"analysis/partis/{w.subject}.{w.chain_type}/ngs.filt.fasta",
+        "germline": f"analysis/partis/germlines/{w.subject}/{locus}/extras.csv"}
 
 rule partis_cache_params:
     """Run partis cache-parameters on a cross-timepoint NGS FASTA"""
     output: directory("analysis/partis/{subject}.{chain_type}/params")
-    input:
-        seqs="analysis/partis/{subject}.{chain_type}/ngs.filt.fasta",
-        germline="analysis/partis/germlines/kimdb"
+    input: unpack(input_for_partis_cache_params)
     log:
         main="analysis/partis/{subject}.{chain_type}/cache_params.log.txt",
         conda="analysis/partis/{subject}.{chain_type}/cache_params.conda_build.txt"
@@ -129,6 +143,8 @@ rule partis_cache_params:
         locus=lambda w: {"kappa": "igk", "lambda": "igl"}.get(w.chain_type, "igh"),
         species=config.get("partis_species", "macaque"),
         seed=config.get("partis_random_seed", 1),
+        germline="analysis/partis/germlines/{subject}",
+        leave_default_germline=config.get("partis_leave_default_germline", True),
         # I have the dependencies provided via conda but the actual partis
         # install still lives in a big ball of stuff in one directory,
         # unfortunately.  The first like of the shell commands will ensure this
@@ -147,11 +163,16 @@ rule partis_cache_params:
               echo "PARTIS_HOME: {params.partis}"
               echo "locus: {params.locus}"
               echo "species: {params.species}"
-              echo "germline: {input.germline}"
+              echo "germline: {params.germline}"
+              echo "leave default germline: {params.leave_default_germline}"
               echo "random seed: {params.seed}"
             ) >> {log.main}
+            germ_arg=""
+            if [[ "{params.leave_default_germline}" == "True" ]]; then
+              germ_arg="--leave-default-germline"
+            fi
             {params.partis}/bin/partis cache-parameters --n-procs {threads} \
-              --initial-germline-dir {input.germline} \
+              --initial-germline-dir {params.germline} "$germ_arg" \
               --random-seed {params.seed} --locus {params.locus} --species {params.species} \
               --infname {input.seqs} --parameter-dir {output} 2>&1 | tee -a {log.main}
         """
