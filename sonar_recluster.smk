@@ -30,6 +30,7 @@ rule sonar_recluster_get_rearrangements:
                     writer.writerow(row)
 
 rule sonar_recluster_get_fastqs:
+    """Create a .fastq.gz with all raw reads for each SONAR cluster"""
     output: directory(WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/fastq")
     input:
         fqgzdir="analysis/samples-by-specimen/{specimen}.{chain_type}",
@@ -39,33 +40,18 @@ rule sonar_recluster_get_fastqs:
             sonar_cluster_fastqs.py "{input.rearr_island}" "{output}" "{input.fqgzdir}"
         """
 
-rule sonar_recluster_fastq_consensus:
-    output: directory(WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/cons")
+rule sonar_recluster_consensuses:
+    """Refine SONAR clusters with quality-aware consensus method"""
+    output:
+        csv=WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/reclustered.csv",
+        details=directory(WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/details")
     input: WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/fastq"
-    shell:
-        """
-            for fqgz in {input}/*.fastq.gz; do
-                fasta={output}/$(basename "$fqgz" | sed s/fastq.gz/fa/)
-                fastq_consensus.py "$fqgz" "$fasta"
-            done
-        """
+    shell: "fastq_consensus.py {input} {output.csv} -O {output.details}"
 
-rule sonar_recluster:
-    """Update each SONAR cluster centroid sequence with quality-aware consensus"""
-    output: WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/rearrangements_reclustered.tsv"
-    input:
-        cons=WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/cons",
-        rearr_island=WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/rearrangements.tsv"
-    shell: "sonar_recluster.py {input.rearr_island} {output} {input.cons}"
-
-rule sonar_recluster_collapse:
-    """Collapse duplicated centroid sequences after updating"""
-    output: WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/rearrangements_reclustered_collapsed.tsv"
-    input: WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/rearrangements_reclustered.tsv"
-    shell: "sonar_recluster_collapse.py {input} {output}"
-
-rule sonar_recluster_fasta:
+rule sonar_recluster_trimmed_fasta:
     """Refined version of SONAR module 2's FASTA output"""
-    output: WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}.fa"
-    input: WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/rearrangements_reclustered_collapsed.tsv"
-    shell: "igseq convert --col-seq sequence_alignment {input} {output}"
+    output: WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/islandSeqs_{antibody_lineage}.fa"
+    input:
+        recluster=WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/reclustered.csv",
+        rearr=WD_SONAR/"output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/rearrangements.tsv"
+    shell: "sonar_recluster_fasta.py {input.recluster} {input.rearr} {output}"
