@@ -99,11 +99,7 @@ def _consensus_per_cluster(reads, clustermap_diff):
     for centroid, seq_ids in clustermap_diff.items():
         reads_here = [rec for rec in reads if rec["sequence_id"] in seq_ids]
         scores = _tally_scores(reads_here)
-        # (I built this to provide quality scores for the consensus as well, but
-        # it's getting complicated enough as it is, so, only tracking the
-        # sequences themselves from here on.)
-        cons_seq, _ = _make_consensus(scores)
-        cons[centroid] = cons_seq
+        cons[centroid] = _make_consensus(scores)
     return cons
 
 def __centroids_by_consensus(reads, clustermap, consensuses):
@@ -125,7 +121,9 @@ def __centroids_by_consensus(reads, clustermap, consensuses):
     # (each consensus seq -> set of matching centroids via eithercons or reads)
     cons_back = defaultdict(set)
     for centroid in clustermap:
-        cons_seq = consensuses[centroid]
+        # (the second item of each tuple is the quality scores but we don't
+        # care about that here)
+        cons_seq = consensuses[centroid][0]
         # This will gather up each seq -> centroid match including those for
         # identical consensus sequences between clusters
         cons_back[cons_seq].add(centroid)
@@ -198,10 +196,11 @@ def _write_iter_details(dir_out_iter, clustermap, consensuses, reads):
     dir_out_iter.mkdir(parents=True, exist_ok=True)
     _write_consensus_table(dir_out_iter/"out.csv", clustermap, consensuses, reads)
     for centroid, seq_ids in clustermap.items():
-        with RecordWriter(dir_out_iter/f"{centroid}.consensus.fasta") as writer:
+        with RecordWriter(dir_out_iter/f"{centroid}.consensus.fastq") as writer:
             writer.write({
                 "sequence_id": centroid,
-                "sequence": consensuses[centroid]})
+                "sequence": consensuses[centroid][0],
+                "sequence_quality": RecordHandler.encode_phred(consensuses[centroid][1])})
         reads_tmp = [rec.copy() for rec in reads if rec["sequence_id"] in seq_ids]
         with RecordWriter(dir_out_iter/f"{centroid}.fastq.gz") as writer:
             for rec in reads_tmp:
@@ -226,15 +225,18 @@ def _write_consensus_table(csv_out, clustermap, consensuses, reads):
     #
     # sequence_id           final centroid ID
     # sequence              final consensus sequence
+    # sequence_quality      final consensus sequence - inferred quality scores
     # duplicate_count       observed duplicate count for final consensus
     # cluster_count         observed read count in final cluster
     with RecordWriter(csv_out) as writer:
         for centroid, seq_ids in clustermap.items():
-            cons_seq = consensuses[centroid]
+            cons_seq, cons_qual = consensuses[centroid]
+            cons_qual = RecordHandler.encode_phred(cons_qual)
             reads_here = [rec for rec in reads if rec["sequence_id"] in seq_ids]
             writer.write({
                 "sequence_id": centroid,
                 "sequence": cons_seq,
+                "sequence_quality": cons_qual,
                 "duplicate_count": sum(cons_seq == rec["sequence"] for rec in reads_here),
                 "cluster_count": len(reads_here)})
 
@@ -271,7 +273,7 @@ def fastq_consensus_recluster(fqgz_dir_in, csv_out, dir_out=None, max_iter=10):
         print(f"iteration {cluster_idx}: {len(consensuses_new)} newly-created consensuses")
         # Even if we've brought more reads in for a particular cluster the
         # consensus might be the same as before.
-        actually_new = sum(seq != consensuses.get(c) for c, seq in consensuses_new.items())
+        actually_new = sum(item != consensuses.get(c) for c, item in consensuses_new.items())
         print(f"iteration {cluster_idx}: ({actually_new} actually different)")
         consensuses.update(consensuses_new)
         print(f"iteration {cluster_idx}: {len(consensuses)} total consensuses")
