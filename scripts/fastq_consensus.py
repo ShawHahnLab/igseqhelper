@@ -28,25 +28,29 @@ def _load_cluster_fastqs(fqgz_dir_in):
     return clustermap, reads
 
 def _tally_scores(reads):
-    # take most abundant sequence as the reference
+    # take most abundant sequence as the reference, with secondary sorting by
+    # most common length
     totals = defaultdict(int)
+    lentotals = defaultdict(int)
     for row in reads:
         totals[row["sequence"]] += 1
-    totals = list(totals.items())
-    totals.sort(key=lambda pair: (pair[1], pair[0]), reverse=True)
-    ref = totals[0][0]
+        lentotals[len(row["sequence"])] += 1
+    stats = [(totals[seq], lentotals[len(seq)], seq) for seq in totals]
+    stats.sort(reverse=True)
+    ref = stats[0][2]
     # align the deduplicated sequences
     alns = {}
-    for pair in totals:
+    for trio in stats:
         # I don't know what's going on under the hood in PairwiseAligner, but
         # accessing some of these properties is evidently quite expensive for
         # some reason, so we'll just stash the bits we want before getting to
         # the loop below (rather than storing the whole object)
-        aln = ALIGNER.align(ref, pair[0])[0]
-        alns[pair[0]] = {
+        query = trio[2]
+        aln = ALIGNER.align(ref, query)[0]
+        alns[query] = {
             "aln_query": aln[1][:],
             "length": aln.length,
-            "indices": aln.indices[:]}
+            "indices": [[int(num) for num in items] for items in aln.indices]}
     # index in ref -> base call -> list of Q scores
     scores = defaultdict(lambda: defaultdict(list))
     for row in reads:
@@ -59,14 +63,18 @@ def _tally_scores(reads):
             if idx_target != -1 and idx_query != -1:
                 basecall = aln["aln_query"][idx]
                 scores[idx_target][basecall].append(row["sequence_quality"][idx_query])
+    # Dictionary keyed by index is stupid.  Switch to a plain list... but make
+    # sure it all makes sense first.
+    scores = sorted(scores.items())
+    assert list(range(1+max(pair[0] for pair in scores))) == [pair[0] for pair in scores]
+    scores = [pair[1] for pair in scores]
     return scores
 
 def _make_consensus(scores):
     consensus = ""
     quals = []
     check = 0
-    for idx, base_scores in scores.items():
-        assert check == idx # TODO rearrange this stupid dictionary approach
+    for base_scores in scores:
         # numbers of observed base calls per base, for use in sorting by
         # decreasing abundance
         tally = {base: len(scores_here) for base, scores_here in base_scores.items()}
