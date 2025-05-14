@@ -223,20 +223,30 @@ def _write_consensus_table(csv_out, clustermap, consensuses, reads):
     #
     # sequence_id           final centroid ID
     # sequence              final consensus sequence
-    # sequence_quality      final consensus sequence - inferred quality scores
+    # sequence_quality      final consensus sequence: inferred quality scores
+    # sequence_quality_min  min of sequence_quality (as integer Q score)
     # duplicate_count       observed duplicate count for final consensus
     # cluster_count         observed read count in final cluster
+    rows = []
+    for centroid, seq_ids in clustermap.items():
+        cons_seq, cons_qual = consensuses[centroid]
+        cons_qual_txt = RecordHandler.encode_phred(cons_qual)
+        reads_here = [rec for rec in reads if rec["sequence_id"] in seq_ids]
+        rows.append({
+            "sequence_id": centroid,
+            "sequence": cons_seq,
+            "sequence_quality": cons_qual_txt,
+            "sequence_quality_min": min(qual for qual in cons_qual),
+            "duplicate_count": sum(cons_seq == rec["sequence"] for rec in reads_here),
+            "cluster_count": len(reads_here)})
+    rows.sort(key=lambda row: (
+        -row["cluster_count"],
+        -row["sequence_quality_min"],
+        -row["duplicate_count"],
+        row["sequence_id"]))
     with RecordWriter(csv_out) as writer:
-        for centroid, seq_ids in clustermap.items():
-            cons_seq, cons_qual = consensuses[centroid]
-            cons_qual = RecordHandler.encode_phred(cons_qual)
-            reads_here = [rec for rec in reads if rec["sequence_id"] in seq_ids]
-            writer.write({
-                "sequence_id": centroid,
-                "sequence": cons_seq,
-                "sequence_quality": cons_qual,
-                "duplicate_count": sum(cons_seq == rec["sequence"] for rec in reads_here),
-                "cluster_count": len(reads_here)})
+        for row in rows:
+            writer.write(row)
 
 def fastq_consensus_recluster(fqgz_dir_in, csv_out, dir_out=None, max_iter=10):
     """Iteratively make consensus sequences and update read clustering"""
