@@ -13,7 +13,8 @@ from igseq.record import RecordReader, RecordWriter, RecordHandler
 ALIGNER = Align.PairwiseAligner()
 ALIGNER.gap_score = -10
 
-def _load_cluster_fastqs(fqgz_dir_in):
+def load_cluster_fastqs(fqgz_dir_in):
+    """Load .fastq.gz files into dictionary of files->reads and list of reads"""
     # assuming files are named {centroid}.fastq.gz
     clustermap = {} # cluster ID -> list of read IDs
     reads = [] # list of read dictionaries
@@ -27,7 +28,21 @@ def _load_cluster_fastqs(fqgz_dir_in):
                 reads.append(row)
     return clustermap, reads
 
-def _tally_scores(reads):
+def tally_scores(reads):
+    """List base call quality score details per position across FASTQ reads
+
+    Each returned list item is a dictionary giving lists of quality scores per
+    observed base call, where the list indexes correspond to positions in an
+    inferred reference sequence across the set of reads.
+
+    The reference is chosen from among the supplied reads by selecting the top
+    match after sorting for:
+
+     1. Most abundant sequence
+     2. Most abundant read length
+     3. Longest read
+     4. Sequence content
+    """
     # take most abundant sequence as the reference, with secondary sorting by
     # most common length
     totals = defaultdict(int)
@@ -35,17 +50,17 @@ def _tally_scores(reads):
     for row in reads:
         totals[row["sequence"]] += 1
         lentotals[len(row["sequence"])] += 1
-    stats = [(totals[seq], lentotals[len(seq)], seq) for seq in totals]
+    stats = [(totals[seq], lentotals[len(seq)], len(seq), seq) for seq in totals]
     stats.sort(reverse=True)
-    ref = stats[0][2]
+    ref = stats[0][3]
     # align the deduplicated sequences
     alns = {}
-    for trio in stats:
+    for attrs in stats:
         # I don't know what's going on under the hood in PairwiseAligner, but
         # accessing some of these properties is evidently quite expensive for
         # some reason, so we'll just stash the bits we want before getting to
         # the loop below (rather than storing the whole object)
-        query = trio[2]
+        query = attrs[3]
         aln = ALIGNER.align(ref, query)[0]
         alns[query] = {
             "aln_query": aln[1][:],
@@ -70,7 +85,8 @@ def _tally_scores(reads):
     scores = [pair[1] for pair in scores]
     return scores
 
-def _make_consensus(scores):
+def make_consensus(scores):
+    """Make consensus from list of base call and Q info for a set of reads"""
     consensus = ""
     quals = []
     check = 0
@@ -91,16 +107,6 @@ def _make_consensus(scores):
         quals.append(score)
         check += 1
     return consensus, quals
-
-def _consensus_per_cluster(reads, clustermap_diff):
-    # reads: full, static list of reads
-    # clustermap_diff: cluster centroid ID -> lists of read IDs for whatever needs consensus
-    cons = {}
-    for centroid, seq_ids in clustermap_diff.items():
-        reads_here = [rec for rec in reads if rec["sequence_id"] in seq_ids]
-        scores = _tally_scores(reads_here)
-        cons[centroid] = _make_consensus(scores)
-    return cons
 
 def __centroids_by_consensus(reads, clustermap, consensuses):
     # First, make a mapping of each read sequence to the cluster that contains
@@ -151,24 +157,28 @@ def __group_overlaps(sets):
     result.sort()
     return result
 
-def _merge_clusters(reads, clustermap, consensuses):
-    # reads: full, static list of reads
-    # clustermap: full set of centroid IDs -> lists of read IDs
-    # consensuses: consensus for each cluster in clustermap
+def merge_clusters(reads, clustermap, consensuses):
+    """Given clusters of reads and consensuses per cluster, merge overlapping clusters
 
+    reads: full, static list of reads
+    clustermap: full set of centroid IDs -> lists of read IDs
+    consensuses: consensus for each cluster in clustermap
+
+    This will return an updated version of clustermap, where any clusters whose
+    consensus sequences perfectly match a read or consensus sequence of another
+    cluster are merged together.
+    """
+    #
     # the set of cluster centroids relevant for each consensus sequence, either
     # in terms of what cluster has that consensus or what single read
     # (belonging to whatever cluster) is that sequence
     cons_back = __centroids_by_consensus(reads, clustermap, consensuses)
-
     # But we're not done yet!  The same centroid may show up in the context of
     # multiple distinct consensus seqs.  Next, assign a new representative for
     # each centroid based on all those it touches.
-    #
     # We don't actually care what those sequences are at this point; it's just
     # about the (potentially overlapping) sets of centroids.
     centroid_groups = __group_overlaps(cons_back.values())
-
     # Now we have the centroids of the previous clustered grouped together and
     # we can take the first one of each group as the ID of the new cluster (for
     # those that are grouped; singletons will remain the same) and group all
@@ -179,18 +189,6 @@ def _merge_clusters(reads, clustermap, consensuses):
         for centroid2 in centroids:
             clustermap_new[centroids[0]] += clustermap[centroid2]
     return clustermap_new
-
-def _make_clustermap_diff(clustermap, clustermap_new):
-    # clustermap: full set of centroid IDs -> lists of read IDs
-    # clustermap_new: new clustermap after merging clusters
-    clustermap_diff = {}
-    # clustermap_new might be missing keys from clustermap, but we only care
-    # about ones in the new dictionary.  Of those, which lists of reads are
-    # different?
-    for centroid in clustermap_new:
-        if clustermap_new[centroid] != clustermap[centroid]:
-            clustermap_diff[centroid] = clustermap_new[centroid][:]
-    return clustermap_diff
 
 def _write_iter_details(dir_out_iter, clustermap, consensuses, reads):
     dir_out_iter.mkdir(parents=True, exist_ok=True)
@@ -253,36 +251,39 @@ def fastq_consensus_recluster(fqgz_dir_in, csv_out, dir_out=None, max_iter=10):
     #    new consensus sequence.  Repeat until there's no more reclustering, up
     #    to some limit
     # 5. Final output is a table of per-cluster info
-
     if dir_out:
         dir_out = Path(dir_out)
     # Load initial per-cluster .fastq.gz files
     # it's easeiest for our purposes here to actually just store a mapping of
     # reads to clusters on the one hand and a big list of all reads on the
     # other.
-    clustermap, reads = _load_cluster_fastqs(fqgz_dir_in)
+    clustermap, reads = load_cluster_fastqs(fqgz_dir_in)
     clustermap_diff = clustermap.copy()
     consensuses = {}
     for cluster_idx in range(max_iter):
-        print(f"iteration {cluster_idx}")
+        print(f"{fqgz_dir_in}: iteration {cluster_idx}")
         # Make consensus sequences for any clusters that have been updated
         # since the last iteration.  On the first iteration, that'll just be
         # everything.  On later iterations the "diff" dictionary will only have
         # entries for what needs updating.
-        consensuses_new = _consensus_per_cluster(reads, clustermap_diff)
-        print(f"iteration {cluster_idx}: {len(consensuses_new)} newly-created consensuses")
+        consensuses_new = {}
+        for centroid, seq_ids in clustermap_diff.items():
+            consensuses_new[centroid] = make_consensus(tally_scores(
+                [rec for rec in reads if rec["sequence_id"] in seq_ids]))
+        print(f"{fqgz_dir_in}: iteration {cluster_idx}: "
+                f"{len(consensuses_new)} newly-created consensuses")
         # Even if we've brought more reads in for a particular cluster the
         # consensus might be the same as before.
         actually_new = sum(item != consensuses.get(c) for c, item in consensuses_new.items())
-        print(f"iteration {cluster_idx}: ({actually_new} actually different)")
+        print(f"{fqgz_dir_in}: iteration {cluster_idx}: ({actually_new} actually different)")
         consensuses.update(consensuses_new)
-        print(f"iteration {cluster_idx}: {len(consensuses)} total consensuses")
+        print(f"{fqgz_dir_in}: iteration {cluster_idx}: {len(consensuses)} total consensuses")
         # Find any matches between the latest consensus sequences on the one
         # hand, and all the reads and consensus sequences on the other.  Merge
         # any clusters with matches.
-        print(f"iteration {cluster_idx}: {len(clustermap)} previous clusters")
-        clustermap_new = _merge_clusters(reads, clustermap, consensuses)
-        print(f"iteration {cluster_idx}: {len(clustermap_new)} total clusters now")
+        print(f"{fqgz_dir_in}: iteration {cluster_idx}: {len(clustermap)} previous clusters")
+        clustermap_new = merge_clusters(reads, clustermap, consensuses)
+        print(f"{fqgz_dir_in}: iteration {cluster_idx}: {len(clustermap_new)} total clusters now")
         # at this point we have an updated mapping of what reads go with what
         # cluster, and an updated set of consensus sequences for each cluster.
         # If an output directory was specified, write the final (updated
@@ -292,8 +293,11 @@ def fastq_consensus_recluster(fqgz_dir_in, csv_out, dir_out=None, max_iter=10):
                 dir_out/f"iter{cluster_idx:03}", clustermap_new, consensuses, reads)
         # figure out which clusters were updated since the last iteration.  If
         # none, we're done.
-        clustermap_diff = _make_clustermap_diff(clustermap, clustermap_new)
-        print(f"iteration {cluster_idx}: {len(clustermap_diff)} updated clusters")
+        clustermap_diff = {}
+        for centroid, reads_new in clustermap_new.items():
+            if clustermap[centroid] != reads_new:
+                clustermap_diff[centroid] = reads_new[:]
+        print(f"{fqgz_dir_in}: iteration {cluster_idx}: {len(clustermap_diff)} updated clusters")
         clustermap = clustermap_new
         # (we might have consensus sequences left over from clusters that are
         # merged into other clusters)
