@@ -30,7 +30,7 @@ def sonar_recluster_fasta(csv_in, rearr_in, fasta_out):
             idx_query_end = list(aln.indices[1]).index(len(seq_old_vdj)-1) + 1
             # trimming target (new full seq) and query (prev. trimmed seq)
             # according to those edges
-            seq_new_vdj = aln[0][idx_query_start:idx_query_end]
+            seq_new_vdj = aln[0][idx_query_start:idx_query_end].replace("-", "")
             query_trim = aln[1][idx_query_start:idx_query_end]
             assert query_trim == seq_old_vdj # it better be!
             fields = {
