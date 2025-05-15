@@ -15,10 +15,13 @@ ALIGNER.gap_score = -10
 
 def load_cluster_fastqs(fqgz_dir_in):
     """Load .fastq.gz files into dictionary of files->reads and list of reads"""
+    fqgz_dir_in = Path(fqgz_dir_in)
     # assuming files are named {centroid}.fastq.gz
     clustermap = {} # cluster ID -> list of read IDs
     reads = [] # list of read dictionaries
-    for fqgz_in in Path(fqgz_dir_in).glob("*.fastq.gz"):
+    # If directory, find contained fastq.gz files, otherwise, assume one file given
+    fqgzs = Path(fqgz_dir_in).glob("*.fastq.gz") if fqgz_dir_in.is_dir() else [fqgz_dir_in]
+    for fqgz_in in fqgzs:
         key = fqgz_in.name.removesuffix(".fastq.gz")
         clustermap[key] = []
         with RecordReader(fqgz_in) as reader:
@@ -321,7 +324,7 @@ def main():
     """CLI for fastq_consensus"""
     parser = ArgumentParser()
     addarg = parser.add_argument
-    addarg("input", help="FASTQ input file (.fastq or .fastq.gz)")
+    addarg("input", help="FASTQ input file (.fastq or .fastq.gz) or directory of files")
     addarg("output", help="Output CSV with final consensus info")
     addarg("-O", "--output-dir", help="Optional output directory for detailed intermediate info")
     addarg("-M", "--max-iterations", default=10, help="Maximum number of cluster-merging cycles")
