@@ -431,10 +431,10 @@ rule sonar_module_2_id_div_island_alternate:
 rule sonar_module_2_id_div_getfasta:
     """SONAR 2: Extract FASTA matching selected island's seq IDs."""
     output:
-        fasta=WD_SONAR / "output/sequences/nucleotide/islandSeqs_{txt}.fa"
+        fasta=WD_SONAR / "output/sequences/nucleotide/islandSeqs_{name}.fa"
     input:
         fasta=WD_SONAR / "output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
-        seqids=WD_SONAR / "output/tables/islandSeqs_{txt}.txt"
+        seqids=WD_SONAR / "output/tables/islandSeqs_{name}.txt"
     singularity: "docker://jesse08/sonar"
     params:
         wd_sonar=lambda w: expand(str(WD_SONAR), **w),
@@ -582,7 +582,8 @@ def sonar_module_3_collect_inputs(w):
     timepoints, labels, specs_here = format_timepoints([SPECIMENS[s] for s in spec_names_here])
     targets = expand(
         "analysis/sonar/{subject}.{chain_type}/{other_specimen}/"
-        "output/sequences/nucleotide/islandSeqs_{antibody_lineage}.fa",
+        "output/sequences/nucleotide/islandSeqs_recluster_{antibody_lineage}/"
+        "islandSeqs_{antibody_lineage}.fa",
         subject=w.subject,
         chain_type=w.chain_type,
         other_specimen=[attrs["Specimen"] for attrs in specs_here],
