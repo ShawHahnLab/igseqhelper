@@ -102,8 +102,9 @@ def make_consensus(scores):
         for base, scores_here in base_scores.items():
             for score in scores_here:
                 pairs.append((base, score))
-        # sort by quality first, then by abundance of base call
-        pairs.sort(key=lambda pair, t=tally: (pair[1], t[pair[0]]), reverse=True)
+        # sort by abundance of base call first, then by quality as a
+        # tie-breaker (both highest-first)
+        pairs.sort(key=lambda pair, t=tally: (t[pair[0]], pair[1]), reverse=True)
         # top one is winner
         base, score = pairs[0]
         consensus += base
