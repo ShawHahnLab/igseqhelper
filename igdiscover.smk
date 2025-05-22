@@ -22,7 +22,10 @@ from datetime import (datetime, timezone)
 # snakemake rules here easy)
 def input_for_igdiscover_as_germline(w):
     chain_type = {"IGH": "mu", "IGK": "kappa", "IGL": "lambda"}[w.locus]
-    name = "kimdb" if w.locus == "IGH" else "sonarramesh"
+    # by default we'll draw from KIMDB-based results for IGH and Ramesh-based
+    # results for IGK and IGL, but we can provide a custom reference name via
+    # the snakemake config if needed
+    name = config.get("igdiscover_ref_name", "kimdb" if w.locus == "IGH" else "sonarramesh")
     targets = {
         "V": f"analysis/igdiscover/{name}/{chain_type}/{w.subject}.1iter/final/database/V.fasta",
         "D": f"analysis/igdiscover/{name}/{chain_type}/{w.subject}.1iter/final/database/D.fasta",
