@@ -1,18 +1,33 @@
+"""
+Rules for reporting on totals of reads and such at different steps in the workflow.
+"""
+
+import lzma
+
 # this rule has no inputs so it'll just take whatever files are available at
 # run time.
 rule report_counts_by_sample:
+    """Sample read count summary CSV (one row per sample)"""
     output: "analysis/reporting/counts/counts_by_sample.csv"
     run: counts_by_sample(output[0])
 
 rule report_counts_by_run:
+    """Run read count summary CSV (one row per run)"""
     output: "analysis/reporting/counts/counts_by_run.csv"
     input: "analysis/reporting/counts/counts_by_sample.csv"
     run: counts_by_run(input[0], output[0])
 
 rule report_counts_by_specimen:
+    """Specimen read and SONAR cluster summary CSV (one row per specimen per cell+chain type)"""
     output: "analysis/reporting/counts/counts_by_specimen.csv"
     input: "analysis/reporting/counts/counts_by_sample.csv"
     run: counts_by_specimen(input[0], output[0])
+
+rule report_counts_by_subject:
+    """Subject read and SONAR cluster summary CSV (one row per subject per cell+chain type)"""
+    output: "analysis/reporting/counts/counts_by_subject.csv"
+    input: "analysis/reporting/counts/counts_by_specimen.csv"
+    run: counts_by_subject(input[0], output[0])
 
 def report_counts_for(samp, runid, category):
     path = Path("analysis")/category/runid/f"{samp}.{category}.counts.csv"
@@ -143,7 +158,13 @@ def counts_by_run(input_csv, output_csv):
             del row["TotalSeqs"]
             writer.writerow(row)
 
-def sonar_airr_counts(input_tsv, output_csv, fmt_islands=None, lineages=None):
+def sonar_airr_counts(input_tsv, output_csv, wcards):
+
+    fmt_islands = ("analysis/sonar/{subject}.{chain_type}/"
+        "{specimen}/output/tables/islandSeqs_{{antibody_lineage}}.txt").format(**wcards)
+    lineages = [lin for lin, attrs in ANTIBODY_LINEAGES.items() if \
+        attrs["Subject"] == wcards["subject"]]
+
     # Reads: grand total in the file.  Some don't make it this far if they
     #        didn't even look like antibody reads (e.g. ferritin)
     # GoodReads: The good (no stops, all parts intact) antibody reads
@@ -152,7 +173,8 @@ def sonar_airr_counts(input_tsv, output_csv, fmt_islands=None, lineages=None):
     # LineageMembers: sum of lineage members across any lineages for this
     #                 specimen (only included if files are available)
     counts = {"SONARReads": 0, "SONARGoodReads": 0, "SONARClusteredReads": 0, "SONARClusteredUnique": 0}
-    with open(input_tsv) as f_in:
+    opener = {".tsv": open, ".xz": lzma.open}.get(Path(input_tsv).suffix, open)
+    with opener(input_tsv, "rt", encoding="ASCII") as f_in:
         reader = csv.DictReader(f_in, delimiter="\t")
         for row in reader:
             counts["SONARReads"] += int(row["duplicate_count"])
@@ -184,14 +206,29 @@ def sonar_airr_counts(input_tsv, output_csv, fmt_islands=None, lineages=None):
         writer.writeheader()
         writer.writerow(counts)
 
+# Typically I wouldn't want to base rules on what happens to be on disk, but
+# reporting is a special case.  (I'm not tying these targets into downstream
+# summary rules, though, because I don't want those to ever trigger rebuilding
+# actual analysis outputs.)
+# TODO figure out how to enforce my global wildcard constraints here
+# https://stackoverflow.com/questions/79744378
+rule report_available_sonar_airr_counts:
+    """"Tabulate SONAR AIRR counts CSV for whatever rearrangements.tsv files are on hand"""
+    input: expand("analysis/reporting/counts/sonar/{subject}.{chain_type}.{specimen}.csv", zip, **glob_wildcards("analysis/sonar/{subject}.{chain_type,[a-z]+}/{specimen,[A-Za-z0-9]+}/output/tables/{specimen2}_rearrangements.tsv{suffix,[^/]*}")._asdict())
+
+ruleorder: report_sonar_airr_counts_xz > report_sonar_airr_counts
+
 rule report_sonar_airr_counts:
     output: csv="analysis/reporting/counts/sonar/{subject}.{chain_type}.{specimen}.csv"
     input: tsv="analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv"
     run:
-        fmt_islands = "analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/islandSeqs_{{antibody_lineage}}.txt"
-        fmt_islands = fmt_islands.format(**vars(wildcards))
-        lineages = [lineage for lineage, attrs in ANTIBODY_LINEAGES.items() if attrs["Subject"] == wildcards.subject]
-        sonar_airr_counts(input.tsv, output.csv, fmt_islands, lineages)
+        sonar_airr_counts(input.tsv, output.csv, vars(wildcards))
+
+rule report_sonar_airr_counts_xz:
+    output: csv="analysis/reporting/counts/sonar/{subject}.{chain_type}.{specimen}.csv"
+    input: tsv="analysis/sonar/{subject}.{chain_type}/{specimen}/output/tables/{specimen}_rearrangements.tsv.xz"
+    run:
+        sonar_airr_counts(input.tsv, output.csv, vars(wildcards))
 
 rule report_sonar_airr_counts_by_subject_and_type:
     output: touch("analysis/reporting/counts/sonar/{subject}.{chain_type}.done")
@@ -251,3 +288,36 @@ def counts_by_specimen(input_csv, output_csv):
             lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+
+def counts_by_subject(input_csv, output_csv):
+    """Condense counts by specimen (by cell type+chain) down to by subject (by cell type+chain)"""
+    # some input columns will be used for grouping, and some will be used to
+    # total across
+    keykeys = ("Subject", "CellType", "Type")
+    totalkeys = (
+        "DemuxSeqs", "TrimSeqs", "MergeSeqs", "FiltSeqs", "CellCount",
+        "SONARReads", "SONARGoodReads", "SONARClusteredReads", "SONARClusteredUnique",
+        "LineageMembers")
+    # group input rows based on the columns given above
+    grouped = defaultdict(list)
+    with open(input_csv, encoding="ASCII") as f_in:
+        for row in DictReader(f_in):
+            key = tuple(row[k] for k in keykeys)
+            grouped[key].append(row)
+    # Flatten into one row per group
+    out = []
+    for key, group in grouped.items():
+        def total(attr):
+            if all(row[attr] in (None, "") for row in group):
+                return None
+            return sum(int(row[attr] if row[attr] else 0) for row in group)
+        # Put the grouping keys back to start with, followed by the number of
+        # specimens per group, followed by the totals across specimens
+        row_out = {key_name: key_part for key_name, key_part in zip(keykeys, key)}
+        row_out["Specimens"] = len(group)
+        row_out.update({key: total(key) for key in totalkeys})
+        out.append(row_out)
+    with open(output_csv, "w", encoding="ASCII") as f_out:
+        writer = DictWriter(f_out, out[0].keys(), lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(out)
