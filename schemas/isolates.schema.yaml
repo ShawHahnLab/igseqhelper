@@ -34,6 +34,14 @@ fields:
         - LN
         - BM
         - PBMC
+  - name: Method
+    title: Method
+    description: What method was used for isolation and sequencing, Sanger or 10x
+    type: string
+    constraints:
+      enum:
+        - Sanger
+        - 10x
   - name: IncludeInTracing
     title: Include in Lineage Tracing?
     description: Should this isolate be used to identify lineage members during lineage tracing?
