@@ -27,6 +27,18 @@ fields:
         - HIV
         - SHIV
         - SCIV
+  - name: IGHRef
+    title: IGH Reference
+    description: IGH reference to use as starting database (KIMDB unless otherwise specified)
+    type: string
+  - name: IGKRef
+    title: IGK Reference
+    description: IGK reference to use as starting database (Ramesh unless otherwise specified)
+    type: string
+  - name: IGLRef
+    title: IGL Reference
+    description: IGL reference to use as starting database (Ramesh unless otherwise specified)
+    type: string
   - name: Comments
     title: Comments
     description: Freeform comments about each subject

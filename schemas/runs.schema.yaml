@@ -17,6 +17,10 @@ fields:
     constraints:
       minimum: 0
       maximum: 1
+  - name: QMin
+    title: Quality Minimum
+    description: For read filtering, a per-run value (overriding defaults) for the minimum quality score per base across all bases for a read to be kept
+    type: number
   - name: Skip
     title: Skip
     description: Should this run be ignored during analysis?
