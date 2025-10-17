@@ -63,14 +63,20 @@ def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
                 isol_attrs = isolates.get(row["sequence_id"], {})
                 category = "isolate" if isol_attrs else "ngs"
                 timepoint = isol_attrs.get("Timepoint", timepoint_seqid)
-                lineage = isol_attrs.get("Lineage")
+                # (Isolate lineage names that include the keyword "unassigned"
+                # in the name will be interpreted as placeholders and ignored.)
+                lineage = isol_attrs.get("Lineage", "")
+                if "unassigned" in lineage:
+                    lineage = ""
                 # Or, do we have NGS seq annotations for it?
                 if row["sequence_id"] in ngs_annots:
                     attrs = ngs_annots[row["sequence_id"]]
                     # sanity check with sequence content if present
                     if attrs.get("sequence") and \
                             annots.get("sequence") and \
-                            attrs["sequence"] != annots["sequence"]:
+                            attrs["sequence"] not in  annots["sequence"]:
+                        print(annots["sequence"])
+                        print(attrs["sequence"])
                         raise ValueError(f"Sequence mismatch for {row['sequence_id']}")
                     if not lineage:
                         lineage = attrs.get("Lineage")

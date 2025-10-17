@@ -2,6 +2,12 @@
 Run partis on all IgG+ material across specimens for one subject and chain type
 (using SONAR's clustered sequences), and partition all of those sequences plus
 the corresponding mature isolate sequences.
+
+Some jargon used in the rules and scripts here:
+
+ * Category: "isolate" or "ngs"
+ * Lineage Group: automatically grouped lineage/clone identifiers coming from
+   my own lineage assignments and/or partis' automatic groupings
 """
 
 def partis_specimens(subject, chain_type):
