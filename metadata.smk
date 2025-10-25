@@ -162,8 +162,8 @@ def load_csv(fp_in, key=None):
 rule all_get_metadata:
     input: TARGET_METADATA
 
-def _setup_metadata(fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates):
-    global SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES
+def _setup_metadata(fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates, fp_seqsets):
+    global SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES, SEQSETS
     SPECIMENS = load_specimens(fp_specimens)
     RUNS = load_runs(fp_runs)
     SAMPLES = load_samples(
@@ -172,6 +172,7 @@ def _setup_metadata(fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_
         runs=RUNS)
     ANTIBODY_LINEAGES = load_antibody_lineages(fp_antibody_lineages)
     ANTIBODY_ISOLATES = load_antibody_isolates(fp_antibody_isolates, ANTIBODY_LINEAGES)
+    SEQSETS = load_csv(fp_seqsets)
 
 try:
     _setup_metadata(
@@ -179,7 +180,8 @@ try:
         "metadata/runs.csv",
         "metadata/samples.csv",
         "metadata/lineages.csv",
-        "metadata/isolates.csv")
+        "metadata/isolates.csv",
+        "metadata/seqsets.csv")
 except FileNotFoundError:
     print("Skipping metadata loading; be sure to run get_metadata rule.")
     SPECIMENS = {}

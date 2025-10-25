@@ -1,0 +1,43 @@
+# https://specs.frictionlessdata.io/table-schema
+missingValues:
+  - ''
+primaryKey: SeqSet
+foreignKeys:
+  - fields: Subject
+    reference:
+      resource: subjects
+      fields: Subject
+  - name: SeqSet
+    title: Sequence Set
+    description: A batch of externally-provided sequences for a given subject and timepoint (e.g. 10x)
+    type: string
+  - name: Subject
+    title: Subject
+    description: Which subject this set of sequences is from
+    type: string
+  - name: Timepoint
+    title: Timepoint
+    description: Time point as measured in weeks post-infection
+    type: integer
+  - name: Material
+    title: Material sampled
+    description: S=spleen, LN=lymph node, BM=bone marrow, PBMC=peripheral blood mononuclear cells.  Generally will be PBMCs
+    type: string
+    constraints:
+      enum:
+        - S
+        - LN
+        - BM
+        - PBMC
+  - name: Method
+    title: Method
+    description: What method was used for isolation and sequencing
+    type: string
+  - name: Source
+    title: Source
+    description: An identifier for the original source of the data
+    type: string
+  - name: Comments
+    title: Comments
+    description: Freeform comments about each sequence set
+    type: string
