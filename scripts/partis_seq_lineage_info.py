@@ -10,20 +10,13 @@ import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
 
-def _load_isol_annots(csv_isol_annots):
-    isolates = {}
-    if csv_isol_annots:
-        with open(csv_isol_annots, encoding="ASCII") as f_in:
-            isolates = {row["Isolate"]: row for row in DictReader(f_in)}
-    return isolates
-
-def _load_ngs_annots(csv_ngs_annots):
-    ngs_annots = {}
-    if csv_ngs_annots:
-        with open(csv_ngs_annots, encoding="ASCII") as f_in:
-            for row in DictReader(f_in):
-                ngs_annots[row["sequence_id"]] = row
-    return ngs_annots
+def _load_metadata(csv_path, key=None):
+    things = {}
+    if csv_path:
+        first = lambda row: list(row.keys())[0]
+        with open(csv_path, encoding="ASCII") as f_in:
+            things = {row[key or first(row)]: row for row in DictReader(f_in)}
+    return things
 
 def _load_igblast_airr(airr_path):
     if airr_path:
@@ -31,7 +24,7 @@ def _load_igblast_airr(airr_path):
             return {row["sequence_id"]: row for row in DictReader(f_in, delimiter="\t")}
     return {}
 
-def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
+def _prep_seq_lineage_info(airr_in, metadata, ngs_annots, igblast, keep_all):
     # clone ID -> AIRR rows (need all to decide what to keep later)
     clones = defaultdict(list)
     # clone IDs of interest for our isolates
@@ -39,7 +32,7 @@ def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
     with open(airr_in, encoding="ASCII") as f_in:
         for row in DictReader(f_in, delimiter="\t"):
             clones[row["clone_id"]].append(row)
-            if row["sequence_id"] in isolates:
+            if row["sequence_id"] in metadata["isolates"]:
                 cloneids.add(row["clone_id"])
     # include everything that's listed under any of those clone IDs of
     # interest.  Each sequence can have one clone ID from partis and one
@@ -49,6 +42,18 @@ def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
         if cloneid in cloneids or keep_all:
             # keep all for this clone, or everything if specified
             for row in rows:
+                # figure out what sort of sequence this is, and its metadata,
+                # from the sequence ID
+                category, seqid = row["sequence_id"].split("-", 1)
+                item = ""
+                # isolate metadata is per isolate, the others are per item
+                if category == "isolate":
+                    attrs = metadata.get(f"{category}s", {}).get(seqid, {})
+                else:
+                    item, seqid = seqid.split("-", 1)
+                    attrs = metadata.get(f"{category}s", {}).get(item, {})
+                if category == "specimen":
+                    category = "ngs"
                 timepoint_seqid = re.match("wk([0-9]+)-.*", row["sequence_id"])
                 if timepoint_seqid:
                     timepoint_seqid = timepoint_seqid.group(1)
@@ -59,27 +64,29 @@ def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
                 annots = igblast.get(row["sequence_id"], row)
                 v_family = re.match("(IG[HKL]V[0-9]+)", annots["v_call"])
                 v_family = v_family.group(1) if v_family else ""
-                # Is sequence from isolates?
-                isol_attrs = isolates.get(row["sequence_id"], {})
-                category = "isolate" if isol_attrs else "ngs"
-                timepoint = isol_attrs.get("Timepoint", timepoint_seqid)
+                timepoint = attrs.get("Timepoint", timepoint_seqid)
                 # (Isolate lineage names that include the keyword "unassigned"
-                # in the name will be interpreted as placeholders and ignored.)
-                lineage = isol_attrs.get("Lineage", "")
+                # in the name will be interpreted as placeholders and ignored.
+                # Other categories won't have a Lineage explicitly provided
+                # anyway.)
+                lineage = attrs.get("Lineage", "")
                 if "unassigned" in lineage:
                     lineage = ""
-                # Or, do we have NGS seq annotations for it?
-                if row["sequence_id"] in ngs_annots:
-                    attrs = ngs_annots[row["sequence_id"]]
-                    # sanity check with sequence content if present
-                    if attrs.get("sequence") and \
-                            annots.get("sequence") and \
-                            attrs["sequence"] not in  annots["sequence"]:
-                        print(annots["sequence"])
-                        print(attrs["sequence"])
-                        raise ValueError(f"Sequence mismatch for {row['sequence_id']}")
-                    if not lineage:
-                        lineage = attrs.get("Lineage")
+                # Do we have NGS seq annotations for it?  If so, take the
+                # lineage from there if not otherwise specified
+                if category == "ngs":
+                    ngsid = "wk" + attrs.get("Timepoint", "") + "-" + seqid
+                    if ngsid in ngs_annots:
+                        ngs_attrs = ngs_annots[ngsid]
+                        # sanity check with sequence content if present
+                        if ngs_attrs.get("sequence") and \
+                                annots.get("sequence") and \
+                                ngs_attrs["sequence"] not in  annots["sequence"]:
+                            print(annots["sequence"])
+                            print(ngs_attrs["sequence"])
+                            raise ValueError(f"Sequence mismatch for {row['sequence_id']}")
+                        if not lineage:
+                            lineage = ngs_attrs.get("Lineage")
                 row_out = {
                     "sequence_id": row["sequence_id"],
                     "sequence": annots["sequence"],
@@ -90,6 +97,8 @@ def _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all):
                     "junction_aa_length": len(annots["junction_aa"]),
                     "timepoint": timepoint,
                     "category": category,
+                    "item": item,
+                    "sequence_id_original": seqid,
                     "partis_clone_id": row["clone_id"] or "",
                     "lineage": lineage or ""}
                 out.append(row_out)
@@ -123,13 +132,21 @@ def _assign_lineage_groups(out):
             # ignoring partis' grouping
             row["lineage_group"] = row["lineage"]
 
-def partis_seq_lineage_info(airr_in, csv_out, isol_annots=None,
+def partis_seq_lineage_info(
+        airr_in, csv_out,
+        metadata_isolates=None, metadata_specimens=None, metadata_seqsets=None,
         csv_ngs_annots=None, airr_in_igblast=None, *, keep_all=False):
     """Report sequences with partis clones overlapping with our isolates"""
-    isolates = _load_isol_annots(isol_annots) # isolate names -> attrs
-    ngs_annots = _load_ngs_annots(csv_ngs_annots) # seq ID -> custom attrs incl. Lineage
+    # name -> attrs
+    metadata = {
+        "isolates": _load_metadata(metadata_isolates),
+        "specimens": _load_metadata(metadata_specimens),
+        "seqsets": _load_metadata(metadata_seqsets),
+        }
+    # seq ID -> custom attrs incl. Lineage
+    ngs_annots = _load_metadata(csv_ngs_annots, "sequence_id")
     igblast = _load_igblast_airr(airr_in_igblast) # seq ID -> IgBLAST attrs
-    out = _prep_seq_lineage_info(airr_in, isolates, ngs_annots, igblast, keep_all)
+    out = _prep_seq_lineage_info(airr_in, metadata, ngs_annots, igblast, keep_all)
     _assign_lineage_groups(out)
     out.sort(key = lambda row: (
         row["lineage_group"] == "",
@@ -149,6 +166,8 @@ def partis_seq_lineage_info(airr_in, csv_out, isol_annots=None,
         "junction_aa_length",
         "timepoint",
         "category",
+        "item",
+        "sequence_id_original",
         "partis_clone_id",
         "lineage"]
     with open(csv_out, "w", encoding="ASCII") as f_out:
@@ -162,14 +181,17 @@ def main():
     arg = parser.add_argument
     arg("input", help="Partis AIRR TSV with clone_id")
     arg("output", help="CSV to write with summary sequence and lineage information")
-    arg("-i", "--isolates", help="CSV with Isolate info")
+    arg("--metadata-isolates", help="CSV with Isolate metadata")
+    arg("--metadata-specimens", help="CSV with Specimen metadata")
+    arg("--metadata-seqsets", help="CSV with SeqSet metadata")
     arg("-n", "--ngs-annotations", help="optional CSV with Lineage info for known NGS sequences")
     arg("-A", "--igblast-airr", help="optional AIRR tsv.gz from IgBLAST to prefer for annotations")
     arg("-a", "--all", action="store_true",
         help="keep all sequences or only those belonging to clones that also include isolates?")
     args = parser.parse_args()
     partis_seq_lineage_info(
-        args.input, args.output, args.isolates,
+        args.input, args.output,
+        args.metadata_isolates, args.metadata_specimens, args.metadata_seqsets,
         args.ngs_annotations, args.igblast_airr, keep_all=args.all)
 
 if __name__ == "__main__":

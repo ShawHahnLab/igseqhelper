@@ -10,43 +10,35 @@ Some jargon used in the rules and scripts here:
    my own lineage assignments and/or partis' automatic groupings
 """
 
-def partis_specimens(subject, chain_type):
+def input_for_partis_ngs_fasta(w):
     """List specimen names that should be used for partis for one subject+chain type"""
     specs = []
     for spec_attrs in SPECIMENS.values():
-        if spec_attrs["Subject"] == subject and "IgG+" in spec_attrs["CellType"]:
+        if spec_attrs["Subject"] == w.subject and "IgG+" in spec_attrs["CellType"]:
             specs.append(spec_attrs["Specimen"])
     for samp_attrs in SAMPLES.values():
         spec_attrs = samp_attrs.get("SpecimenAttrs", {})
         if samp_attrs["Type"] == chain_type and \
-                spec_attrs.get("Subject") == subject and \
+                spec_attrs.get("Subject") == w.subject and \
                 "IgG+" in spec_attrs.get("CellType"):
             specs.append(spec_attrs["Specimen"])
-    return specs
-
-def input_for_partis_ngs_fasta(w):
-    """input paths for partis_ngs_fasta, as dict with timepoint label as key"""
-    spec_names_here = partis_specimens(w.subject, w.chain_type)
-    timepoints, labels, specs_here = format_timepoints([SPECIMENS[s] for s in spec_names_here])
     targets = expand(
         "analysis/sonar/{subject}.{chain_type}/{specimen}/output/sequences/nucleotide/{specimen}_goodVJ_unique.fa",
         subject = w.subject,
         chain_type = w.chain_type,
-        specimen = [attrs["Specimen"] for attrs in specs_here])
-    targets = {label: target for label, target in zip(labels, targets)}
-    return targets
+        specimen = specs)
+    return dict(zip(specs, targets))
 
 rule partis_ngs_fasta:
     """Cross-timepoint NGS seqs for partis"""
     output: "analysis/partis/{subject}.{chain_type}/ngs.fasta"
     input: unpack(input_for_partis_ngs_fasta)
     run:
-        seq_col = "LightSeq" if wildcards.chain_type in ["kappa", "lambda"] else "HeavySeq"
         with open(output[0], "w") as f_out:
-            for label, fasta in input.items():
+            for spec, fasta in input.items():
                 for rec in SeqIO.parse(fasta, "fasta"):
                     rec.description = ""
-                    rec.id = label + "-" + rec.id
+                    rec.id = "specimen-" + spec+ "-" + rec.id
                     SeqIO.write(rec, f_out, "fasta-2line")
 
 rule partis_isolates_fasta:
@@ -58,23 +50,51 @@ rule partis_isolates_fasta:
             for isolate_attrs in ANTIBODY_ISOLATES.values():
                 if isolate_attrs[seq_col]:
                     lineage_attrs = isolate_attrs.get("LineageAttrs", {})
-                    isolate_prefix = re.sub("-.*", "", isolate_attrs["Isolate"])
                     subject = lineage_attrs.get("Subject")
-                    # include an isolate for this subject if the metadata
-                    # specifically links the two, or failing that, if the
-                    # isolate name begins with the subject name
-                    if (subject and subject == wildcards.subject) or \
-                            (not subject and isolate_prefix == wildcards.subject):
-                        seqid = isolate_attrs["Isolate"]
+                    if subject and subject == wildcards.subject:
+                        seqid = "isolate-" + isolate_attrs["Isolate"]
                         seq = isolate_attrs[seq_col]
                         f_out.write(f">{seqid}\n{seq}\n")
 
+rule partis_seqsets_fasta:
+    """All seqset seqs for this subject and locus for partis"""
+    output: "analysis/partis/{subject}.{chain_type}/seqsets.fasta"
+    run:
+        locus = {"kappa": "IGK", "lambda": "IGL"}.get(wildcards.chain_type, "IGH")
+        # (noting isolate seqs so we can exclude overlaps where I've defined an
+        # isolate *from* the seqset input)
+        chain_col = "HeavySeq" if locus == "IGH" else "LightSeq"
+        isols_by_seq = defaultdict(set)
+        for isol, attrs in ANTIBODY_ISOLATES.items():
+            linattrs = attrs["LineageAttrs"]
+            if linattrs["Subject"] == wildcards.subject:
+                isols_by_seq[attrs[chain_col]].add(isol)
+        recs = []
+        for seqset, attrs in SEQSETS.items():
+            path = f"analysis/seqsets/{seqset}.{locus}.fasta.gz"
+            tpoint = attrs["Timepoint"]
+            if attrs["Subject"] == wildcards.subject:
+                with gzip.open(path, "rt", encoding="ASCII") as f_in:
+                    for rec in SeqIO.parse(f_in, "fasta"):
+                        seq = str(rec.seq)
+                        # skip cases where the sequence matches an isolate
+                        # *and* the timepoint-prefixed ID is contained within
+                        # one of those isolate IDs
+                        if f"wk{tpoint}-{rec.id}" in "/".join(isols_by_seq.get(seq, "")):
+                            continue
+                        seqid = f"seqset-{seqset}-{rec.id}"
+                        recs.append((seqid, seq))
+        with open(output[0], "w") as f_out:
+            for seqid, seq in recs:
+                f_out.write(f">{seqid}\n{seq}\n")
+
 rule partis_combo_fasta:
-    """Combined isolate+NGS seqs for partis"""
+    """Combined isolate+seqset+NGS seqs for partis"""
     output: "analysis/partis/{subject}.{chain_type}/combined.fasta"
     input:
         isolates="analysis/partis/{subject}.{chain_type}/isolates.fasta",
-        ngs="analysis/partis/{subject}.{chain_type}/ngs.fasta"
+        ngs="analysis/partis/{subject}.{chain_type}/ngs.fasta",
+        seqsets="analysis/partis/{subject}.{chain_type}/seqsets.fasta"
     shell: "cat {input} > {output}"
 
 rule partis_excludes:
@@ -254,7 +274,9 @@ def input_for_partis_seq_lineage_info(w):
     targets = {
         "airr": path/"partitions.airr.tsv",
         "airr_igblast": igblast_path/"combined.fasta.tsv.gz",
-        "isolates": ancient("metadata/isolates.csv")}
+        "specimens": "metadata/specimens.csv",
+        "seqsets": "metadata/seqsets.csv",
+        "isolates": "metadata/isolates.csv"}
     # If there's a CSV provided with NGS sequence lineage info, use that also,
     # so we can assign custom lineage IDs to NGS seqs
     path_annotations = path/"ngs_lineages.csv"
@@ -267,7 +289,7 @@ rule partis_seq_lineage_info:
     output: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
     input: unpack(input_for_partis_seq_lineage_info)
     run:
-        cmd = "partis_seq_lineage_info.py {input.airr} {output} -i {input.isolates} -A {input.airr_igblast} --all"
+        cmd = "partis_seq_lineage_info.py {input.airr} {output} --metadata-isolates {input.isolates} --metadata-specimens {input.specimens} --metadata-seqsets {input.seqsets} -A {input.airr_igblast} --all"
         if "ngs_annots" in dict(input):
             cmd += " -n {input.ngs_annots}"
         shell(cmd)
