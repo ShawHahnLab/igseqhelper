@@ -295,6 +295,7 @@ rule partis_seq_lineage_info:
     """Report sequence and lineage info from partis, merging metadata for our seqs+isolates"""
     output: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
     input: unpack(input_for_partis_seq_lineage_info)
+    priority: 10
     run:
         cmd = "partis_seq_lineage_info.py {input.airr} {output} --metadata-isolates {input.isolates} --metadata-specimens {input.specimens} --metadata-seqsets {input.seqsets} -A {input.airr_igblast} --all"
         if "ngs_annots" in dict(input):
@@ -305,10 +306,12 @@ rule partis_lineages:
     """Summarize partis info per-lineage-group, one row per group+timepoint+category"""
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
     input: "analysis/partis/{subject}.{chain_type}/seq_lineages.csv"
+    priority: 10
     shell: "partis_lineages.py {input} {output}"
 
 rule partis_lineages_summary:
     """Summarize partis info per-lineage-group further, one row per lineage group"""
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups_summary.csv"
     input: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
+    priority: 10
     shell: "partis_lineages_summary.py {input} {output}"
