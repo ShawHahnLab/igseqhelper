@@ -99,27 +99,34 @@ rule partis_combo_fasta:
 
 rule partis_excludes:
     """Gather sequences to exclude from partis parameter caching"""
-    output: "analysis/partis/{subject}.{chain_type}/excludes.fasta"
+    output:
+        includes="analysis/partis/{subject}.{chain_type}/combined.includes.fasta",
+        excludes="analysis/partis/{subject}.{chain_type}/combined.excludes.fasta"
     input: "analysis/igblast/custom-{subject}.IGH/partis/{subject}.{chain_type}/combined.fasta.tsv.gz"
     run:
-        excludes = []
-        with gzip.open(input[0], "rt") as f_in:
+        with \
+                open(output.excludes, "w") as f_out_excl, \
+                open(output.includes, "w") as f_out_incl, \
+                gzip.open(input[0], "rt") as f_in:
             for row in DictReader(f_in, delimiter="\t"):
-                vseq = row["v_sequence_alignment"].replace("-", "")
-                if len(vseq) < 250 and (row["complete_vdj"] == "T" or not row["junction"]):
-                    excludes.append(row)
-        with open(output[0], "w") as f_out:
-            for row in excludes:
                 seqid = row["sequence_id"]
                 seq = row["sequence"]
-                f_out.write(f">{seqid}\n{seq}\n")
+                vseq = row["v_sequence_alignment"].replace("-", "")
+                hndl = f_out_incl
+                # I've had trouble with sequences with a big deletion in V
+                # and/or a seemingly-absent junction causing partis to crash.
+                # Those aren't going to be of interest for us anyway so I'll
+                # just exclude them.
+                if len(vseq) < 250 and (row["complete_vdj"] == "T" or not row["junction"]):
+                    hndl = f_out_excl
+                hndl.write(f">{seqid}\n{seq}\n")
 
 rule partis_cache_params_fasta:
     """Make a version of the repertoire NGS FASTA for use with partis cache-parameters"""
     output: "analysis/partis/{subject}.{chain_type}/ngs.filt.fasta"
     input:
         fasta_ngs="analysis/partis/{subject}.{chain_type}/ngs.fasta",
-        fasta_excludes="analysis/partis/{subject}.{chain_type}/excludes.fasta"
+        fasta_excludes="analysis/partis/{subject}.{chain_type}/combined.excludes.fasta"
     run:
         excludes = {rec.id: str(rec.seq) for rec in SeqIO.parse(input.fasta_excludes, "fasta")}
         with open(output[0], "w") as f_out:
