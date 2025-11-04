@@ -1,9 +1,22 @@
 #!/usr/bin/env python
 
 """
-Germline divergence calculation and plots"""
+Germline divergence calculation and plots.
 
-# TODO allow toggle between boxplot and jitter versions
+This tool can flexibly handle sequence data input or already-prepared tabular
+data, and can output tabular germline divergence data or finished plot PDFs.
+
+Columns for tabular data in input/output:
+
+    sequence_id
+    sequence
+    timepoint    x axis in plots; can parse from seq IDs if not given directly
+    group        in plots, sequences with be color-coded by these labels
+    locus        in plots, panels will be separated by locus
+    v_call       by IgBLAST if not given
+    partial      by IgBLAST if not given: "T" for sequences starting partway into V
+    divergence   by IgBLAST if not given: calculated via IgBLAST if not given directly
+"""
 
 import re
 import sys
@@ -70,41 +83,35 @@ def __setup_arg_parser():
         description=rewrap(__doc__),
         formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    parser.add_argument("-r", "--reference", nargs="+",
+    arg = parser.add_argument
+    arg("-r", "--reference", nargs="+",
         help="one or more FASTA/directory/builtin names pointing to V/D/J FASTA files")
-    parser.add_argument("-S", "--species",
+    arg("-S", "--species",
         help="species to use (human or rhesus).  Default: infer from database if possible")
-    parser.add_argument("-Q", "--query", nargs="+", action=ParseInputs, help="query files")
-    parser.add_argument("-o", "--output", help="output file")
-    parser.add_argument(
-        "-G", "--group", nargs="+", action=AggrAction,
+    arg("-Q", "--query", nargs="+", action=ParseInputs, help="query files")
+    arg("-o", "--output", help="output file")
+    arg("-G", "--group", nargs="+", action=AggrAction,
         default=defaultdict(lambda: "Lineage Members"),
-        help="names for groups of sequences in output")
-    parser.add_argument(
-        "-P", "--pattern", nargs="+", action=AggrAction,
+        help="names for groups of sequences in output (e.g. \"bulk\" or \"isolate\")")
+    arg("-P", "--pattern", nargs="+", action=AggrAction,
         default=defaultdict(lambda: "^wk([0-9]+)-"),
         help="regular expression for parsing timepoints from sequence IDs")
-    parser.add_argument(
-        "--col-timepoint", nargs="+", action=AggrAction,
+    arg("--col-timepoint", nargs="+", action=AggrAction,
         default=defaultdict(lambda: "timepoint"),
         help="column with numeric timepoints (for tabular inputs)")
-    parser.add_argument(
-        "--col-group", nargs="+", action=AggrAction,
+    arg("--col-group", nargs="+", action=AggrAction,
         default=defaultdict(lambda: "group"),
         help="column with group designators (for tabular inputs)")
-    parser.add_argument(
-        "--col-seq-id", nargs="+", action=AggrAction, default=nonedict(),
+    arg("--col-seq-id", nargs="+", action=AggrAction, default=nonedict(),
         help="column with sequence IDs (for tabular inputs)")
-    parser.add_argument(
-        "--col-seq", nargs="+", action=AggrAction, default=nonedict(),
+    arg("--col-seq", nargs="+", action=AggrAction, default=nonedict(),
         help="column with sequences (for tabular inputs)")
-    parser.add_argument(
-        "-T", "--timepoint", nargs="+", action=AggrAction, default=nonedict(),
+    arg("-T", "--timepoint", nargs="+", action=AggrAction, default=nonedict(),
         help="default timepoint to apply to subsequent file arguments")
-    parser.add_argument(
-        "--plot-width", type=int, default=DEFAULTS["plot_width"], help="Width of plot if output is PDF")
-    parser.add_argument(
-        "--plot-height", type=int, default=DEFAULTS["plot_height"], help="Height of plot if output is PDF")
+    arg("--plot-width", type=int, default=DEFAULTS["plot_width"],
+        help="Width of plot if output is PDF")
+    arg("--plot-height", type=int, default=DEFAULTS["plot_height"],
+        help="Height of plot if output is PDF")
     return parser
 
 def germ_div(
@@ -112,14 +119,13 @@ def germ_div(
         timepoint_cols=None, group_cols=None, timepoint_defs=None, timepoint_pats=None, groups=None,
         seq_id_cols=None, seq_cols=None,
         plot_width=DEFAULTS["plot_width"], plot_height=DEFAULTS["plot_height"]):
+    """Calculate and/or plot germline divergence for antibody sequences."""
     def default_dict_txt(obj):
+        "Just a formatting helper for logging function args here"
         out = ", ".join([f"'{key}': '{val}'" for key, val in obj.items()])
         try:
             val = obj[None]
-            if out:
-                out = f"{out}, default: '{val}'"
-            else:
-                out = f"default: '{val}'"
+            out = f"{out}, default: '{val}'" if out else f"default: '{val}'"
         except KeyError:
             pass
         out = "{" + out + "}"
@@ -141,12 +147,17 @@ def germ_div(
     germ_div_output(output, path_out, width=plot_width, height=plot_height)
 
 def maybe_num(obj, cls=float):
+    """Cast obj as float if possible, return as-is if not"""
     try:
         return cls(obj)
     except (ValueError, TypeError):
         return obj
 
-def calc_germ_div(ref_paths, paths_in, species=None, timepoint_cols=None, group_cols=None, timepoint_defs=None, timepoint_pats=None, groups=None, seq_id_cols=None, seq_cols=None, partial_threshold=15):
+def calc_germ_div(
+        ref_paths, paths_in, species=None, timepoint_cols=None, group_cols=None,
+        timepoint_defs=None, timepoint_pats=None, groups=None,
+        seq_id_cols=None, seq_cols=None, partial_threshold=15):
+    """Infer (with IgBLAST if needed) germline divergence for input as list of dicts"""
     if species or ref_paths:
         if species and not ref_paths:
             # If only species is given, default to using all available reference
@@ -210,21 +221,14 @@ def calc_germ_div(ref_paths, paths_in, species=None, timepoint_cols=None, group_
                             tp_from_pat = match.group(1)
                         except IndexError:
                             tp_from_pat = match.group(0)
-                if tp_from_col is not None:
-                    tp = tp_from_col
-                elif tp_from_pat is not None:
-                    tp = tp_from_pat
-                else:
-                    tp = tp_def
-                if tp is not None:
-                    tp = float(tp)
+                tpoint = maybe_num(tp_from_col or tp_from_pat or tp_def)
                 # Infer group
                 group_from_col = rec.get(group_col)
                 if group_from_col is not None:
                     group = group_from_col
                 row = {
                     "sequence_id": rec[reader.colmap["sequence_id"]],
-                    "timepoint": tp,
+                    "timepoint": tpoint,
                     "group": group,
                     "locus": rec.get("locus", ""),
                     "v_call": rec.get("v_call", ""),
@@ -240,7 +244,9 @@ def calc_germ_div(ref_paths, paths_in, species=None, timepoint_cols=None, group_
             [str(attrs["path"]) for attrs in attrs_list]) as (db_dir, _):
             for path in paths_in.values():
                 if do_igblast.get(path):
-                    with igblast.run_igblast(db_dir, organism, path, threads=1, fmt_in=None, colmap=colmap, extra_args=["-outfmt", "19"]) as proc:
+                    with igblast.run_igblast(
+                            db_dir, organism, path, threads=1,
+                            fmt_in=None, colmap=colmap, extra_args=["-outfmt", "19"]) as proc:
                         reader = DictReader(proc.stdout, delimiter="\t")
                         for rec in reader:
                             partial = ""
@@ -255,7 +261,12 @@ def calc_germ_div(ref_paths, paths_in, species=None, timepoint_cols=None, group_
     output = list(output.values())
     output = sorted(
         output,
-        key=lambda x: [x["locus"], x["timepoint"] or 0, x["group"] or "", x["divergence"], x["sequence_id"]])
+        key=lambda x: (
+            x["locus"],
+            x["timepoint"] or 0,
+            x["group"] or "",
+            x["divergence"],
+            x["sequence_id"]))
     output = _smooth_v_calls(output)
     return output
 
@@ -276,7 +287,10 @@ def _smooth_v_calls(rows):
         rows_out.append(row)
     return rows_out
 
-def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None, note_partial_seqs=False, jitter_seed=1):
+def germ_div_plot(
+        rows, jitter_width=None, jitter_height=None, group_colors=None,
+        note_partial_seqs=False, jitter_seed=1):
+    """Render a plotnine plot object for prepared germline divergence data"""
     tp_breaks = {round(row["timepoint"]) for row in rows}
     tp_breaks.add(0)
     tp_breaks = sorted(list(tp_breaks))
@@ -296,7 +310,10 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None
     plt = p9.ggplot(
         DataFrame(rows),
         p9.aes(**plot_attrs)) + \
-        p9.geom_jitter(width=jitter_width, height=jitter_height, random_state=RandomState(jitter_seed)) + \
+        p9.geom_jitter(
+            width=jitter_width,
+            height=jitter_height,
+            random_state=RandomState(jitter_seed)) + \
         p9.guides(
             color=p9.guide_legend(title="Category"),
             shape=False) + \
@@ -325,18 +342,13 @@ def germ_div_plot(rows, jitter_width=None, jitter_height=None, group_colors=None
     return plt
 
 def germ_div_output(rows, path_out, **kwargs):
+    """Write germline divergence info to file, either as CSV or as a plot PDF"""
     ext = Path(path_out).suffix.lower()
     if ext == ".csv" or path_out == "-":
         for row in rows:
-            if row["divergence"] is None:
-                row["divergence"] = ""
-            else:
-                row["divergence"] = f"{row['divergence']:.6f}"
+            row["divergence"] = "" if row["divergence"] is None else f"{row['divergence']:.6f}"
         try:
-            if path_out == "-":
-                handle = sys.stdout
-            else:
-                handle = open(path_out, "wt")
+            handle = sys.stdout if path_out == "-" else open(path_out, "wt", encoding="UTF8")
             writer = DictWriter(handle, fieldnames = rows[0].keys(), lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
@@ -347,11 +359,9 @@ def germ_div_output(rows, path_out, **kwargs):
         plt.save(path_out, **kwargs)
 
 def main(arglist=None):
+    """CLI for germ_div"""
     parser = __setup_arg_parser()
-    if arglist is None:
-        args = parser.parse_args()
-    else:
-        args = parser.parse_args(arglist)
+    args = parser.parse_args() if arglist is None else parser.parse_args(arglist)
     if not vars(args):
         parser.print_help()
         sys.exit(0)
