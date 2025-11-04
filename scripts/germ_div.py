@@ -84,34 +84,40 @@ def __setup_arg_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter)
 
     arg = parser.add_argument
-    arg("-r", "--reference", nargs="+",
-        help="one or more FASTA/directory/builtin names pointing to V/D/J FASTA files")
-    arg("-S", "--species",
-        help="species to use (human or rhesus).  Default: infer from database if possible")
     arg("-Q", "--query", nargs="+", action=ParseInputs, help="query files")
     arg("-o", "--output", help="output file")
-    arg("-G", "--group", nargs="+", action=AggrAction,
-        default=defaultdict(lambda: "Lineage Members"),
-        help="names for groups of sequences in output (e.g. \"bulk\" or \"isolate\")")
-    arg("-P", "--pattern", nargs="+", action=AggrAction,
-        default=defaultdict(lambda: "^wk([0-9]+)-"),
-        help="regular expression for parsing timepoints from sequence IDs")
-    arg("--col-timepoint", nargs="+", action=AggrAction,
-        default=defaultdict(lambda: "timepoint"),
-        help="column with numeric timepoints (for tabular inputs)")
-    arg("--col-group", nargs="+", action=AggrAction,
-        default=defaultdict(lambda: "group"),
-        help="column with group designators (for tabular inputs)")
-    arg("--col-seq-id", nargs="+", action=AggrAction, default=nonedict(),
-        help="column with sequence IDs (for tabular inputs)")
-    arg("--col-seq", nargs="+", action=AggrAction, default=nonedict(),
-        help="column with sequences (for tabular inputs)")
-    arg("-T", "--timepoint", nargs="+", action=AggrAction, default=nonedict(),
-        help="default timepoint to apply to subsequent file arguments")
     arg("--plot-width", type=int, default=DEFAULTS["plot_width"],
         help="Width of plot if output is PDF")
     arg("--plot-height", type=int, default=DEFAULTS["plot_height"],
         help="Height of plot if output is PDF")
+    igblastgrp = parser.add_argument_group(
+        title="IgBLAST settings")
+    igblastgrp.add_argument("-r", "--reference", nargs="+",
+        help="one or more FASTA/directory/builtin names pointing to V/D/J FASTA files")
+    igblastgrp.add_argument("-S", "--species",
+        help="species to use (human or rhesus).  Default: infer from database if possible")
+    querygrp = parser.add_argument_group(
+        title="query attribute arguments",
+        description="These arguments control how metadata is inferred for input data. "
+        "Values can be prefixed with a key in order to pair them with a matching query "
+        "argument, for example -Q ngs=ngs.fasta -T ngs=12 will assign timepoint 12 to "
+        "all sequences in ngs.fasta.")
+    def queryarg(*args, **kwargs):
+        querygrp.add_argument(*args, **kwargs, nargs="+", action=AggrAction)
+    queryarg("-G", "--group", default=defaultdict(lambda: "Lineage Members"),
+        help="names for groups of sequences in output (e.g. \"bulk\" or \"isolate\")")
+    queryarg("-P", "--pattern", default=defaultdict(lambda: "^wk([0-9]+)-"),
+        help="regular expression for parsing timepoints from sequence IDs")
+    queryarg("--col-timepoint", default=defaultdict(lambda: "timepoint"),
+        help="column with numeric timepoints (for tabular inputs)")
+    queryarg("--col-group", default=defaultdict(lambda: "group"),
+        help="column with group designators (for tabular inputs)")
+    queryarg("--col-seq-id", default=nonedict(),
+        help="column with sequence IDs (for tabular inputs)")
+    queryarg("--col-seq", default=nonedict(),
+        help="column with sequences (for tabular inputs)")
+    queryarg("-T", "--timepoint", default=nonedict(),
+        help="default timepoint to apply to subsequent file arguments")
     return parser
 
 def germ_div(
