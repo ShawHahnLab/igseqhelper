@@ -52,8 +52,23 @@ def _prep_seq_lineage_info(airr_in, metadata, ngs_annots, igblast, keep_all):
                 else:
                     item, seqid = seqid.split("-", 1)
                     attrs = metadata.get(f"{category}s", {}).get(item, {})
+                if attrs.get("Skip") == "TRUE":
+                    # skip entries if that's noted in their metadata (isolates
+                    # we don't want to actually analyze, basically); generally
+                    # they shouldn't get this far anyway, but if so, we'll
+                    # exclude them now
+                    continue
+                # A bit of post-processing on the category labels
+                # (using the shorthand "ngs" for per-specimen material, and
+                # including a more specific suffix for cases where a
+                # particular preparation method was noted, like 10x)
                 if category == "specimen":
                     category = "ngs"
+                if attrs.get("Method"):
+                    # (oh except don't both with a suffix for Sanger isolates;
+                    # that can just be left implicit, since most are Sanger)
+                    if not (category == "isolate" and attrs["Method"] == "Sanger"):
+                        category += "_" + attrs["Method"]
                 timepoint_seqid = re.match("wk([0-9]+)-.*", row["sequence_id"])
                 if timepoint_seqid:
                     timepoint_seqid = timepoint_seqid.group(1)
