@@ -84,7 +84,7 @@ def __setup_arg_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter)
 
     arg = parser.add_argument
-    arg("-Q", "--query", nargs="+", action=ParseInputs, help="query files")
+    arg("-Q", "--query", required=True, nargs="+", action=ParseInputs, help="query files")
     arg("-o", "--output", help="output file")
     arg("--plot-width", type=int, default=DEFAULTS["plot_width"],
         help="Width of plot if output is PDF")
@@ -123,7 +123,7 @@ def __setup_arg_parser():
     return parser
 
 def germ_div(
-        ref_paths, paths_in, path_out, species=None, threads=1,
+        paths_in, path_out, igblast_args,
         timepoint_cols=None, group_cols=None, timepoint_defs=None, timepoint_pats=None, groups=None,
         seq_id_cols=None, seq_cols=None,
         plot_width=DEFAULTS["plot_width"], plot_height=DEFAULTS["plot_height"]):
@@ -138,10 +138,11 @@ def germ_div(
             pass
         out = "{" + out + "}"
         return out
-    LOGGER.info("given ref path(s): %s", ref_paths)
+    LOGGER.info("given ref path(s): %s", igblast_args.get("ref"))
     LOGGER.info("given query path: %s", paths_in)
     LOGGER.info("given output: %s", path_out)
-    LOGGER.info("given species: %s", species)
+    LOGGER.info("given species: %s", igblast_args.get("species"))
+    LOGGER.info("given threads: %s", igblast_args.get("threads"))
     LOGGER.info("given timepoint columns: %s", default_dict_txt(timepoint_cols))
     LOGGER.info("given group columns: %s", default_dict_txt(group_cols))
     LOGGER.info("given timepoint defaults: %s", default_dict_txt(timepoint_defs))
@@ -150,7 +151,7 @@ def germ_div(
     LOGGER.info("given seq ID columns: %s", default_dict_txt(seq_id_cols))
     LOGGER.info("given seq columns: %s", default_dict_txt(seq_cols))
     output = calc_germ_div(
-        ref_paths, paths_in, species, threads,
+        paths_in, igblast_args,
         timepoint_cols, group_cols, timepoint_defs, timepoint_pats, groups, seq_id_cols, seq_cols)
     germ_div_output(output, path_out, width=plot_width, height=plot_height)
 
@@ -162,10 +163,12 @@ def maybe_num(obj, cls=float):
         return obj
 
 def calc_germ_div(
-        ref_paths, paths_in, species=None, threads=1, timepoint_cols=None, group_cols=None,
+        paths_in, igblast_args, timepoint_cols=None, group_cols=None,
         timepoint_defs=None, timepoint_pats=None, groups=None,
         seq_id_cols=None, seq_cols=None, partial_threshold=15):
     """Infer (with IgBLAST if needed) germline divergence for input as list of dicts"""
+    ref_paths = igblast_args.get("ref")
+    species = igblast_args.get("species")
     if species or ref_paths:
         if species and not ref_paths:
             # If only species is given, default to using all available reference
@@ -253,7 +256,7 @@ def calc_germ_div(
             for path in paths_in.values():
                 if do_igblast.get(path):
                     with igblast.run_igblast(
-                            db_dir, organism, path, threads=threads,
+                            db_dir, organism, path, threads=igblast_args.get("threads", 1),
                             fmt_in=None, colmap=colmap, extra_args=["-outfmt", "19"]) as proc:
                         reader = DictReader(proc.stdout, delimiter="\t")
                         for rec in reader:
@@ -299,6 +302,16 @@ def germ_div_plot(
         rows, jitter_width=None, jitter_height=None, group_colors=None,
         note_partial_seqs=False, jitter_seed=1):
     """Render a plotnine plot object for prepared germline divergence data"""
+    # sort by group size to ensure members of more rare groups are shown
+    # layered on top of members of more abundant groups
+    # (ggplot handles the ordering of points that way, and evidently plotnine
+    # does as well https://stackoverflow.com/a/16880383)
+    cts = defaultdict(int)
+    for row in rows:
+        cts[row["group"]] += 1
+    for row in rows:
+        row["_groupcount"] = cts[row["group"]]
+    rows.sort(key=lambda row: -row["_groupcount"])
     tp_breaks = {round(row["timepoint"]) for row in rows}
     tp_breaks.add(0)
     tp_breaks = sorted(list(tp_breaks))
@@ -370,11 +383,12 @@ def main(arglist=None):
     """CLI for germ_div"""
     parser = __setup_arg_parser()
     args = parser.parse_args() if arglist is None else parser.parse_args(arglist)
-    if not vars(args):
-        parser.print_help()
-        sys.exit(0)
+    igblast_args = {
+        "ref": args.reference,
+        "species": args.species,
+        "threads": args.threads}
     germ_div(
-        args.reference, args.query, args.output, args.species, args.threads,
+        args.query, args.output, igblast_args,
         args.col_timepoint, args.col_group, args.timepoint, args.pattern, args.group,
         args.col_seq_id, args.col_seq, args.plot_width, args.plot_height)
 
