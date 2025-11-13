@@ -215,7 +215,7 @@ rule partis_partition:
     output: "analysis/partis/{subject}.{chain_type}/partitions.yaml"
     input:
         params_dir="analysis/partis/{subject}.{chain_type}/params",
-        fasta="analysis/partis/{subject}.{chain_type}/combined.fasta"
+        fasta="analysis/partis/{subject}.{chain_type}/combined.includes.fasta"
     log:
         main="analysis/partis/{subject}.{chain_type}/partition.log.txt",
         conda="analysis/partis/{subject}.{chain_type}/partition.conda_build.txt"
