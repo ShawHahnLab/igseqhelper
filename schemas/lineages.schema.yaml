@@ -15,6 +15,12 @@ fields:
   - name: Subject
     title: Subject
     type: string
+  - name: Color
+    title: Lineage Color Code
+    description: Hexadecimal "#RRGGBB" color code for lineage if we have one
+    type: string
+    constraints:
+      pattern: "#[A-Fa-f0-9]{6}"
   - name: LightLocus
     title: Light Chain Locus
     description: Either "IGK" or "IGL" for the light chain used for one lineage

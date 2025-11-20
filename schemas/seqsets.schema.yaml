@@ -7,6 +7,7 @@ foreignKeys:
     reference:
       resource: subjects
       fields: Subject
+fields:
   - name: SeqSet
     title: Sequence Set
     description: A batch of externally-provided sequences for a given subject and timepoint (e.g. 10x)
