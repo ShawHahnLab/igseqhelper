@@ -69,6 +69,8 @@ rule partis_seqsets_fasta:
             linattrs = attrs["LineageAttrs"]
             if linattrs["Subject"] == wildcards.subject:
                 isols_by_seq[attrs[chain_col]].add(isol)
+                if attrs["AltName"]:
+                    isols_by_seq[attrs[chain_col]].add(attrs["AltName"])
         recs = []
         for seqset, attrs in SEQSETS.items():
             path = f"analysis/seqsets/{seqset}.{locus}.fasta.gz"
