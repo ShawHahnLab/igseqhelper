@@ -8,6 +8,23 @@ import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
 
+def _condense_names(rows):
+    names = set()
+    for row in rows:
+        if row["category"] == "isolate":
+            if row["names"] == "(many)":
+                names = "(many)"
+                break
+            names |= set(row["names"].split("/"))
+    else:
+        names = sorted(names)
+        # TODO would be nice to handle things like
+        # CC01-40/CC01-41/.../CC01-45/CC01-46
+        # as
+        # "CC01-40 through CC01-46"
+        names = "/".join(names) if len(names) < 10 else "(many)"
+    return names
+
 def _prep_row_out(group, rows):
     # Minimum and maximum junction AA length across all sequences
     # across all categories and timepoints
@@ -24,8 +41,11 @@ def _prep_row_out(group, rows):
         float(row["v_identity_max"]) if row["v_identity_max"] else 0,
         row["junction_aa_v_max"]) for row in rows]
     juncts_max.sort(reverse=True)
+    # note isolate names if there aren't too many
+    names = _condense_names(rows)
     row_out = {
         "lineage_group": group,
+        "names": names,
         "v_family": _format_v_family(rows),
         "v_identity_min": juncts_min[0][0],
         "v_identity_max": juncts_max[0][0],
@@ -84,7 +104,7 @@ def _prep_cols(info):
     # define categories, timepoints, output columns
     categories = sorted({row["category"] for row in info})
     timepoints = sorted({int(row["timepoint"]) for row in info})
-    cols = ["lineage_group"]
+    cols = ["lineage_group", "names"]
     for category in categories:
         for timepoint in timepoints:
             # member total at this timepoint for this category

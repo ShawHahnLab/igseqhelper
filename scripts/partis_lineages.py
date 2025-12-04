@@ -11,6 +11,7 @@ from csv import DictReader, DictWriter
 
 COLS = [
     "lineage_group",
+    "names",
     "v_family",
     "v_identity_min",
     "v_identity_max",
@@ -63,8 +64,13 @@ def partis_lineages(csv_in, csv_out):
                     row["junction_aa"]) for row in rows]
                 juncts.sort()
             # set up output per group+timepoint+category
+            # note original IDs if there aren't too many of them
+            names = ""
+            names = {row["sequence_id_original"] for row in rows}
+            names = "/".join(sorted(names)) if len(names) < 10 else "(many)"
             out.append({
                 "lineage_group": lineage_group,
+                "names": names,
                 "v_family": v_family,
                 "v_identity_min": f"{juncts[0][0]:.2f}" if juncts else "",
                 "v_identity_max": f"{juncts[-1][0]:.2f}" if juncts else "",
