@@ -9,9 +9,7 @@ import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
 
-COLS = [
-    "lineage_group",
-    "names",
+COLS_HEAVY =  [
     "v_family",
     "j_family",
     "v_identity_min",
@@ -20,7 +18,11 @@ COLS = [
     "junction_aa_v_min",
     "junction_aa_v_max",
     "junction_aa_length_min",
-    "junction_aa_length_max",
+    "junction_aa_length_max"]
+COLS_LIGHT = [f"light_{col}" for col in COLS_HEAVY if col != "d_call"]
+COLS = [
+    "lineage_group",
+    "names"] + COLS_HEAVY + COLS_LIGHT + [
     "timepoint",
     "category",
     "total"]
@@ -35,57 +37,84 @@ def _load_seq_info(csv_in):
         groups[row["lineage_group"]].append(row)
     return groups
 
+def condense_families(rows, key):
+    return "/".join(sorted({row[key] for row in rows if row[key]}))
+
+def get_junction_aa_lengths(rows, prefix):
+    """Nonzero junction aa lengths"""
+    return [r[f"{prefix}junction_aa_length"] for r in rows if r[f"{prefix}junction_aa_length"]]
+
+def get_juncts(rows, prefix):
+    """Non-empty junctions paired with corresponding v identities"""
+    juncts = [(
+        float(row[f"{prefix}v_identity"]) if row[f"{prefix}v_identity"] else 0,
+        row[f"{prefix}junction_aa"]) for row in rows]
+    juncts = [pair for pair in juncts if pair[1]]
+    juncts.sort()
+    return juncts
+
+def _get_chain_attrs(rows, chain, lineage_group):
+    prefix = {"heavy": "", "light": "light_"}[chain]
+    v_family = ""
+    j_family = ""
+    d_call = ""
+    junctlens = get_junction_aa_lengths(rows, prefix)
+    junction_aa_length_min = min(junctlens, default=0)
+    junction_aa_length_max = max(junctlens, default=0)
+    juncts = None
+    if lineage_group:
+        v_family = condense_families(rows, f"{prefix}v_family")
+        j_family = condense_families(rows, f"{prefix}j_family")
+        d_call = set()
+        if chain == "heavy":
+            for row in rows:
+                d_call = d_call | set(re.split("[/,]", row["d_call"]))
+            d_call = "/".join(sorted(d_call - {""}))
+        juncts = get_juncts(rows, prefix)
+    attrs = {
+        f"{prefix}v_family": v_family,
+        f"{prefix}j_family": j_family,
+        f"{prefix}v_identity_min": f"{juncts[0][0]:.2f}" if juncts else "",
+        f"{prefix}v_identity_max": f"{juncts[-1][0]:.2f}" if juncts else "",
+        f"{prefix}d_call": d_call, # only keep below if heavy
+        f"{prefix}junction_aa_v_min": juncts[0][1] if juncts else "",
+        f"{prefix}junction_aa_v_max": juncts[-1][1] if juncts else "",
+        f"{prefix}junction_aa_length_min": junction_aa_length_min,
+        f"{prefix}junction_aa_length_max": junction_aa_length_max}
+    if chain != "heavy":
+        del attrs[f"{prefix}d_call"]
+    return attrs
+
+def _group_rows(rows):
+    chunk = defaultdict(list)
+    for row in rows:
+        timepoint = int(row["timepoint"])
+        category = row["category"]
+        chunk[(timepoint, category)].append(row)
+    return chunk
+
 def partis_lineages(csv_in, csv_out):
     """Summarize partis info per-lineage-group, one row per group+timepoint+category"""
     groups = _load_seq_info(csv_in)
     out = []
     for lineage_group, rows in groups.items():
         # within each lineage group, group rows by timepoint and category
-        chunk = defaultdict(list)
-        for row in rows:
-            timepoint = int(row["timepoint"])
-            category = row["category"]
-            chunk[(timepoint, category)].append(row)
-        for key, rows in chunk.items():
-            v_family = ""
-            j_family = ""
-            d_call = ""
-            junction_aa_length_min = min(int(row["junction_aa_length"]) for row in rows)
-            junction_aa_length_max = max(int(row["junction_aa_length"]) for row in rows)
-            juncts = None
-            if lineage_group:
-                v_family = "/".join(sorted({row["v_family"] for row in rows}))
-                j_family = "/".join(sorted({row["j_family"] for row in rows}))
-                d_call = set()
-                for row in rows:
-                    d_call = d_call | set(re.split("[/,]", row["d_call"]))
-                d_call = "/".join(sorted(d_call - {""}))
-                junction_aa_length_min = min(int(row["junction_aa_length"]) for row in rows)
-                junction_aa_length_max = max(int(row["junction_aa_length"]) for row in rows)
-                juncts = [(
-                    float(row["v_identity"]) if row["v_identity"] else 0,
-                    row["junction_aa"]) for row in rows]
-                juncts.sort()
+        for key, rows in _group_rows(rows).items():
             # set up output per group+timepoint+category
             # note original IDs if there aren't too many of them
             names = ""
             names = {row["sequence_id_original"] for row in rows}
             names = "/".join(sorted(names)) if len(names) < 10 else "(many)"
-            out.append({
+            row_out = {
                 "lineage_group": lineage_group,
-                "names": names,
-                "v_family": v_family,
-                "j_family": j_family,
-                "v_identity_min": f"{juncts[0][0]:.2f}" if juncts else "",
-                "v_identity_max": f"{juncts[-1][0]:.2f}" if juncts else "",
-                "d_call": d_call,
-                "junction_aa_v_min": juncts[0][1] if juncts else "",
-                "junction_aa_v_max": juncts[-1][1] if juncts else "",
-                "junction_aa_length_min": junction_aa_length_min,
-                "junction_aa_length_max": junction_aa_length_max,
+                "names": names}
+            row_out.update(_get_chain_attrs(rows, "heavy", lineage_group))
+            row_out.update(_get_chain_attrs(rows, "light", lineage_group))
+            row_out.update({
                 "timepoint": key[0],
                 "category": key[1],
                 "total": len(rows)})
+            out.append(row_out)
     # total counts per lineage goup across timepoints and categories
     totals = defaultdict(int)
     for row in out:

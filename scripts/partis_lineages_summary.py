@@ -9,6 +9,7 @@ from collections import defaultdict
 from csv import DictReader, DictWriter
 
 def _condense_names(rows):
+    # note isolate names if there aren't too many
     names = set()
     for row in rows:
         if "isolate" in row["category"]:
@@ -25,38 +26,45 @@ def _condense_names(rows):
         names = "/".join(names) if len(names) < 10 else "(many)"
     return names
 
-def _prep_row_out(group, rows):
+def get_junction_aa_lengths(rows, prefix, case):
+    """Nonzero junction aa length mins or maxes across rows"""
+    key = f"{prefix}junction_aa_length_{case}"
+    return [int(row[key]) for row in rows if row[key]]
+
+def get_juncts_for(rows, prefix, vcase):
+    """Non-empty junctions paired with corresponding v identities for max/min case"""
+    juncts = [(
+        float(row[f"{prefix}v_identity_{vcase}"]) if row[f"{prefix}v_identity_{vcase}"] else 0,
+        row[f"{prefix}junction_aa_v_{vcase}"]) for row in rows]
+    juncts = [pair for pair in juncts if pair[1]]
+    juncts.sort(reverse=vcase == "max")
+    return juncts
+
+def _prep_chain_attrs(rows, chain):
+    prefix = {"heavy": "", "light": "light_"}[chain]
     # Minimum and maximum junction AA length across all sequences
     # across all categories and timepoints
-    junction_aa_length_min = min(int(row["junction_aa_length_min"]) for row in rows)
-    junction_aa_length_max = max(int(row["junction_aa_length_max"]) for row in rows)
+    junction_aa_length_min = min(get_junction_aa_lengths(rows, prefix, "min"), default=0)
+    junction_aa_length_max = max(get_junction_aa_lengths(rows, prefix, "max"), default=0)
     # The pair of junction AA sequences associated with the lowest V
     # identity and the highest V identity across all sequences across
     # all categories and timepoints
-    juncts_min = [(
-        float(row["v_identity_min"]) if row["v_identity_min"] else 0,
-        row["junction_aa_v_min"]) for row in rows]
-    juncts_min.sort()
-    juncts_max= [(
-        float(row["v_identity_max"]) if row["v_identity_max"] else 0,
-        row["junction_aa_v_max"]) for row in rows]
-    juncts_max.sort(reverse=True)
-    # note isolate names if there aren't too many
-    names = _condense_names(rows)
-    row_out = {
-        "lineage_group": group,
-        "names": names,
-        "v_family": _format_vj_family(rows, "v_family"),
-        "j_family": _format_vj_family(rows, "j_family"),
-        "v_identity_min": juncts_min[0][0],
-        "v_identity_max": juncts_max[0][0],
-        "d_call": _format_d_call(rows),
-        "junction_aa_v_min": juncts_min[0][1],
-        "junction_aa_v_max": juncts_max[0][1],
-        "junction_aa_length_min": junction_aa_length_min,
-        "junction_aa_length_max": junction_aa_length_max,
+    juncts_min = get_juncts_for(rows, prefix, "min")
+    juncts_max = get_juncts_for(rows, prefix, "max")
+    attrs = {
+        f"{prefix}v_family": _format_vj_family(rows, f"{prefix}v_family"),
+        f"{prefix}j_family": _format_vj_family(rows, f"{prefix}j_family"),
+        f"{prefix}v_identity_min": juncts_min[0][0] if juncts_min else None,
+        f"{prefix}v_identity_max": juncts_max[0][0] if juncts_max else None,
+        f"{prefix}d_call": _format_d_call(rows) if chain == "heavy" else "",
+        f"{prefix}junction_aa_v_min": juncts_min[0][1] if juncts_min else None,
+        f"{prefix}junction_aa_v_max": juncts_max[0][1] if juncts_max else None,
+        f"{prefix}junction_aa_length_min": junction_aa_length_min,
+        f"{prefix}junction_aa_length_max": junction_aa_length_max,
         }
-    return row_out
+    if chain != "heavy":
+        del attrs[f"{prefix}d_call"]
+    return attrs
 
 def _format_vj_family(rows, key):
     # V or J family across everything (should only be one!  but if not, same
@@ -118,7 +126,7 @@ def _prep_cols(info):
     cols.append("total")
     cols.append("earliest")
     cols.append("latest")
-    cols += [
+    cols_heavy = [
         "v_family",
         "j_family",
         "v_identity_min",
@@ -128,6 +136,7 @@ def _prep_cols(info):
         "junction_aa_v_max",
         "junction_aa_length_min",
         "junction_aa_length_max"]
+    cols += cols_heavy + [f"light_{col}" for col in cols_heavy if col != "d_call"]
     return cols, categories
 
 def partis_lineages_summary(csv_in, csv_out):
@@ -142,7 +151,11 @@ def partis_lineages_summary(csv_in, csv_out):
     # define output rows
     out = []
     for group, rows in groups.items():
-        row_out = _prep_row_out(group, rows)
+        row_out = {
+            "lineage_group": group,
+            "names": _condense_names(rows)}
+        row_out.update(_prep_chain_attrs(rows, "heavy"))
+        row_out.update(_prep_chain_attrs(rows, "light"))
         _add_summary_cols(row_out, rows, categories)
         out.append(row_out)
     # sort with these things highest:
