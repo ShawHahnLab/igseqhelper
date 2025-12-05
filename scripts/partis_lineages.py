@@ -13,6 +13,7 @@ COLS = [
     "lineage_group",
     "names",
     "v_family",
+    "j_family",
     "v_identity_min",
     "v_identity_max",
     "d_call",
@@ -47,12 +48,14 @@ def partis_lineages(csv_in, csv_out):
             chunk[(timepoint, category)].append(row)
         for key, rows in chunk.items():
             v_family = ""
+            j_family = ""
             d_call = ""
             junction_aa_length_min = min(int(row["junction_aa_length"]) for row in rows)
             junction_aa_length_max = max(int(row["junction_aa_length"]) for row in rows)
             juncts = None
             if lineage_group:
                 v_family = "/".join(sorted({row["v_family"] for row in rows}))
+                j_family = "/".join(sorted({row["j_family"] for row in rows}))
                 d_call = set()
                 for row in rows:
                     d_call = d_call | set(re.split("[/,]", row["d_call"]))
@@ -72,6 +75,7 @@ def partis_lineages(csv_in, csv_out):
                 "lineage_group": lineage_group,
                 "names": names,
                 "v_family": v_family,
+                "j_family": j_family,
                 "v_identity_min": f"{juncts[0][0]:.2f}" if juncts else "",
                 "v_identity_max": f"{juncts[-1][0]:.2f}" if juncts else "",
                 "d_call": d_call,

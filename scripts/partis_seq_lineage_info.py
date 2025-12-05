@@ -10,6 +10,12 @@ import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
 
+def get_family(txt):
+    if not txt:
+        return ""
+    family = re.match("(IG[HKL][VDJ][0-9]+)", txt)
+    return family.group(1) if family else ""
+
 def _load_metadata(csv_path, key=None):
     things = {}
     if csv_path:
@@ -18,10 +24,10 @@ def _load_metadata(csv_path, key=None):
             things = {row[key or first(row)]: row for row in DictReader(f_in)}
     return things
 
-def _load_igblast_airr(airr_path):
+def _load_igblast_airr(airr_path, key="sequence_id"):
     if airr_path:
         with gzip.open(airr_path, "rt", encoding="ASCII") as f_in:
-            return {row["sequence_id"]: row for row in DictReader(f_in, delimiter="\t")}
+            return {row[key]: row for row in DictReader(f_in, delimiter="\t")}
     return {}
 
 def _load_clones_from_partis_airr(airr_in, metadata, keep_all):
@@ -104,11 +110,10 @@ def __include_igblast_attrs(row_out, igblast):
     # what's already in this row.  Note this will also use the sequence from
     # IgBLAST if available since partis seems to pad it with N for some reason
     igblast_attrs = igblast.get(row_out["sequence_id"], row_out)
-    v_family = re.match("(IG[HKL]V[0-9]+)", igblast_attrs["v_call"])
-    v_family = v_family.group(1) if v_family else ""
     row_out.update({
         "sequence": igblast_attrs["sequence"],
-        "v_family": v_family,
+        "v_family": get_family(igblast_attrs["v_call"]),
+        "j_family": get_family(igblast_attrs["j_call"]),
         "v_identity": igblast_attrs["v_identity"],
         "d_call": igblast_attrs["d_call"],
         "junction_aa": igblast_attrs["junction_aa"],
@@ -131,6 +136,15 @@ def __include_ngs_attrs(row_out, ngs_annots):
             if not row_out["lineage"]:
                 row_out["lineage"] = ngs_attrs.get("Lineage", "")
 
+def __include_isolate_light_attrs(row_out, isolate_light_annots):
+    attrs = isolate_light_annots.get(row_out["sequence_light"], {})
+    row_out.update({
+    "light_v_family": get_family(attrs.get("v_call")),
+    "light_j_family": get_family(attrs.get("j_call")),
+    "light_v_identity": attrs.get("v_identity"),
+    "light_junction_aa": attrs.get("junction_aa"),
+    "light_junction_aa_length": len(attrs.get("junction_aa", ""))})
+
 def __check_for_duplicated_isolates(out):
     # Sanity-check the isolates to ensure we don't have duplicates.  I worry
     # this could happen for the 10x sequences that could be present both in the
@@ -145,7 +159,7 @@ def __check_for_duplicated_isolates(out):
         for isolate, num in isolate_tally.items():
             print(f"  {isolate}: {num}")
 
-def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, cloneids):
+def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, isolate_light_annots, cloneids):
     # include everything that's listed under any of those clone IDs of
     # interest, if defined.  Each sequence can have one clone ID from partis
     # and one (if it's in our isolate metadata) Lineage assigned from us.
@@ -164,6 +178,7 @@ def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, cloneids):
                 # and (if applicable) manually-defined info on NGS sequences
                 __include_igblast_attrs(row_out, igblast)
                 __include_ngs_attrs(row_out, ngs_annots)
+                __include_isolate_light_attrs(row_out, isolate_light_annots)
                 row_out.update({
                     "partis_clone_id": row["clone_id"] or "",
                     "lineage": row_out["lineage"] or ""})
@@ -223,7 +238,7 @@ def _finalize(out):
 def partis_seq_lineage_info(
         airr_in, csv_out,
         metadata_isolates=None, metadata_specimens=None, metadata_seqsets=None,
-        csv_ngs_annots=None, airr_in_igblast=None, *, keep_all=False):
+        csv_ngs_annots=None, airr_in_igblast=None, airr_in_isolate_light=None, *, keep_all=False):
     """Report sequences with partis clones overlapping with our isolates"""
     # name -> attrs
     metadata = {
@@ -233,22 +248,26 @@ def partis_seq_lineage_info(
         }
     # seq ID here -> custom attrs incl. Lineage
     ngs_annots = _load_metadata(csv_ngs_annots, "sequence_id")
-     # seq ID here -> IgBLAST attrs
+    # seq ID here -> IgBLAST attrs
     igblast_annots = _load_igblast_airr(airr_in_igblast)
+    # unique isolate light seq -> AIRR attrs
+    # (This is purely to get some very basic attributes for the light chains so
+    # we'll just track via sequence)
+    isolate_light_annots = _load_igblast_airr(airr_in_isolate_light, "sequence")
     clones, cloneids = _load_clones_from_partis_airr(airr_in, metadata, keep_all)
-    out = _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast_annots, cloneids)
+    out = _prep_seq_lineage_info(
+            clones, metadata, ngs_annots, igblast_annots, isolate_light_annots, cloneids)
     _assign_lineage_groups(out)
     _finalize(out)
+    keys_by_chain = ["v_family", "j_family", "v_identity", "junction_aa", "junction_aa_length"]
     keys = [
         "lineage_group",
         "sequence_id",
         "sequence",
-        "sequence_light",
-        "v_family",
-        "v_identity",
+        "sequence_light"] + \
+            keys_by_chain + \
+            [f"light_{key}" for key in keys_by_chain] + [
         "d_call",
-        "junction_aa",
-        "junction_aa_length",
         "timepoint",
         "category",
         "item",
@@ -273,13 +292,14 @@ def main():
     arg("--metadata-seqsets", help="CSV with SeqSet metadata")
     arg("-n", "--ngs-annotations", help="optional CSV with Lineage info for known NGS sequences")
     arg("-A", "--igblast-airr", help="optional AIRR tsv.gz from IgBLAST to prefer for annotations")
+    arg("-L", "--isolate-light-airr", help="optional AIRR tsv.gz for isolate light chain sequences")
     arg("-a", "--all", action="store_true",
         help="keep all sequences or only those belonging to clones that also include isolates?")
     args = parser.parse_args()
     partis_seq_lineage_info(
         args.input, args.output,
         args.metadata_isolates, args.metadata_specimens, args.metadata_seqsets,
-        args.ngs_annotations, args.igblast_airr, keep_all=args.all)
+        args.ngs_annotations, args.igblast_airr, args.isolate_light_airr, keep_all=args.all)
 
 if __name__ == "__main__":
     main()

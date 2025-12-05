@@ -273,6 +273,14 @@ rule partis_partition_airr:
 
 ### Below is really reporting logic, but, no time for proper organization here
 
+rule isolates_light_fasta:
+    output: temp("analysis/partis/isolates_light.fasta")
+    run:
+        with open(output[0], "w", encoding="ASCII") as f_out:
+            for isolate, attrs in ANTIBODY_ISOLATES.items():
+                if attrs["LightSeq"]:
+                    f_out.write(f">{isolate}\n{attrs['LightSeq']}\n")
+
 def input_for_partis_seq_lineage_info(w):
     if w.chain_type in ("kappa", "lambda"):
         raise ValueError("light chain not supported")
@@ -283,6 +291,7 @@ def input_for_partis_seq_lineage_info(w):
     targets = {
         "airr": path/"partitions.airr.tsv",
         "airr_igblast": igblast_path/"combined.fasta.tsv.gz",
+        "airr_isolates_light": "analysis/igblast/sonarramesh/partis/isolates_light.fasta.tsv.gz",
         "specimens": "metadata/specimens.csv",
         "seqsets": "metadata/seqsets.csv",
         "isolates": "metadata/isolates.csv"}
@@ -299,7 +308,7 @@ rule partis_seq_lineage_info:
     input: unpack(input_for_partis_seq_lineage_info)
     priority: 10
     run:
-        cmd = "partis_seq_lineage_info.py {input.airr} {output} --metadata-isolates {input.isolates} --metadata-specimens {input.specimens} --metadata-seqsets {input.seqsets} -A {input.airr_igblast} --all"
+        cmd = "partis_seq_lineage_info.py {input.airr} {output} --metadata-isolates {input.isolates} --metadata-specimens {input.specimens} --metadata-seqsets {input.seqsets} -A {input.airr_igblast} -L {input.airr_isolates_light} --all"
         if "ngs_annots" in dict(input):
             cmd += " -n {input.ngs_annots}"
         shell(cmd)

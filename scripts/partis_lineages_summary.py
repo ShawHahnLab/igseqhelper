@@ -46,7 +46,8 @@ def _prep_row_out(group, rows):
     row_out = {
         "lineage_group": group,
         "names": names,
-        "v_family": _format_v_family(rows),
+        "v_family": _format_vj_family(rows, "v_family"),
+        "j_family": _format_vj_family(rows, "j_family"),
         "v_identity_min": juncts_min[0][0],
         "v_identity_max": juncts_max[0][0],
         "d_call": _format_d_call(rows),
@@ -57,15 +58,15 @@ def _prep_row_out(group, rows):
         }
     return row_out
 
-def _format_v_family(rows):
-    # V family across everything (should only be one!  but if not, same
+def _format_vj_family(rows, key):
+    # V or J family across everything (should only be one!  but if not, same
     # idea as for D, just no upper limit.)
-    v_family = set()
+    family = set()
     for row in rows:
-        v_family = v_family | set(row["v_family"].split("/"))
-    v_family = v_family - {""}
-    v_family = "/".join(sorted(v_family))
-    return v_family
+        family = family | set(row[key].split("/"))
+    family = family - {""}
+    family = "/".join(sorted(family))
+    return family
 
 def _format_d_call(rows):
     # D call(s) across everything (parsing and re-formatting any with
@@ -119,6 +120,7 @@ def _prep_cols(info):
     cols.append("latest")
     cols += [
         "v_family",
+        "j_family",
         "v_identity_min",
         "v_identity_max",
         "d_call",
