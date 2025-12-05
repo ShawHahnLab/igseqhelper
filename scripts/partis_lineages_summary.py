@@ -11,7 +11,7 @@ from csv import DictReader, DictWriter
 def _condense_names(rows):
     names = set()
     for row in rows:
-        if row["category"] == "isolate":
+        if "isolate" in row["category"]:
             if row["names"] == "(many)":
                 names = "(many)"
                 break

@@ -57,17 +57,20 @@ def __infer_basics_from_metadata(seqid_in, metadata):
         "category": category,
         "item": item,
         "timepoint": attrs.get("Timepoint", timepoint_seqid),
-        "notes": "",
-        "lineage": ""}
+        "notes": [],
+        "lineage": "",
+        "sequence_light": ""}
     # Catch the special case of seqset entries that have been added to the
-    # isolates table
+    # isolates table.  Watch out for duplicates though.
     if category == "seqset":
         isolate_alt_name = attrs["Subject"] + "-wk" + attrs["Timepoint"] + "-" + seqid
         isolate_map = {r["AltName"]: r for r in metadata["isolates"].values() if r["AltName"]}
         if isolate_alt_name in isolate_map:
-            print(f"TODO handle seqset entry as isolate {isolate_alt_name}")
-            # So, should I just overwrite the seqsets info with isolates info?
-            # Maybe?  Could run into duplicates though
+            row_out["notes"].append("Matched to isolate via seqset entry seq ID")
+            attrs = isolate_map[isolate_alt_name]
+            row_out["category"] = "isolate"
+            row_out["item"] = ""
+            row_out["sequence_id_original"] = attrs["Isolate"]
     if attrs.get("Skip") == "TRUE":
         # skip entries if that's noted in their metadata (isolates
         # we don't want to actually analyze, basically); generally
@@ -85,6 +88,8 @@ def __infer_basics_from_metadata(seqid_in, metadata):
         # that can just be left implicit, since most are Sanger)
         if not (row_out["category"] == "isolate" and attrs["Method"] == "Sanger"):
             row_out["category"] += "_" + attrs["Method"]
+    # Note paired light seqs where available (this will just be for isolates)
+    row_out["sequence_light"] = attrs.get("LightSeq", "")
     # (Isolate lineage names that include the keyword "unassigned"
     # in the name will be interpreted as placeholders and ignored.
     # Other categories won't have a Lineage explicitly provided
@@ -126,6 +131,20 @@ def __include_ngs_attrs(row_out, ngs_annots):
             if not row_out["lineage"]:
                 row_out["lineage"] = ngs_attrs.get("Lineage", "")
 
+def __check_for_duplicated_isolates(out):
+    # Sanity-check the isolates to ensure we don't have duplicates.  I worry
+    # this could happen for the 10x sequences that could be present both in the
+    # "seqsets" files and also stored as isolates.
+    isolate_tally = defaultdict(int)
+    for row in out:
+        if row["category"] == "isolate":
+            isolate_tally[row["sequence_id_original"]] += 1
+    isolate_tally = {key: val for key, val in isolate_tally.items() if val > 1}
+    if isolate_tally:
+        print("Duplicated isolates in output!")
+        for isolate, num in isolate_tally.items():
+            print(f"  {isolate}: {num}")
+
 def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, cloneids):
     # include everything that's listed under any of those clone IDs of
     # interest, if defined.  Each sequence can have one clone ID from partis
@@ -137,7 +156,7 @@ def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, cloneids):
             for row in rows:
                 # start of by figuring out what sort of sequence this is, and
                 # its metadata, from the sequence ID.  Category of None implies
-                # skip this one entirely.
+                # skip this one entirely, based on the supplied metadata.
                 row_out = __infer_basics_from_metadata(row["sequence_id"], metadata)
                 if row_out["category"] is None:
                     continue
@@ -149,6 +168,7 @@ def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, cloneids):
                     "partis_clone_id": row["clone_id"] or "",
                     "lineage": row_out["lineage"] or ""})
                 out.append(row_out)
+    __check_for_duplicated_isolates(out)
     return out
 
 def _assign_lineage_groups(out):
@@ -189,6 +209,17 @@ def _assign_lineage_groups(out):
             row["lineage_group"] = row["lineage"]
             row["lineage_group_category"] = "manual"
 
+def _finalize(out):
+    for row in out:
+        row["notes"] = "; ".join(row["notes"])
+    out.sort(key = lambda row: (
+        row["lineage_group"] == "",
+        row["partis_clone_id"] == "",
+        row["lineage_group"],
+        row["lineage"],
+        row["partis_clone_id"],
+        row["sequence_id"]))
+
 def partis_seq_lineage_info(
         airr_in, csv_out,
         metadata_isolates=None, metadata_specimens=None, metadata_seqsets=None,
@@ -207,17 +238,12 @@ def partis_seq_lineage_info(
     clones, cloneids = _load_clones_from_partis_airr(airr_in, metadata, keep_all)
     out = _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast_annots, cloneids)
     _assign_lineage_groups(out)
-    out.sort(key = lambda row: (
-        row["lineage_group"] == "",
-        row["partis_clone_id"] == "",
-        row["lineage_group"],
-        row["lineage"],
-        row["partis_clone_id"],
-        row["sequence_id"]))
+    _finalize(out)
     keys = [
         "lineage_group",
         "sequence_id",
         "sequence",
+        "sequence_light",
         "v_family",
         "v_identity",
         "d_call",
