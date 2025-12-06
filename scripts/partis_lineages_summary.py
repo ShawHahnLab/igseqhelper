@@ -44,8 +44,8 @@ def _prep_chain_attrs(rows, chain):
     prefix = {"heavy": "", "light": "light_"}[chain]
     # Minimum and maximum junction AA length across all sequences
     # across all categories and timepoints
-    junction_aa_length_min = min(get_junction_aa_lengths(rows, prefix, "min"), default=0)
-    junction_aa_length_max = max(get_junction_aa_lengths(rows, prefix, "max"), default=0)
+    junction_aa_length_min = min(get_junction_aa_lengths(rows, prefix, "min"), default=None)
+    junction_aa_length_max = max(get_junction_aa_lengths(rows, prefix, "max"), default=None)
     # The pair of junction AA sequences associated with the lowest V
     # identity and the highest V identity across all sequences across
     # all categories and timepoints
@@ -57,6 +57,8 @@ def _prep_chain_attrs(rows, chain):
         f"{prefix}v_identity_min": juncts_min[0][0] if juncts_min else None,
         f"{prefix}v_identity_max": juncts_max[0][0] if juncts_max else None,
         f"{prefix}d_call": _format_d_call(rows) if chain == "heavy" else "",
+        f"{prefix}cdr3_aa_length_min": max(0, (junction_aa_length_min) or 0 - 2),
+        f"{prefix}cdr3_aa_length_max": max(0, (junction_aa_length_max) or 0 - 2),
         f"{prefix}junction_aa_v_min": juncts_min[0][1] if juncts_min else None,
         f"{prefix}junction_aa_v_max": juncts_max[0][1] if juncts_max else None,
         f"{prefix}junction_aa_length_min": junction_aa_length_min,
@@ -129,11 +131,13 @@ def _prep_cols(info):
     cols_heavy = [
         "v_family",
         "j_family",
-        "v_identity_min",
-        "v_identity_max",
+        "v_identity_max", # (first since max identity means min divergence)
+        "v_identity_min", # (ditto)
         "d_call",
-        "junction_aa_v_min",
-        "junction_aa_v_max",
+        "cdr3_aa_length_min",
+        "cdr3_aa_length_max",
+        "junction_aa_v_max", # (ditto)
+        "junction_aa_v_min", # (ditto)
         "junction_aa_length_min",
         "junction_aa_length_max"]
     cols += cols_heavy + [f"light_{col}" for col in cols_heavy if col != "d_call"]

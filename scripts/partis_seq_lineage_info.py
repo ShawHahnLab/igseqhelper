@@ -118,7 +118,8 @@ def __include_igblast_attrs(row_out, igblast):
         "v_identity": igblast_attrs["v_identity"],
         "d_call": igblast_attrs["d_call"],
         "junction_aa": igblast_attrs["junction_aa"],
-        "junction_aa_length": len(igblast_attrs["junction_aa"])})
+        "junction_aa_length":
+            len(igblast_attrs["junction_aa"]) if igblast_attrs["sequence"] else None})
 
 def __include_ngs_attrs(row_out, ngs_annots):
     # Do we have NGS seq annotations for it?  If so, take the lineage from
@@ -144,7 +145,8 @@ def __include_isolate_light_attrs(row_out, isolate_light_annots):
     "light_j_family": get_family(attrs.get("j_call")),
     "light_v_identity": attrs.get("v_identity"),
     "light_junction_aa": attrs.get("junction_aa"),
-    "light_junction_aa_length": len(attrs.get("junction_aa", ""))})
+    "light_junction_aa_length":
+        len(attrs.get("junction_aa", "")) if row_out["sequence_light"] else None})
 
 def __check_for_duplicated_isolates(out):
     # Sanity-check the isolates to ensure we don't have duplicates.  I worry

@@ -59,8 +59,8 @@ def _get_chain_attrs(rows, chain, lineage_group):
     j_family = ""
     d_call = ""
     junctlens = get_junction_aa_lengths(rows, prefix)
-    junction_aa_length_min = min(junctlens, default=0)
-    junction_aa_length_max = max(junctlens, default=0)
+    junction_aa_length_min = min(junctlens, default=None)
+    junction_aa_length_max = max(junctlens, default=None)
     juncts = None
     if lineage_group:
         v_family = condense_families(rows, f"{prefix}v_family")
