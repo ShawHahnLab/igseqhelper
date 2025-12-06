@@ -66,8 +66,8 @@ def __infer_basics_from_metadata(seqid_in, metadata):
         "notes": [],
         "lineage": "",
         "sequence_light": ""}
-    # Catch the special case of seqset entries that have been added to the
-    # isolates table.  Watch out for duplicates though.
+    # Catch the special case of seqset entries (10x) that have been added to
+    # the isolates table.  Watch out for duplicates though.
     if category == "seqset":
         isolate_alt_name = attrs["Subject"] + "-wk" + attrs["Timepoint"] + "-" + seqid
         isolate_map = {r["AltName"]: r for r in metadata["isolates"].values() if r["AltName"]}
@@ -77,6 +77,7 @@ def __infer_basics_from_metadata(seqid_in, metadata):
             row_out["category"] = "isolate"
             row_out["item"] = ""
             row_out["sequence_id_original"] = attrs["Isolate"]
+            row_out["lineage"] = attrs["Lineage"]
     if attrs.get("Skip") == "TRUE":
         # skip entries if that's noted in their metadata (isolates
         # we don't want to actually analyze, basically); generally
@@ -208,7 +209,12 @@ def _assign_lineage_groups(out):
             if row["partis_clone_id"]:
                 row["lineage_group"] = "partis-" + row["partis_clone_id"]
                 row["lineage_group_category"] = "automatic"
-        elif "" in lins:
+        elif "" in lins or row["category"] == "isolate_10x":
+            # (Bypassing the empty-lineage-assignment check for 10x isolates
+            # specifically, so I can always check the partis groupings in case
+            # partis merged some of those together.  That's only because I've
+            # noted a bunch of lineage labels from elsewhere that I haven't yet
+            # confirmed.)
             # Otherwise, if it's a mix of assigned and blank lineages, use this
             # clone ID to group by all observed lineage names for this clone.
             # (TODO Wait, should I also span across other clone IDs that
