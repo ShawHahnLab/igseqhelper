@@ -83,7 +83,7 @@ def __infer_basics_from_metadata(seqid_in, metadata):
         # we don't want to actually analyze, basically); generally
         # they shouldn't get this far anyway, but if so, we'll
         # exclude them now
-        return row_out
+        return None
     # A bit of post-processing on the category labels
     # (using the shorthand "ngs" for per-specimen material, and
     # including a more specific suffix for cases where a
@@ -173,7 +173,7 @@ def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, isolate_light_
                 # its metadata, from the sequence ID.  Category of None implies
                 # skip this one entirely, based on the supplied metadata.
                 row_out = __infer_basics_from_metadata(row["sequence_id"], metadata)
-                if row_out["category"] is None:
+                if row_out is None:
                     continue
                 # Add additional information with the help of IgBLAST output
                 # and (if applicable) manually-defined info on NGS sequences
