@@ -31,9 +31,13 @@ fields:
     title: Protocol
     description: Library prep and sequencing protocol; "IgSeq" for the usual IgSeq library layout, or freeform text for anything else
     type: string
+  - name: Description
+    title: Description
+    description: Description of what's sequenced in each run
+    type: string
   - name: Comments
     title: Comments
-    description: Freeform comments about each run
+    description: Any additional freeform comments about each run
     type: string
   - name: Summary from Analysis
     title: Summary from Analysis
