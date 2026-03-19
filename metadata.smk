@@ -5,8 +5,6 @@ Handlers for metadata.
 import csv
 import logging
 import yaml
-import urllib.request
-from io import StringIO
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
@@ -15,39 +13,6 @@ with open("metadata/igseq.package.yaml") as f_in:
     METAMETADATA = yaml.safe_load(f_in)
 
 TARGET_METADATA = ["metadata/" + resource["path"] for resource in METAMETADATA["resources"]]
-
-def download_metadata(path_yaml, path_out=None):
-    """Download CSV from google sheets.
-
-    YAML like this:
-          google_slug: 2PACX-1vRsc...
-          resources:
-            - name: subjects
-              path: subjects.csv
-              google_gid: 1234567890
-            - name: specimens
-              path: specimens.csv
-              google_gid: 9876543210
-            ...
-    Becomes:
-         metadata/samples.csv
-         metadata/specimens.csv
-         metadata/...
-    """
-    with open(path_yaml) as f_in:
-        info = yaml.safe_load(f_in)
-    slug = info["google_slug"]
-    for res in info["resources"]:
-        gid = res["google_gid"]
-        url = f"https://docs.google.com/spreadsheets/d/e/{slug}/pub?gid={gid}&single=true&output=csv"
-        parent = Path(path_yaml).parent
-        path = parent / res["path"]
-        if path_out is not None and str(path) == path_out:
-            with urllib.request.urlopen(url) as f_in, open(path, "wt") as f_out:
-                reader = csv.reader(StringIO(f_in.read().decode("UTF8")))
-                writer = csv.writer(f_out, lineterminator="\n")
-                for row in reader:
-                    writer.writerow(row)
 
 def load_runs(fp_in):
     """Load run metadata CSV.
@@ -194,8 +159,7 @@ rule get_metadata:
     """Create CSV files from Google sheets based on frictionless data package YAML."""
     output: "metadata/{sheet}.csv"
     input: "metadata/igseq.package.yaml"
-    run:
-        download_metadata(input[0], output[0])
+    shell: "download_metadata.py {input} {output}"
 
 rule validate:
     input:
