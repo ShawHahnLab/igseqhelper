@@ -20,6 +20,8 @@ def input_for_merge_split_by_locus_final(w):
         "analysis/merge/{run}.grouped/{sample}.fastq.gz",
         run=w.run, sample=row["Sample"])
 
+ruleorder: merge > merge_split_by_locus_link
+
 rule merge_split_by_locus_link:
     """Symlink merge file from locus-based workflow into main merge path"""
     output: "analysis/merge/{run}/{sample}.fastq.gz"
