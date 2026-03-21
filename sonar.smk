@@ -41,7 +41,7 @@ def sonar_setup_helper_rules():
     for key in subject_type_map:
         subject, chain_type = key
         for lineage, attrs in ANTIBODY_LINEAGES.items():
-            if attrs["Subject"] == subject:
+            if attrs["Subject"] == subject and lineage != f"{subject}-unassigned":
                 subject_type_lineage_map[key].add(lineage)
 
     for key, specimens in subject_type_map.items():
