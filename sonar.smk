@@ -42,6 +42,9 @@ def sonar_setup_helper_rules():
         subject, chain_type = key
         for lineage, attrs in ANTIBODY_LINEAGES.items():
             if attrs["Subject"] == subject and lineage != f"{subject}-unassigned":
+                if (chain_type == "kappa" and attrs["LightLocus"] != "IGK") or (
+                        chain_type == "lambda" and attrs["LightLocus"] != "IGL"):
+                    continue
                 subject_type_lineage_map[key].add(lineage)
 
     for key, specimens in subject_type_map.items():
