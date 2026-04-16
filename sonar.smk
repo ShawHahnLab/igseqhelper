@@ -659,7 +659,11 @@ checkpoint sonar_module_3_igphyml:
 
     For the automatic alignment case ("auto" as the keyword before the lineage
     name), this will build a tree with the appropriate germline V sequence for
-    the lineage included and will root the tree on that V sequence.
+    the lineage included and will root the tree on that V sequence.  Note the
+    automatic case will crash in the unusual circumstance that there are no
+    collected sequences (SONAR puts a newline between the collected sequences
+    and the rest of them, and if the file starts with that newline, MUSCLE
+    crashes).
 
     For the custom alignment case (any other keyword), this will given the
     first sequence ID in the alignment as the --root for sonar igphyml.
