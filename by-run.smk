@@ -168,7 +168,7 @@ def make_run_rules():
                         run=runid, samp=samp_names, rp=["R1", "R2", "I1"])
                 input:
                     reads=expand(
-                        "analysis/reads/{run}/Undetermined_S0_L001_{rp}_001.fastq.gz",
+                        "analysis/reads/{run}/Undetermined_S0_{rp}_001.fastq.gz",
                         run=runid, rp=["I1", "R1", "R2"]),
                     samples=ancient("metadata/samples.csv")
                 log:
@@ -197,7 +197,7 @@ def make_run_rules():
                 "rp": ["I1", "R1", "R2"],
                 "suffix": "_fastqc.quals.csv"}
             fastqc_targets = \
-                expand("{prefix}/reads/{run}/Undetermined_S0_L001_{rp}_001{suffix}", **fastqc_args) + \
+                expand("{prefix}/reads/{run}/Undetermined_S0_{rp}_001{suffix}", **fastqc_args) + \
                 expand("{prefix}/demux/{run}/{sample}.{rp}{suffix}", **fastqc_args)
             fastqc_args["rp"] = ["R1", "R2"] # (no I1 for the rest)
             fastqc_targets += \
@@ -228,9 +228,9 @@ make_run_rules()
 rule getreads:
     output:
         outdir=directory("analysis/reads/{run}"),
-        r1="analysis/reads/{run}/Undetermined_S0_L001_R1_001.fastq.gz",
-        i1="analysis/reads/{run}/Undetermined_S0_L001_I1_001.fastq.gz",
-        r2="analysis/reads/{run}/Undetermined_S0_L001_R2_001.fastq.gz"
+        r1="analysis/reads/{run}/Undetermined_S0_R1_001.fastq.gz",
+        i1="analysis/reads/{run}/Undetermined_S0_I1_001.fastq.gz",
+        r2="analysis/reads/{run}/Undetermined_S0_R2_001.fastq.gz"
     input: ancient("/seq/runs/{run}")
     log:
         conda="analysis/reads/{run}/conda_build.txt"
@@ -239,7 +239,7 @@ rule getreads:
     shell:
         """
             conda list --explicit > {log.conda}
-            igseq getreads -t {threads} --threads-load $(({threads}<4 ? {threads} : 4)) {input}
+            igseq getreads --no-lane-splitting -t {threads} --threads-load $(({threads}<4 ? {threads} : 4)) {input}
         """
 
 ### Samples grouped by subject or specimen
