@@ -7,8 +7,9 @@ channels:
   - defaults
 dependencies:
   ### General workflow tools
+  - python=3.10
   - snakemake>=7.32,<8
-  - pylint>=2.17,<3
+  - pylint>=3,<5
   - frictionless>=5.17,<6
   ### Specific analysis helper tools
   - seqmagick>=0.8,<1
@@ -16,4 +17,4 @@ dependencies:
   - plotnine>=0.10
   - openpyxl>=3.1,<4
   ### igseq
-  - igseq=0.7.0rc1
+  - igseq=0.8.0
