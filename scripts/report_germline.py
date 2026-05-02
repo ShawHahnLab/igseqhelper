@@ -64,6 +64,7 @@ def report_germline(subject, locus, segment, fasta_in, info_csv_in, csv_out):
     else:
         num_seqs_ref = None
         num_seqs_novel = None
+        num_seqs_trunc = None
         fract_seqs_novel = None
         fract_seqs_novel_trunc = None
 

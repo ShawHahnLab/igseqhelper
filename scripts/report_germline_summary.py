@@ -7,7 +7,7 @@ Each row is one subject.  Columns are named according to the subject parsed
 from each input file, the locus (H, K, L) and segment (V, J):
 
     {subject}
-    {locus}r         Name of reference used for starting DB
+    {locus}ref       Name of reference used for starting DB
     {locus}{seg}rs   Sequences in reference DB
     {locus}{seg}s    Total sequences in personalized germline
     {locus}{seg}ns   ...number that are not in ref DB
