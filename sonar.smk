@@ -278,7 +278,7 @@ rule sonar_module_1:
               echo "Cluster min2: {params.cluster_min2}"
               echo
               set -x
-              sonar blast_V --lib germline/V.fasta --derep --threads {threads} 2>&1
+              sonar blast_V -f --lib germline/V.fasta --derep --threads {threads} 2>&1
               sonar blast_J {params.libd_arg} --jlib germline/J.fasta --noC --threads {threads} 2>&1
               sonar finalize --jmotif '{params.jmotif}' --threads {threads} 2>&1
               sonar cluster_sequences --threads {threads} --id {params.cluster_id_fract} --min2 {params.cluster_min2} 2>&1
@@ -310,7 +310,11 @@ rule alternate_iddiv_with_igblast:
                         "row mismatch between ID-DIV table and AIRR: %s vs %s", iddiv_id, airr_id)
                 sonar_gene = iddiv_row["v_gene"]
                 airr_gene = airr_row["v_call"].split("*")[0]
-                airr_div = 100 - float(airr_row["v_identity"])
+                try:
+                    airr_div = 100 - float(airr_row["v_identity"])
+                except ValueError as err:
+                    print(f"WARNING: IgBLAST failed to assign V for cluster {airr_row['sequence_id']}")
+                    airr_div = 100
                 iddiv_row["germ_div"] = f"{airr_div:.2f}"
                 writer.writerow(iddiv_row)
 
