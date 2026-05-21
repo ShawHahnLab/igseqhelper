@@ -4,6 +4,13 @@ Rules for reporting on totals of reads and such at different steps in the workfl
 
 import lzma
 
+rule report_fastqc_quals_summary:
+    """Basic per-R1/R2/I1 quality metrics (one row per run)"""
+    # (This isn't really about read counts per se but closely tied to these
+    # other outputs; we'll fold it into the per-run counts CSV below)
+    output: temp("analysis/reporting/counts/fastqc_quals_summary_by_run.csv")
+    shell: "report_fastqc_quals_summary.py -o {output}"
+
 rule report_counts_by_sample:
     """Sample read count summary CSV (one row per sample)"""
     output: "analysis/reporting/counts/counts_by_sample.csv"
@@ -15,8 +22,10 @@ rule report_counts_by_sample:
 rule report_counts_by_run:
     """Run read count summary CSV (one row per run)"""
     output: "analysis/reporting/counts/counts_by_run.csv"
-    input: "analysis/reporting/counts/counts_by_sample.csv"
-    shell: "report_counts_by_run.py {input} {output}"
+    input:
+        samples="analysis/reporting/counts/counts_by_sample.csv",
+        quals="analysis/reporting/counts/fastqc_quals_summary_by_run.csv"
+    shell: "report_counts_by_run.py {input.samples} --qualsummary {input.quals} {output}"
 
 rule report_counts_by_specimen:
     """Specimen read and SONAR cluster summary CSV (one row per specimen per cell+chain type)"""

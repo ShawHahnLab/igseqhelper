@@ -20,18 +20,29 @@ def divide(val1, val2, fmt="{:.2f}"):
         num = fmt.format(num)
     return num
 
-def report_counts_by_run(counts_by_sample_csv, output_csv):
+def __setup_run_row(run_info, row, quals):
+    if row["Run"] not in run_info:
+        runrow = {
+            "Run": row["Run"],
+            "UnassignedSeqs": "",
+            "PhixSeqs": "",
+            "SampleSeqs": []}
+        if quals:
+            for key in ("R1Q", "I1Q", "R2Q"):
+                runrow[key] = quals.get(row["Run"], {}).get(key)
+        run_info[row["Run"]] = runrow
+
+def report_counts_by_run(counts_by_sample_csv, output_csv, quals_csv=None):
     """Run read count summary CSV (one row per run)"""
     run_info = {}
     with open(counts_by_sample_csv, encoding="ASCII") as f_in:
         rows = [row for row in DictReader(f_in) if row["Run"]]
+    quals = {}
+    if quals_csv:
+        with open(quals_csv, encoding="ASCII") as f_in:
+            quals = {row["Run"]: row for row in DictReader(f_in)}
     for row in rows:
-        if row["Run"] not in run_info:
-            run_info[row["Run"]] = {
-                "Run": row["Run"],
-                "UnassignedSeqs": "",
-                "PhixSeqs": "",
-                "SampleSeqs": []}
+        __setup_run_row(run_info, row, quals)
         path_run_counts = ANALYSIS/"reads"/row["Run"]/"getreads.counts.csv"
         if path_run_counts.exists():
             with open(path_run_counts, encoding="ASCII") as f_in:
@@ -54,7 +65,7 @@ def report_counts_by_run(counts_by_sample_csv, output_csv):
             f_out,
             fieldnames=[
                 "Run", "RawReads", "PassingFilter", "UnassignedSeqs", "PhixSeqs", "SampleSeqs",
-                "UnassignedFraction", "PhixFraction"],
+                "UnassignedFraction", "PhixFraction", "R1Q", "I1Q", "R2Q"],
             lineterminator="\n")
         writer.writeheader()
         for row in run_info.values():
@@ -72,9 +83,10 @@ def main():
     parser = ArgumentParser(description=__doc__)
     arg = parser.add_argument
     arg("samples", help="Path to samples counts CSV")
+    arg("--qualsummary", help="Path to optional per-run quality metrics CSV")
     arg("output", help="Path for output CSV to write")
     args = parser.parse_args()
-    report_counts_by_run(args.samples, args.output)
+    report_counts_by_run(args.samples, args.output, args.qualsummary)
 
 if __name__ == "__main__":
     main()
