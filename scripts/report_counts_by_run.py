@@ -4,6 +4,7 @@
 Run read count summary CSV (one row per run)
 """
 
+import re
 from pathlib import Path
 from csv import DictReader, DictWriter
 from argparse import ArgumentParser
@@ -60,6 +61,13 @@ def report_counts_by_run(counts_by_sample_csv, output_csv, quals_csv=None):
         else:
             if row["CountsDemux"]:
                 run_info[row["Run"]]["SampleSeqs"].append(int(row["CountsDemux"]))
+    def run_date(attrs):
+        match = re.match("(20)?([0-9]{6})[-_].*", attrs["Run"])
+        txt1, txt2 = match.groups()
+        txt1 = txt1 or "20"
+        date = (txt1 + txt2[:2]) + "-" + txt2[2:4] + "-" + txt2[4:6]
+        return date
+    run_info = sorted(run_info.values(), key=run_date)
     with open(output_csv, "wt", encoding="ASCII") as f_out:
         writer = DictWriter(
             f_out,
@@ -68,7 +76,7 @@ def report_counts_by_run(counts_by_sample_csv, output_csv, quals_csv=None):
                 "UnassignedFraction", "PhixFraction", "R1Q", "I1Q", "R2Q"],
             lineterminator="\n")
         writer.writeheader()
-        for row in run_info.values():
+        for row in run_info:
             row["SampleSeqs"] = sum(row["SampleSeqs"]) if row["SampleSeqs"] else ""
             parts = [row["UnassignedSeqs"], row["SampleSeqs"]]
             parts = [p for p in parts if p]
