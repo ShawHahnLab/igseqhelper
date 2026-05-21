@@ -24,14 +24,6 @@ def load_runs(fp_in):
     runs = {k: v for k, v in runs.items() if v.get("Skip") != "TRUE"}
     return runs
 
-def load_specimens(fp_in):
-    """Load specimen metadata CSV.
-
-    Output is a dictionary of specimen names to their attributes.
-    """
-    LOGGER.info("load_specimens: fp_in %s", fp_in)
-    return load_csv(fp_in, "Specimen")
-
 def load_samples(fp_in, specimens=None, runs=None):
     """Load sample metadata CSV and optionally link to barcode data.
 
@@ -64,12 +56,6 @@ def load_samples(fp_in, specimens=None, runs=None):
             _load_nested_items(sample, "Sample", specimens, "Specimen")
     return samples
 
-def load_antibody_lineages(fp_in):
-    """Load antibody lineage CSV."""
-    LOGGER.info("load_antibody_lineages: fp_in %s", fp_in)
-    lineages = load_csv(fp_in, "Lineage")
-    return lineages
-
 def load_antibody_isolates(fp_in, antibody_lineages=None):
     """Load antibody isolate CSV and optionally link to antibody lineage data.
 
@@ -95,14 +81,14 @@ def _load_nested_items(entry, entrykey, others, key):
     else:
         LOGGER.error("Missing %s for %s %s", key, entrykey, entry[entrykey])
 
-def load_csv(fp_in, key=None):
+def load_csv(fp_in, key=None, loglvl=logging.DEBUG):
     """Generic CSV to dictionary.
 
     Assumes first row is header names.  If key is given, that column is used as
     the key for the top-level dictionary output.  If not, the first column is
     used.
     """
-    LOGGER.debug("load_csv: fp_in %s", fp_in)
+    LOGGER.log(loglvl, "load_csv: fp_in %s", fp_in)
     warn = False
     with open(fp_in) as f_in:
         entries = {}
@@ -127,20 +113,22 @@ def load_csv(fp_in, key=None):
 rule all_get_metadata:
     input: TARGET_METADATA
 
-def _setup_metadata(fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates, fp_seqsets):
-    global SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES, SEQSETS
-    SPECIMENS = load_specimens(fp_specimens)
+def _setup_metadata(fp_subjects, fp_specimens, fp_runs, fp_samples, fp_antibody_lineages, fp_antibody_isolates, fp_seqsets):
+    global SUBJECTS, SPECIMENS, RUNS, SAMPLES, ANTIBODY_LINEAGES, ANTIBODY_ISOLATES, SEQSETS
+    SUBJECTS = load_csv(fp_subjects, "Subject", logging.INFO)
+    SPECIMENS = load_csv(fp_specimens, "Specimen", logging.INFO)
     RUNS = load_runs(fp_runs)
     SAMPLES = load_samples(
         fp_samples,
         specimens=SPECIMENS,
         runs=RUNS)
-    ANTIBODY_LINEAGES = load_antibody_lineages(fp_antibody_lineages)
+    ANTIBODY_LINEAGES = load_csv(fp_antibody_lineages, "Lineage", logging.INFO)
     ANTIBODY_ISOLATES = load_antibody_isolates(fp_antibody_isolates, ANTIBODY_LINEAGES)
     SEQSETS = load_csv(fp_seqsets)
 
 try:
     _setup_metadata(
+        "metadata/subjects.csv",
         "metadata/specimens.csv",
         "metadata/runs.csv",
         "metadata/samples.csv",

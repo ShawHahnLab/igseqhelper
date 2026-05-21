@@ -24,8 +24,12 @@ def input_for_igdiscover_as_germline(w):
     chain_type = {"IGH": "mu", "IGK": "kappa", "IGL": "lambda"}[w.locus]
     # by default we'll draw from KIMDB-based results for IGH and Ramesh-based
     # results for IGK and IGL, but we can provide a custom reference name via
-    # the snakemake config if needed
-    name = config.get("igdiscover_ref_name", "kimdb" if w.locus == "IGH" else "sonarramesh")
+    # the subject metadata or snakemake config if needed
+    subject_attrs = SUBJECTS.get(w.subject, {})
+    germ_ref = subject_attrs.get(
+        f"{w.locus}Ref", "kimdb" if w.locus == "IGH" else "sonarramesh")
+    germ_ref = {"MUSA": "musa-filt"}.get(germ_ref, germ_ref)
+    name = config.get("igdiscover_ref_name", germ_ref)
     targets = {
         "V": f"analysis/igdiscover/{name}/{chain_type}/{w.subject}.1iter/final/database/V.fasta",
         "D": f"analysis/igdiscover/{name}/{chain_type}/{w.subject}.1iter/final/database/D.fasta",
