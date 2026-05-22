@@ -19,6 +19,15 @@ def _load_clusters(airr_in):
         reader = csv.DictReader(f_in, delimiter="\t")
         for row in reader:
             clusters[row["centroid"]].append(row)
+    # sorting each cluster's rows by descending cluster count (which means put
+    # the centroid first, in effect) and then by descending duplicate count.
+    for rows in clusters.values():
+        rows.sort(
+            reverse=True,
+            key=lambda row: (
+                int(row.get("cluster_count") or 0),
+                int(row.get("duplicate_count") or 0),
+                row["sequence_id"]))
     return clusters
 
 def _load_fqgz_recs(fqgz_paths, clusters):

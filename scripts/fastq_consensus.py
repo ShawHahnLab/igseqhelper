@@ -18,7 +18,7 @@ def load_cluster_fastqs(fqgz_dir_in):
     fqgz_dir_in = Path(fqgz_dir_in)
     # assuming files are named {centroid}.fastq.gz
     clustermap = {} # cluster ID -> list of read IDs
-    reads = [] # list of read dictionaries
+    reads = {} # read ID -> read attributes
     # If directory, find contained fastq.gz files, otherwise, assume one file given
     fqgzs = Path(fqgz_dir_in).glob("*.fastq.gz") if fqgz_dir_in.is_dir() else [fqgz_dir_in]
     for fqgz_in in fqgzs:
@@ -28,24 +28,26 @@ def load_cluster_fastqs(fqgz_dir_in):
             for row in reader:
                 row["sequence_quality"] = RecordHandler.decode_phred(row["sequence_quality"])
                 clustermap[key].append(row["sequence_id"])
-                reads.append(row)
+                reads[row["sequence_id"]] = row
     return clustermap, reads
 
-def tally_scores(reads):
+def tally_scores(reads, ref_is_first=True):
     """List base call quality score details per position across FASTQ reads
 
     Each returned list item is a dictionary giving lists of quality scores per
-    observed base call, where the list indexes correspond to positions in an
-    inferred reference sequence across the set of reads.
+    observed base call, where the list indexes correspond to positions in a
+    reference sequence from the set of reads.
 
-    The reference is chosen from among the supplied reads by selecting the top
-    match after sorting for:
+    If ref_is_first=True, the reference is the first read in the list.
+    Otherwise, the reference is chosen from among the supplied reads by
+    selecting the top match after sorting for:
 
      1. Most abundant sequence
      2. Most abundant read length
      3. Longest read
      4. Sequence content
     """
+    ref = reads[0]["sequence"]
     # take most abundant sequence as the reference, with secondary sorting by
     # most common length
     totals = defaultdict(int)
@@ -55,7 +57,8 @@ def tally_scores(reads):
         lentotals[len(row["sequence"])] += 1
     stats = [(totals[seq], lentotals[len(seq)], len(seq), seq) for seq in totals]
     stats.sort(reverse=True)
-    ref = stats[0][3]
+    if not ref_is_first:
+        ref = stats[0][3]
     # align the deduplicated sequences
     alns = {}
     for attrs in stats:
@@ -115,15 +118,13 @@ def make_consensus(scores):
 def __centroids_by_consensus(reads, clustermap, consensuses):
     # First, make a mapping of each read sequence to the cluster that contains
     # it
-    # (just a helper for matching things up below)
-    readmap = {row["sequence_id"]: row for row in reads}
     # (each read seq -> centroid)
     # In theory this could have clashing entries, but in practice it won't
     # since identical reads will have always been placed in the same cluster.
     read_seqs_to_centroids = {}
     for centroid, read_ids in clustermap.items():
         for read_id in read_ids:
-            seq = readmap[read_id]["sequence"]
+            seq = reads[read_id]["sequence"]
             read_seqs_to_centroids[seq] = centroid
     # Now, with the existing mapping of centroids to consensus seqs and this
     # mapping of read seqs to centroids, gather all relevant centroids for each
@@ -164,7 +165,7 @@ def __group_overlaps(sets):
 def merge_clusters(reads, clustermap, consensuses):
     """Given clusters of reads and consensuses per cluster, merge overlapping clusters
 
-    reads: full, static list of reads
+    reads: full dict of all reads
     clustermap: full set of centroid IDs -> lists of read IDs
     consensuses: consensus for each cluster in clustermap
 
@@ -203,7 +204,7 @@ def _write_iter_details(dir_out_iter, clustermap, consensuses, reads):
                 "sequence_id": centroid,
                 "sequence": consensuses[centroid][0],
                 "sequence_quality": RecordHandler.encode_phred(consensuses[centroid][1])})
-        reads_tmp = [rec.copy() for rec in reads if rec["sequence_id"] in seq_ids]
+        reads_tmp = [reads[seq_id].copy() for seq_id in seq_ids]
         with RecordWriter(dir_out_iter/f"{centroid}.fastq.gz") as writer:
             for rec in reads_tmp:
                 rec["sequence_quality"] = RecordHandler.encode_phred(
@@ -235,7 +236,7 @@ def _write_consensus_table(csv_out, clustermap, consensuses, reads):
     for centroid, seq_ids in clustermap.items():
         cons_seq, cons_qual = consensuses[centroid]
         cons_qual_txt = RecordHandler.encode_phred(cons_qual)
-        reads_here = [rec for rec in reads if rec["sequence_id"] in seq_ids]
+        reads_here = [reads[seq_id] for seq_id in seq_ids]
         rows.append({
             "sequence_id": centroid,
             "sequence": cons_seq,
@@ -283,7 +284,7 @@ def fastq_consensus_recluster(fqgz_dir_in, csv_out, dir_out=None, max_iter=10):
         consensuses_new = {}
         for centroid, seq_ids in clustermap_diff.items():
             consensuses_new[centroid] = make_consensus(tally_scores(
-                [rec for rec in reads if rec["sequence_id"] in seq_ids]))
+                [reads[seq_id] for seq_id in seq_ids]))
         print(f"{fqgz_dir_in}: iteration {cluster_idx}: "
                 f"{len(consensuses_new)} newly-created consensuses")
         # Even if we've brought more reads in for a particular cluster the
