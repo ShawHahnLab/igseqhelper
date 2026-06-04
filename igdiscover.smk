@@ -26,8 +26,8 @@ def input_for_igdiscover_as_germline(w):
     # results for IGK and IGL, but we can provide a custom reference name via
     # the subject metadata or snakemake config if needed
     subject_attrs = SUBJECTS.get(w.subject, {})
-    germ_ref = subject_attrs.get(
-        f"{w.locus}Ref", "kimdb" if w.locus == "IGH" else "sonarramesh")
+    germ_ref = subject_attrs.get(f"{w.locus}Ref") or \
+        ("kimdb" if w.locus == "IGH" else "sonarramesh")
     germ_ref = {"MUSA": "musa-filt"}.get(germ_ref, germ_ref)
     name = config.get("igdiscover_ref_name", germ_ref)
     targets = {
