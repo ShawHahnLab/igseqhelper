@@ -234,7 +234,7 @@ rule partis_partition:
         locus=lambda w: {"kappa": "igk", "lambda": "igl"}.get(w.chain_type, "igh"),
         species=config.get("partis_species", "macaque"),
         seed=config.get("partis_random_seed", 1),
-        partis=os.getenv("PARTIS_HOME", "")
+        partis=param_partis
     conda: "envs/partis.yaml"
     threads: 14
     shell:
@@ -264,7 +264,7 @@ rule partis_partition_airr:
         main="analysis/partis/{subject}.{chain_type}/partition.log.txt",
         conda="analysis/partis/{subject}.{chain_type}/partition.conda_build.txt"
     params:
-        partis=os.getenv("PARTIS_HOME", "")
+        partis=param_partis
     conda: "envs/partis.yaml"
     shell:
         """
