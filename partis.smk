@@ -167,6 +167,15 @@ def input_for_partis_cache_params(w):
         "seqs": f"analysis/partis/{w.subject}.{w.chain_type}/ngs.filt.fasta",
         "germline": f"analysis/partis/germlines/{w.subject}/{locus}/extras.csv"}
 
+def param_partis(w):
+    """Parameter for partis install dir outside of the Snakemake setup here"""
+    partis = os.getenv("PARTIS_HOME", "")
+    partis_default = os.getenv("HOME") + "/opt/partis"
+    if not partis:
+        if Path(partis_default).is_dir():
+            return partis_default
+    return partis
+
 rule partis_cache_params:
     """Run partis cache-parameters on a cross-timepoint NGS FASTA"""
     output: directory("analysis/partis/{subject}.{chain_type}/params")
@@ -182,9 +191,9 @@ rule partis_cache_params:
         leave_default_germline=config.get("partis_leave_default_germline", True),
         # I have the dependencies provided via conda but the actual partis
         # install still lives in a big ball of stuff in one directory,
-        # unfortunately.  The first like of the shell commands will ensure this
-        # variable is set.
-        partis=os.getenv("PARTIS_HOME", "")
+        # unfortunately.  The first line of the shell commands will ensure this
+        # variable is set to something.
+        partis=param_partis
     conda: "envs/partis.yaml"
     threads: 14
     shell:
