@@ -23,6 +23,9 @@ ruleorder: sonar_module_2_id_div_island_alternate > sonar_module_2_id_div_island
 #   * sonar_3_{subject}_{chain_type}_custom
 #   * sonar_3_{subject}_{chain_type}_custom_{antibody_lineage}
 #
+# (These rule names presume IgG except for those that explicitly reference
+# chain type mu.)
+#
 # Get a full list of these rules and their descriptions with snakemake -l.
 def sonar_setup_helper_rules():
     # specimen -> sets of chain_type (but only for IgG+)
@@ -35,6 +38,12 @@ def sonar_setup_helper_rules():
         subject = attrs["Subject"]
         for chain_type in specimen_types[specimen]:
             if "IgG" in attrs["CellType"]:
+                subject_type_map[(subject, chain_type)].add(specimen)
+            if "IgM" in attrs["CellType"] and chain_type == "mu":
+                # (not bothering for IgM light chain -- these rules are
+                # implicitly all for IgG other than this exception -- but will
+                # add helper rules for IgM heavy chain specifically, noted as
+                # mu chain type.)
                 subject_type_map[(subject, chain_type)].add(specimen)
     # subject/chain_type -> sets of lineages
     subject_type_lineage_map = defaultdict(set)
@@ -188,19 +197,6 @@ JMOTIF = {
     "epsilon": "TGGGG",
     "kappa": "TT[C|T][G|A]G",
     "lambda": "TT[C|T][G|A]G"}
-
-# Some of these SONAR tables and FASTAs are huge, so I'm compressing recent
-# ones with xz, and adding this rule to default to compressed files if already
-# available.  (Note to self: if you go and xz-compress some other module's
-# stuff Snakemake will probably complain about ambiguous rules.)
-ruleorder: sonar_module_1_decompress > sonar_module_1
-rule sonar_module_1_decompress:
-    output: (WD_SONAR/"output/{compressed}")
-    input: (WD_SONAR/"output/{compressed}.xz")
-    shell:
-        """
-            xz --decompress < {input} > {output}
-        """
 
 def input_sonar_germline(w):
     locus = {"kappa": "IGK", "lambda": "IGL"}.get(w.chain_type, "IGH")
@@ -629,6 +625,9 @@ def sonar_module_3_igphyml_param_v_id(wildcards):
         return ""
     key_default = "germline_v"
     key = "germline_v_{subject}_{chain_type}_{antibody_lineage}".format(**wildcards)
+    # (config key can't have "-" like our lineage names often do; expect "_"
+    # for those cases instead)
+    key = re.sub(r"[^A-Za-z0-9]", "_", key)
     v_call = config.get(key, config.get(key_default))
     if v_call:
         return v_call
