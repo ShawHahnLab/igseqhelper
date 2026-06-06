@@ -251,6 +251,8 @@ def calc_germ_div(
         output.update(output_chunk)
 
     if any(do_igblast.values()):
+        if not species and not ref_paths:
+            raise ValueError("IgBLAST needed but no species or reference given")
         with igblast.setup_db_dir(
             [str(attrs["path"]) for attrs in attrs_list]) as (db_dir, _):
             for path in paths_in.values():
