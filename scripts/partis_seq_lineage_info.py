@@ -189,7 +189,7 @@ def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, isolate_light_
     __check_for_duplicated_isolates(out)
     return out
 
-def _assign_lineage_groups(out):
+def _assign_lineage_groups(out, auto_group_for=None):
     # For each partis clone ID, note the set of all corresponding lineages we
     # have manually assigned from any data source
     clone_lineages = defaultdict(set)
@@ -211,12 +211,12 @@ def _assign_lineage_groups(out):
             if row["partis_clone_id"]:
                 row["lineage_group"] = "partis-" + row["partis_clone_id"]
                 row["lineage_group_category"] = "automatic"
-        elif "" in lins or row["category"] == "isolate_10x":
-            # (Bypassing the empty-lineage-assignment check for 10x isolates
-            # specifically, so I can always check the partis groupings in case
-            # partis merged some of those together.  That's only because I've
-            # noted a bunch of lineage labels from elsewhere that I haven't yet
-            # confirmed.)
+        elif "" in lins or (auto_group_for and row["category"] in auto_group_for):
+            # (Bypassing the empty-lineage-assignment check for given category
+            # (originally 10x isolates specifically), so I can always check the
+            # partis groupings in case partis merged some of those together.
+            # That's only because I've noted a bunch of lineage labels from
+            # elsewhere that I haven't yet confirmed.)
             # Otherwise, if it's a mix of assigned and blank lineages, use this
             # clone ID to group by all observed lineage names for this clone.
             # (TODO Wait, should I also span across other clone IDs that
@@ -246,7 +246,8 @@ def _finalize(out):
 def partis_seq_lineage_info(
         airr_in, csv_out,
         metadata_isolates=None, metadata_specimens=None, metadata_seqsets=None,
-        csv_ngs_annots=None, airr_in_igblast=None, airr_in_isolate_light=None, *, keep_all=False):
+        csv_ngs_annots=None, airr_in_igblast=None, airr_in_isolate_light=None,
+        *, keep_all=False, auto_group_for=None):
     """Report sequences with partis clones overlapping with our isolates"""
     # name -> attrs
     metadata = {
@@ -265,7 +266,7 @@ def partis_seq_lineage_info(
     clones, cloneids = _load_clones_from_partis_airr(airr_in, metadata, keep_all)
     out = _prep_seq_lineage_info(
             clones, metadata, ngs_annots, igblast_annots, isolate_light_annots, cloneids)
-    _assign_lineage_groups(out)
+    _assign_lineage_groups(out, auto_group_for)
     _finalize(out)
     keys_by_chain = ["v_family", "j_family", "v_identity", "junction_aa", "junction_aa_length"]
     keys = [
@@ -301,13 +302,17 @@ def main():
     arg("-n", "--ngs-annotations", help="optional CSV with Lineage info for known NGS sequences")
     arg("-A", "--igblast-airr", help="optional AIRR tsv.gz from IgBLAST to prefer for annotations")
     arg("-L", "--isolate-light-airr", help="optional AIRR tsv.gz for isolate light chain sequences")
+    arg("-X", "--auto-group-for", nargs="+",
+        help="category label(s) to allow merging lineage groups" \
+        " even if all have assigned lineages already (e.g. isolate_10x)")
     arg("-a", "--all", action="store_true",
         help="keep all sequences or only those belonging to clones that also include isolates?")
     args = parser.parse_args()
     partis_seq_lineage_info(
         args.input, args.output,
         args.metadata_isolates, args.metadata_specimens, args.metadata_seqsets,
-        args.ngs_annotations, args.igblast_airr, args.isolate_light_airr, keep_all=args.all)
+        args.ngs_annotations, args.igblast_airr, args.isolate_light_airr,
+        keep_all=args.all, auto_group_for=args.auto_group_for)
 
 if __name__ == "__main__":
     main()
