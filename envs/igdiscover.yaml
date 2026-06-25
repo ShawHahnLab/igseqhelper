@@ -6,3 +6,6 @@ channels:
   - defaults
 dependencies:
   - igdiscover>=0.15,<0.16
+  # for pkg_resources
+  # https://stackoverflow.com/a/79886564
+  - setuptools<82
