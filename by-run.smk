@@ -93,13 +93,18 @@ rule trim:
         species=config.get("species", "rhesus"),
         min_length=config.get("trim_min_length", 50),
         qual_cutoff=config.get("trim_qual_cutoff", 15),
+        # For two-color chemistries we'll get a trailing poly-G at the 3' end
+        # for short sequences.  Apply a special cutadapt setting for those.
+        # (cutadapt refers to this as nextseq specifically but it also includes
+        # our MiSeq i100 Plus.)
+        # https://cutadapt.readthedocs.io/en/stable/guide.html#nextseq-trim
         nextseq_qual_cutoff=config.get("trim_nextseq_qual_cutoff", 15),
-        is_nextseq=lambda w: RUNS.get(w.run, {}).get("SequencerModel") == "NextSeq"
+        do_nextseq_trim_algorithm=lambda w: RUNS.get(w.run, {}).get("SequencerModel") in ("NextSeq", "MiSeq i100")
     shell:
         """
             conda list --explicit > {log.conda}
             nextseq_args=""
-            if [[ "{params.is_nextseq}" == "True" ]]; then
+            if [[ "{params.do_nextseq_trim_algorithm}" == "True" ]]; then
                 nextseq_args="--nextseq-trim {params.nextseq_qual_cutoff}"
             fi
             (
@@ -108,7 +113,7 @@ rule trim:
               echo "Min trimmed length: {params.min_length}"
               echo "Quality cutoff: {params.qual_cutoff}"
               echo "NextSeq quality cutoff: {params.nextseq_qual_cutoff}"
-              echo "Is NextSeq: {params.is_nextseq}"
+              echo "Using NextSeq trimming algorithm: {params.do_nextseq_trim_algorithm}"
             ) >> {log.main}
             (
               igseq trim -t {threads} \
