@@ -34,8 +34,16 @@ def sonar_recluster_fasta(csv_in, rearr_in, fasta_out):
             query_trim = aln[1][idx_query_start:idx_query_end]
             assert query_trim == seq_old_vdj # it better be!
             fields = {
+                # SONAR-style read counts of exact duplicates to the given
+                # sequence and total of those clustered here (even if slightly
+                # different)
                 "duplicate_count": row["duplicate_count"],
-                "cluster_count": row["cluster_count"]}
+                "cluster_count": row["cluster_count"],
+                # My own summary value for read base call quality: the minimum
+                # quality score observed across bases among the *maximum*
+                # quality score observed for each base.  (in other words, how
+                # shaky is the shakiest-looking base call for the cluster?)
+                "sequence_quality_min": row["sequence_quality_min"]}
             desc = " ".join(f"{key}={val}" for key, val in fields.items())
             writer.write({
                 "sequence_id": row["sequence_id"],
