@@ -31,18 +31,24 @@ wildcard_constraints:
 include: "metadata.smk"
 include: "by-run.smk"
 include: "by-run-locus-demux.smk"
-include: "mining-d.smk"
-include: "igdiscover.smk"
-include: "sonar.smk"
-include: "partis.smk"
 include: "igblast.smk"
 include: "fastqc.smk"
-include: "armadillo.smk"
-include: "reporting.smk"
-include: "reporting_counts.smk"
-include: "reporting_lineages.smk"
-include: "reporting_sonar.smk"
-include: "reporting_germline.smk"
-include: "reporting_igdiscover.smk"
-include: "reporting_mining-d.smk"
-include: "summary.smk"
+# (including these optional toggles to allow us to skip loading the remaining
+# rules, because sometimes under heavy filesystem load just the gathering of
+# the huge number of per-subject/per-lineage/etc. rules in the workflow can
+# take quite a while.)
+if not config.get("igseq_verysimple_workflow"):
+    include: "mining-d.smk"
+    include: "igdiscover.smk"
+    include: "sonar.smk"
+    include: "partis.smk"
+    if not config.get("igseq_simple_workflow"):
+        include: "armadillo.smk"
+        include: "reporting.smk"
+        include: "reporting_counts.smk"
+        include: "reporting_lineages.smk"
+        include: "reporting_sonar.smk"
+        include: "reporting_germline.smk"
+        include: "reporting_igdiscover.smk"
+        include: "reporting_mining-d.smk"
+        include: "summary.smk"
