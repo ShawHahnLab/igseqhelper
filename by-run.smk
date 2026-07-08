@@ -277,7 +277,7 @@ def grouped_samples_input(w, pattern="analysis/filt/{runid}/{samp}.fastq.gz"):
     else:
         raise ValueError("unrecognized wildcards for rule grouped_samples_input")
     if not targets:
-        raise ValueError("no matching inputs for rule grouped_samples_input")
+        raise ValueError(f"no matching inputs for rule grouped_samples_input ({w})")
     return targets
 
 # path_link -> path_real
