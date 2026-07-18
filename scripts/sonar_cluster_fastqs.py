@@ -52,7 +52,7 @@ def sonar_cluster_fastqs(airr_in, dir_out, fqgz_dir_in):
     dir_out = Path(dir_out)
     clusters = _load_clusters(airr_in)
     fqgzs = Path(fqgz_dir_in).glob("*.fastq.gz")
-    fqgz_recs = _load_fqgz_recs(fqgzs, clusters)
+    fqgz_recs = _load_fqgz_recs(fqgzs, clusters) if clusters else {}
     dir_out.mkdir(parents=True, exist_ok=True)
     for centroid, rows in clusters.items():
         qual_recs = []
