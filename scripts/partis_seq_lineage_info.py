@@ -121,22 +121,21 @@ def __include_igblast_attrs(row_out, igblast):
         "junction_aa_length":
             len(igblast_attrs["junction_aa"]) if igblast_attrs["sequence"] else None})
 
-def __include_ngs_attrs(row_out, ngs_annots):
-    # Do we have NGS seq annotations for it?  If so, take the lineage from
-    # there if not otherwise specified
-    if row_out["category"] == "ngs":
-        ngsid = "wk" + row_out["timepoint"] + "-" + row_out["sequence_id_original"]
-        if ngsid in ngs_annots:
-            ngs_attrs = ngs_annots[ngsid]
-            # sanity check with sequence content if present
-            if ngs_attrs.get("sequence") and \
-                    row_out.get("sequence") and \
-                    ngs_attrs["sequence"] not in row_out["sequence"]:
-                print(row_out["sequence"])
-                print(ngs_attrs["sequence"])
-                raise ValueError(f"Sequence mismatch for {row_out['sequence_id']}")
-            if not row_out["lineage"]:
-                row_out["lineage"] = ngs_attrs.get("Lineage", "")
+def __include_custom_attrs(row_out, custom_annots):
+    # Do we have our own manual annotations for this ID?  If so, take the
+    # lineage from there if not otherwise specified
+    # (now using the same full, unambiguous ID used in my partis rules, so we
+    # can generalize this beyond just the NGS rows)
+    if (custom_attrs := custom_annots.get(row_out["sequence_id"])):
+        # also sanity check with sequence content if present
+        if custom_attrs.get("sequence") and \
+                row_out.get("sequence") and \
+                custom_attrs["sequence"] not in row_out["sequence"]:
+            print(row_out["sequence"])
+            print(custom_attrs["sequence"])
+            raise ValueError(f"Sequence mismatch for {row_out['sequence_id']}")
+        if not row_out["lineage"]:
+            row_out["lineage"] = custom_attrs.get("Lineage", "")
 
 def __include_isolate_light_attrs(row_out, isolate_light_annots):
     attrs = isolate_light_annots.get(row_out["sequence_light"], {})
@@ -162,7 +161,7 @@ def __check_for_duplicated_isolates(out):
         for isolate, num in isolate_tally.items():
             print(f"  {isolate}: {num}")
 
-def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, isolate_light_annots, cloneids):
+def _prep_seq_lineage_info(clones, metadata, custom_annots, igblast, isolate_light_annots, cloneids):
     # include everything that's listed under any of those clone IDs of
     # interest, if defined.  Each sequence can have one clone ID from partis
     # and one (if it's in our isolate metadata) Lineage assigned from us.
@@ -178,9 +177,9 @@ def _prep_seq_lineage_info(clones, metadata, ngs_annots, igblast, isolate_light_
                 if row_out is None:
                     continue
                 # Add additional information with the help of IgBLAST output
-                # and (if applicable) manually-defined info on NGS sequences
+                # and (if applicable) manually-defined info on sequences
                 __include_igblast_attrs(row_out, igblast)
-                __include_ngs_attrs(row_out, ngs_annots)
+                __include_custom_attrs(row_out, custom_annots)
                 __include_isolate_light_attrs(row_out, isolate_light_annots)
                 row_out.update({
                     "partis_clone_id": row["clone_id"] or "",
@@ -246,7 +245,7 @@ def _finalize(out):
 def partis_seq_lineage_info(
         airr_in, csv_out,
         metadata_isolates=None, metadata_specimens=None, metadata_seqsets=None,
-        csv_ngs_annots=None, airr_in_igblast=None, airr_in_isolate_light=None,
+        csv_custom_annots=None, airr_in_igblast=None, airr_in_isolate_light=None,
         *, keep_all=False, auto_group_for=None):
     """Report sequences with partis clones overlapping with our isolates"""
     # name -> attrs
@@ -256,7 +255,7 @@ def partis_seq_lineage_info(
         "seqsets": _load_metadata(metadata_seqsets),
         }
     # seq ID here -> custom attrs incl. Lineage
-    ngs_annots = _load_metadata(csv_ngs_annots, "sequence_id")
+    custom_annots = _load_metadata(csv_custom_annots, "sequence_id")
     # seq ID here -> IgBLAST attrs
     igblast_annots = _load_igblast_airr(airr_in_igblast)
     # unique isolate light seq -> AIRR attrs
@@ -265,7 +264,7 @@ def partis_seq_lineage_info(
     isolate_light_annots = _load_igblast_airr(airr_in_isolate_light, "sequence")
     clones, cloneids = _load_clones_from_partis_airr(airr_in, metadata, keep_all)
     out = _prep_seq_lineage_info(
-            clones, metadata, ngs_annots, igblast_annots, isolate_light_annots, cloneids)
+            clones, metadata, custom_annots, igblast_annots, isolate_light_annots, cloneids)
     _assign_lineage_groups(out, auto_group_for)
     _finalize(out)
     keys_by_chain = ["v_family", "j_family", "v_identity", "junction_aa", "junction_aa_length"]
@@ -299,7 +298,7 @@ def main():
     arg("--metadata-isolates", help="CSV with Isolate metadata")
     arg("--metadata-specimens", help="CSV with Specimen metadata")
     arg("--metadata-seqsets", help="CSV with SeqSet metadata")
-    arg("-n", "--ngs-annotations", help="optional CSV with Lineage info for known NGS sequences")
+    arg("-n", "--custom-annotations", help="optional CSV with Lineage info for known sequences")
     arg("-A", "--igblast-airr", help="optional AIRR tsv.gz from IgBLAST to prefer for annotations")
     arg("-L", "--isolate-light-airr", help="optional AIRR tsv.gz for isolate light chain sequences")
     arg("-X", "--auto-group-for", nargs="+",
@@ -311,7 +310,7 @@ def main():
     partis_seq_lineage_info(
         args.input, args.output,
         args.metadata_isolates, args.metadata_specimens, args.metadata_seqsets,
-        args.ngs_annotations, args.igblast_airr, args.isolate_light_airr,
+        args.custom_annotations, args.igblast_airr, args.isolate_light_airr,
         keep_all=args.all, auto_group_for=args.auto_group_for)
 
 if __name__ == "__main__":

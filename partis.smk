@@ -304,11 +304,11 @@ def input_for_partis_seq_lineage_info(w):
         "specimens": "metadata/specimens.csv",
         "seqsets": "metadata/seqsets.csv",
         "isolates": "metadata/isolates.csv"}
-    # If there's a CSV provided with NGS sequence lineage info, use that also,
-    # so we can assign custom lineage IDs to NGS seqs
-    path_annotations = path/"ngs_lineages.csv"
+    # If there's a CSV provided with sequence lineage info, use that also, so
+    # we can assign custom lineage IDs to NGS or other seqs
+    path_annotations = path/"custom_lineage_assignments.csv"
     if path_annotations.exists():
-        targets["ngs_annots"] = path_annotations
+        targets["custom_annots"] = path_annotations
     return targets
 
 rule partis_seq_lineage_info:
@@ -318,8 +318,8 @@ rule partis_seq_lineage_info:
     priority: 10
     run:
         cmd = "partis_seq_lineage_info.py {input.airr} {output} --metadata-isolates {input.isolates} --metadata-specimens {input.specimens} --metadata-seqsets {input.seqsets} -A {input.airr_igblast} -L {input.airr_isolates_light} --all"
-        if "ngs_annots" in dict(input):
-            cmd += " -n {input.ngs_annots}"
+        if "custom_annots" in dict(input):
+            cmd += " -n {input.custom_annots}"
         shell(cmd)
 
 rule partis_lineages:
