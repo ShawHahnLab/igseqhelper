@@ -2,9 +2,13 @@
 
 """
 Report sequence and lineage info from partis, merging metadata for our seqs+isolates.
+
+This notes rows that seem like duplicates or conflicting sequences based on
+cell barcodes, for 10x, but doesn't actually remove them.
 """
 
 import re
+import sys
 import gzip
 import argparse
 from collections import defaultdict
@@ -57,9 +61,15 @@ def __infer_basics_from_metadata(seqid_in, metadata):
     timepoint_seqid = re.match("wk([0-9]+)-.*", seqid_in)
     if timepoint_seqid:
         timepoint_seqid = timepoint_seqid.group(1)
+    # will assume any 16 NT motif inside a seq ID, delimited by dashes or
+    # underscores, is a 10x cell barcode
+    cell_barcode = ""
+    if (match := re.search(r"[-_]([ACTG]{16})[-_]", seqid_in)):
+        cell_barcode = match.group(1)
     row_out = {
         "sequence_id": seqid_in,
         "sequence_id_original": seqid,
+        "cell_barcode": cell_barcode,
         "category": category,
         "item": item,
         "timepoint": attrs.get("Timepoint", timepoint_seqid),
@@ -161,6 +171,46 @@ def __check_for_duplicated_isolates(out):
         for isolate, num in isolate_tally.items():
             print(f"  {isolate}: {num}")
 
+def __exclude_based_on_cell_barcodes(out):
+    # for seqset rows with cell barcodes inferred, exclude duplicates, but
+    # exclude all rows for the cell if the heavy chain sequences clash.
+    exclude_extras = set()
+    exclude_clashes = set()
+    # first, group those with barcodes, by barcodes
+    by_barcode = defaultdict(list)
+    for row in out:
+        if row["cell_barcode"] and row["category"] == "seqset_10x":
+            by_barcode[row["cell_barcode"]].append(row)
+    # Confirm only the item identifier and associated long seq ID differ, and
+    # if so, mark all but the first for removal (...and excluding notes since I
+    # make that a list object)
+    skips = ("sequence_id", "item", "notes")
+    for chunk in by_barcode.values():
+        check = {tuple(((k, v) for k, v in row.items() if k not in skips)) for row in chunk}
+        if len(check) != 1:
+            # If there's more than one unique case, after excluding the keys
+            # that actually should differ, categorize this as a clash between
+            # distinct heavy chains for all rows.
+            for row in chunk:
+                exclude_clashes.add(row["sequence_id"])
+        else:
+            # Otherwise, just note the extra rows past the first one as
+            # duplicates.
+            for row in chunk[1:]:
+                exclude_extras.add(row["sequence_id"])
+    # Mark those cases for exclusion.  (Looping over all rows but this will
+    # only set a non-empty string for the applicable 10x cases.)
+    if exclude_clashes:
+        sys.stderr.write(
+            f"Excluding {len(exclude_clashes)} sequences "
+            "with mismatched heavy chains within cells\n")
+    for row in out:
+        row["exclusion_reason"] = ""
+        if row["sequence_id"] in exclude_extras:
+            row["exclusion_reason"] = "duplicate"
+        if row["sequence_id"] in exclude_clashes:
+            row["exclusion_reason"] = "clash"
+
 def _prep_seq_lineage_info(clones, metadata, custom_annots, igblast, isolate_light_annots, cloneids):
     # include everything that's listed under any of those clone IDs of
     # interest, if defined.  Each sequence can have one clone ID from partis
@@ -185,6 +235,7 @@ def _prep_seq_lineage_info(clones, metadata, custom_annots, igblast, isolate_lig
                     "partis_clone_id": row["clone_id"] or "",
                     "lineage": row_out["lineage"] or ""})
                 out.append(row_out)
+    __exclude_based_on_cell_barcodes(out)
     __check_for_duplicated_isolates(out)
     return out
 
@@ -280,9 +331,11 @@ def partis_seq_lineage_info(
         "category",
         "item",
         "sequence_id_original",
+        "cell_barcode",
         "partis_clone_id",
         "lineage_group_category",
         "lineage",
+        "exclusion_reason",
         "notes"]
     with open(csv_out, "w", encoding="ASCII") as f_out:
         writer = DictWriter(f_out, keys, lineterminator="\n")

@@ -2,6 +2,8 @@
 
 """
 Summarize partis info per-lineage-group, one row per group+timepoint+category.
+
+This ignores rows in the input with exclusion_reason defined.
 """
 
 import re
@@ -28,8 +30,11 @@ COLS = [
     "total"]
 
 def _load_seq_info(csv_in):
+    seq_info = []
     with open(csv_in, encoding="ASCII") as f_in:
-        seq_info = list(DictReader(f_in))
+        for row in DictReader(f_in):
+            if not row["exclusion_reason"]:
+                seq_info.append(row)
     groups = defaultdict(list)
     for row in seq_info:
         # group rows by lineage group, including those with none assigned
