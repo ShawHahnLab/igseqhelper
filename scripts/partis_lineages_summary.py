@@ -143,8 +143,24 @@ def _prep_cols(info):
     cols += cols_heavy + [f"light_{col}" for col in cols_heavy if col != "d_call"]
     return cols, categories
 
-def partis_lineages_summary(csv_in, csv_out):
-    """Summarize partis info per-lineage-group further, one row per lineage group"""
+def _write(csv_out, cols, out):
+    with open(csv_out, "w", encoding="ASCII") as f_out:
+        writer = DictWriter(f_out, cols, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(out)
+
+def partis_lineages_summary(csv_in, csv_out, sort_junct_min, sort_total_min):
+    """Summarize partis info per-lineage-group further, one row per lineage group
+
+    Sorting is first into those above or below a juction length cutoff, then
+    those above or below a total lineage member count cutoff, then by
+    decreasing junction length and member count numbers.
+
+    sort_junct_min: at or above this heavy chain junction AA length (for max
+                    observed across lineage) will be at top
+    sort_total_min: next, at or above this for total member count will be at
+                    top
+    """
     with open(csv_in, encoding="ASCII") as f_in:
         info = list(DictReader(f_in))
     cols, categories = _prep_cols(info)
@@ -164,19 +180,16 @@ def partis_lineages_summary(csv_in, csv_out):
         out.append(row_out)
     # sort with these things highest:
     #
-    #  * >=20 AA CDRH3
-    #  * multiplets
+    #  * >=whatever AA CDRH3
+    #  * multiplets (that is, if sort_total_min=2)
     #  * longest junctions
     #  * highest member count
     out.sort(key=lambda row: (
-        not row["junction_aa_length_max"] >= 22,
-        not row["total"] > 1,
+        not row["junction_aa_length_max"] >= sort_junct_min,
+        not row["total"] >= sort_total_min,
         -row["junction_aa_length_max"],
         -row["total"]))
-    with open(csv_out, "w", encoding="ASCII") as f_out:
-        writer = DictWriter(f_out, cols, lineterminator="\n")
-        writer.writeheader()
-        writer.writerows(out)
+    _write(csv_out, cols, out)
 
 def main():
     """CLI for partis_lineages_summary"""
@@ -186,8 +199,10 @@ def main():
         help="CSV with per lineage group+timepoint+dataset category summary information")
     arg("output",
         help="CSV to write with one row per per lineage group")
+    arg("-J", "--sort-junct-min", type=int, default=23, help="")
+    arg("-T", "--sort-total-min", type=int, default=2, help="")
     args = parser.parse_args()
-    partis_lineages_summary(args.input, args.output)
+    partis_lineages_summary(args.input, args.output, args.sort_junct_min, args.sort_total_min)
 
 if __name__ == "__main__":
     main()

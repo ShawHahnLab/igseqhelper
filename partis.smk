@@ -334,4 +334,10 @@ rule partis_lineages_summary:
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups_summary.csv"
     input: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
     priority: 10
-    shell: "partis_lineages_summary.py {input} {output}"
+    params:
+        # Lineages at or above these values for heavy chain junction AA length
+        # and total lineage member count will be sorted on top, and the rest
+        # below.
+        sort_junct=23,
+        sort_total=2
+    shell: "partis_lineages_summary.py {input} {output} -J {params.sort_junct} -T {params.sort_total}"
