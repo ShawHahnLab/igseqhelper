@@ -55,6 +55,12 @@ fields:
     title: Light chain J gene
     description: Name of assigned light chain J gene, whether from generic germline reference or individualized
     type: string
+  - name: SuspectedVDDJ
+    title: Suspected VDDJ
+    description: Is this lineage a suspected case of a VDDJ recombination (D-D fusion)?
+    type: boolean
+    trueValues: [ "Y" ]
+    falseValues: [ "", "N" ]
   - name: GermlineComments
     title: Germline Comments
     description: Freeform comments about the germline assignments for each lineage
