@@ -8,6 +8,9 @@ import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
 
+DEFAULT_SORT_JUNCT_MIN=23
+DEFAULT_SORT_TOTAL_MIN=2
+
 def _condense_names(rows):
     # note isolate names if there aren't too many
     names = set()
@@ -128,7 +131,9 @@ def _prep_cols(info):
     # define categories, timepoints, output columns
     categories = sorted({row["category"] for row in info})
     timepoints = sorted({int(row["timepoint"]) for row in info})
-    cols = ["lineage_group", "names", "uca_seq_id", "uca_junction_aa_length_diff"]
+    cols = [
+        "lineage_group", "names", "uca_seq_id", "uca_junction_aa_length_diff",
+        "lineage_attrs", "suspected_vddj"]
     for category in categories:
         for timepoint in timepoints:
             # member total at this timepoint for this category
@@ -162,7 +167,8 @@ def _write(csv_out, cols, out):
         writer.writeheader()
         writer.writerows(out)
 
-def partis_lineages_summary(csv_in, csv_out, sort_junct_min, sort_total_min):
+def partis_lineages_summary(csv_in, csv_out, csv_in_lineage_attrs=None, *,
+        sort_junct_min=DEFAULT_SORT_JUNCT_MIN, sort_total_min=DEFAULT_SORT_TOTAL_MIN):
     """Summarize partis info per-lineage-group further, one row per lineage group
 
     Sorting is first into those above or below a juction length cutoff, then
@@ -176,6 +182,10 @@ def partis_lineages_summary(csv_in, csv_out, sort_junct_min, sort_total_min):
     """
     with open(csv_in, encoding="ASCII") as f_in:
         info = list(DictReader(f_in))
+    lin_attrs = {}
+    if csv_in_lineage_attrs:
+        with open(csv_in_lineage_attrs, encoding="ASCII") as f_in:
+            lin_attrs = {row["Lineage"]: row for row in DictReader(f_in)}
     cols, categories = _prep_cols(info)
     # group by lineage group
     groups = defaultdict(list)
@@ -186,7 +196,9 @@ def partis_lineages_summary(csv_in, csv_out, sort_junct_min, sort_total_min):
     for group, rows in groups.items():
         row_out = {
             "lineage_group": group,
-            "names": _condense_names(rows)}
+            "names": _condense_names(rows),
+            "lineage_attrs": "Y" if group in lin_attrs else "",
+            "suspected_vddj": lin_attrs.get(group, {}).get("SuspectedVDDJ")}
         row_out.update(_prep_chain_attrs(rows, "heavy"))
         row_out.update(_prep_chain_attrs(rows, "light"))
         row_out.update(_prep_uca_cols(rows))
@@ -213,10 +225,14 @@ def main():
         help="CSV with per lineage group+timepoint+dataset category summary information")
     arg("output",
         help="CSV to write with one row per per lineage group")
-    arg("-J", "--sort-junct-min", type=int, default=23, help="")
-    arg("-T", "--sort-total-min", type=int, default=2, help="")
+    arg("-L", "--lineage-attrs", help="optional CSV with per-lineage metadata")
+    arg("-J", "--sort-junct-min", type=int, default=DEFAULT_SORT_JUNCT_MIN, help="")
+    arg("-T", "--sort-total-min", type=int, default=DEFAULT_SORT_TOTAL_MIN, help="")
     args = parser.parse_args()
-    partis_lineages_summary(args.input, args.output, args.sort_junct_min, args.sort_total_min)
+    partis_lineages_summary(
+        args.input, args.output, args.lineage_attrs,
+        sort_junct_min=args.sort_junct_min,
+        sort_total_min=args.sort_total_min)
 
 if __name__ == "__main__":
     main()

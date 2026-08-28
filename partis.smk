@@ -343,7 +343,7 @@ rule partis_seq_lineage_info:
             "--metadata-isolates {input.isolates} --metadata-specimens {input.specimens} "
             "--metadata-seqsets {input.seqsets} "
             "-A {input.airr_igblast} -L {input.airr_isolates_light} -U {input.airr_igblast_ucas} "
-            "--all")
+            "--all -P {wildcards.subject}")
         if "custom_annots" in dict(input):
             cmd += " -n {input.custom_annots}"
         shell(cmd)
@@ -358,7 +358,9 @@ rule partis_lineages:
 rule partis_lineages_summary:
     """Summarize partis info per-lineage-group further, one row per lineage group"""
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups_summary.csv"
-    input: "analysis/partis/{subject}.{chain_type}/lineage_groups.csv"
+    input:
+        lin_groups="analysis/partis/{subject}.{chain_type}/lineage_groups.csv",
+        lin_attrs=ancient("metadata/lineages.csv")
     priority: 10
     params:
         # Lineages at or above these values for heavy chain junction AA length
@@ -366,4 +368,8 @@ rule partis_lineages_summary:
         # below.
         sort_junct=23,
         sort_total=2
-    shell: "partis_lineages_summary.py {input} {output} -J {params.sort_junct} -T {params.sort_total}"
+    shell:
+        """
+            partis_lineages_summary.py {input.lin_groups} {output} \
+                -L {input.lin_attrs} -J {params.sort_junct} -T {params.sort_total}
+        """

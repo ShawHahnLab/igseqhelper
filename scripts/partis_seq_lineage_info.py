@@ -237,7 +237,7 @@ def _prep_seq_lineage_info(clones, metadata, custom_annots, igblast, isolate_lig
                 out.append(row_out)
     return out
 
-def _assign_lineage_groups(out, auto_group_for=None):
+def _assign_lineage_groups(out, lin_prefix=None, auto_group_for=None):
     # For each partis clone ID, note the set of all corresponding lineages we
     # have manually assigned from any data source
     clone_lineages = defaultdict(set)
@@ -258,6 +258,8 @@ def _assign_lineage_groups(out, auto_group_for=None):
             row["lineage_group_category"] = "none"
             if row["partis_clone_id"]:
                 row["lineage_group"] = "partis-" + row["partis_clone_id"]
+                if lin_prefix:
+                    row["lineage_group"] = lin_prefix + "-" + row["lineage_group"]
                 row["lineage_group_category"] = "automatic"
         elif "" in lins or (auto_group_for and row["category"] in auto_group_for):
             # (Bypassing the empty-lineage-assignment check for given category
@@ -378,7 +380,7 @@ def partis_seq_lineage_info(
         metadata_isolates=None, metadata_specimens=None, metadata_seqsets=None,
         csv_custom_annots=None,
         airr_in_igblast=None, airr_in_isolate_light=None, airr_in_uca=None,
-        *, keep_all=False, auto_group_for=None):
+        *, lin_prefix=None, keep_all=False, auto_group_for=None):
     """Report sequences with partis clones overlapping with our isolates"""
     # name -> attrs
     metadata = {
@@ -402,7 +404,7 @@ def partis_seq_lineage_info(
             clones, metadata, custom_annots, igblast_annots, isolate_light_annots, cloneids)
     _exclude_based_on_cell_barcodes(out)
     _check_for_duplicated_isolates(out)
-    _assign_lineage_groups(out, auto_group_for)
+    _assign_lineage_groups(out, lin_prefix, auto_group_for)
     _note_uca_diffs(out, uca_annots)
     _exclude_duke_pair_edge_cases(out)
     _finalize(out)
@@ -445,6 +447,8 @@ def main():
     arg("-A", "--igblast-airr", help="optional AIRR tsv.gz from IgBLAST to prefer for annotations")
     arg("-L", "--isolate-light-airr", help="optional AIRR tsv.gz for isolate light chain sequences")
     arg("-U", "--uca-heavy-airr", help="optional AIRR tsv.gz for UCA heavy chain sequences")
+    arg("-P", "--lineage-name-prefix",
+        help="optional prefix for auto-named lineage groups (like subject ID)")
     arg("-X", "--auto-group-for", nargs="+",
         help="category label(s) to allow merging lineage groups" \
         " even if all have assigned lineages already (e.g. isolate_10x)")
@@ -455,7 +459,7 @@ def main():
         args.input, args.output,
         args.metadata_isolates, args.metadata_specimens, args.metadata_seqsets,
         args.custom_annotations, args.igblast_airr, args.isolate_light_airr, args.uca_heavy_airr,
-        keep_all=args.all, auto_group_for=args.auto_group_for)
+        lin_prefix=args.lineage_name_prefix, keep_all=args.all, auto_group_for=args.auto_group_for)
 
 if __name__ == "__main__":
     main()
