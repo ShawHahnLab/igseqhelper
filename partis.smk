@@ -282,6 +282,26 @@ rule partis_partition_airr:
 
 ### Below is really reporting logic, but, no time for proper organization here
 
+rule partis_lineage_ucas:
+    """Gather any discovered UCA/RUA sequences across lineages for one subject"""
+    # Will use this to annotate changes relative to UCA, like CDRH3 indels
+    output: "analysis/partis/{subject}.{chain_type}/UCAs.fasta"
+    run:
+        chain = "heavy"
+        if wildcards.chain_type in ["kappa", "lambda"]:
+            chain = "light"
+        ucas = []
+        for subdir in Path(f"summary/{wildcards.subject}").glob("*"):
+            name = subdir.name
+            path = subdir/f"{name}_{chain}.fa"
+            if path.exists():
+                for rec in SeqIO.parse(path, "fasta"):
+                    if rec.id in (f"{name}_RUA", f"{name}_UCA"):
+                        ucas.append((name, rec.id, str(rec.seq).replace("-", "")))
+        with open(output[0], "w", encoding="ASCII") as f_out:
+            for lineage, seqid, seq in ucas:
+                f_out.write(f">{seqid} {lineage}\n{seq}\n")
+
 rule isolates_light_fasta:
     output: temp("analysis/partis/isolates_light.fasta")
     run:
@@ -301,6 +321,7 @@ def input_for_partis_seq_lineage_info(w):
         "airr": path/"partitions.airr.tsv",
         "airr_igblast": igblast_path/"combined.fasta.tsv.gz",
         "airr_isolates_light": "analysis/igblast/sonarramesh/partis/isolates_light.fasta.tsv.gz",
+        "airr_igblast_ucas": igblast_path/"UCAs.fasta.tsv.gz",
         "specimens": "metadata/specimens.csv",
         "seqsets": "metadata/seqsets.csv",
         "isolates": "metadata/isolates.csv"}
@@ -317,7 +338,12 @@ rule partis_seq_lineage_info:
     input: unpack(input_for_partis_seq_lineage_info)
     priority: 10
     run:
-        cmd = "partis_seq_lineage_info.py {input.airr} {output} --metadata-isolates {input.isolates} --metadata-specimens {input.specimens} --metadata-seqsets {input.seqsets} -A {input.airr_igblast} -L {input.airr_isolates_light} --all"
+        cmd = (
+            "partis_seq_lineage_info.py {input.airr} {output} "
+            "--metadata-isolates {input.isolates} --metadata-specimens {input.specimens} "
+            "--metadata-seqsets {input.seqsets} "
+            "-A {input.airr_igblast} -L {input.airr_isolates_light} -U {input.airr_igblast_ucas} "
+            "--all")
         if "custom_annots" in dict(input):
             cmd += " -n {input.custom_annots}"
         shell(cmd)

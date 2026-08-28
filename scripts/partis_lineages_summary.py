@@ -92,6 +92,19 @@ def _format_d_call(rows):
         d_call = "/".join(sorted(d_call))
     return d_call
 
+def _prep_uca_cols(rows):
+    uca_ids = set()
+    diffs = set()
+    for row in rows:
+        uca_ids.add(row["uca_seq_id"])
+        tp = row["timepoint"]
+        diffs_here = set(row["uca_junction_aa_length_diff"].split(" ")) - {""}
+        diffs = diffs | {f"wk{tp}{diff}" for diff in diffs_here}
+    diffs = " ".join(sorted(diffs))
+    assert len(uca_ids) == 1
+    uca_ids = uca_ids.pop()
+    return {"uca_seq_id": uca_ids, "uca_junction_aa_length_diff": diffs}
+
 def _add_summary_cols(row_out, rows, categories):
     totals = defaultdict(int)
     times = defaultdict(list)
@@ -115,7 +128,7 @@ def _prep_cols(info):
     # define categories, timepoints, output columns
     categories = sorted({row["category"] for row in info})
     timepoints = sorted({int(row["timepoint"]) for row in info})
-    cols = ["lineage_group", "names"]
+    cols = ["lineage_group", "names", "uca_seq_id", "uca_junction_aa_length_diff"]
     for category in categories:
         for timepoint in timepoints:
             # member total at this timepoint for this category
@@ -176,6 +189,7 @@ def partis_lineages_summary(csv_in, csv_out, sort_junct_min, sort_total_min):
             "names": _condense_names(rows)}
         row_out.update(_prep_chain_attrs(rows, "heavy"))
         row_out.update(_prep_chain_attrs(rows, "light"))
+        row_out.update(_prep_uca_cols(rows))
         _add_summary_cols(row_out, rows, categories)
         out.append(row_out)
     # sort with these things highest:

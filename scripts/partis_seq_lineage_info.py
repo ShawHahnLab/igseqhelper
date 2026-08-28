@@ -157,7 +157,7 @@ def __include_isolate_light_attrs(row_out, isolate_light_annots):
     "light_junction_aa_length":
         len(attrs.get("junction_aa", "")) if row_out["sequence_light"] else None})
 
-def __check_for_duplicated_isolates(out):
+def _check_for_duplicated_isolates(out):
     # Sanity-check the isolates to ensure we don't have duplicates.  I worry
     # this could happen for the 10x sequences that could be present both in the
     # "seqsets" files and also stored as isolates.
@@ -171,7 +171,7 @@ def __check_for_duplicated_isolates(out):
         for isolate, num in isolate_tally.items():
             print(f"  {isolate}: {num}")
 
-def __exclude_based_on_cell_barcodes(out):
+def _exclude_based_on_cell_barcodes(out):
     # for seqset rows with cell barcodes inferred, exclude duplicates, but
     # exclude all rows for the cell if the heavy chain sequences clash.
     exclude_extras = set()
@@ -235,8 +235,6 @@ def _prep_seq_lineage_info(clones, metadata, custom_annots, igblast, isolate_lig
                     "partis_clone_id": row["clone_id"] or "",
                     "lineage": row_out["lineage"] or ""})
                 out.append(row_out)
-    __exclude_based_on_cell_barcodes(out)
-    __check_for_duplicated_isolates(out)
     return out
 
 def _assign_lineage_groups(out, auto_group_for=None):
@@ -274,13 +272,95 @@ def _assign_lineage_groups(out, auto_group_for=None):
             # set up so that we could end with some things labeled "linA" and
             # others "linA/linB".  But good enough for now.)
             lineages = set(clone_lineages[row["partis_clone_id"]]) - {""}
-            row["lineage_group"] = "/".join(sorted(lineages))
+            lineages = sorted(lineages)
+            # edge case for a few Duke entries that would otherwise be like
+            # "DI57-Duke-H035106-K028816/DI57-Duke-H035106-L028115"
+            # will instead be like
+            # "DI57-Duke-035106"
+            duke_pattern = r"([A-Z0-9]+-Duke-H[0-9]+)-[KL][0-9]+$"
+            if len(lineages) > 1 and all(re.match(duke_pattern, lin) for lin in lineages):
+                prefix = re.match(duke_pattern, lineages[0])
+                prefix = prefix.group(1)
+                if all(lin.startswith(prefix) for lin in lineages):
+                    # if all start like that, then use short form
+                    row["lineage_group"] = re.sub(r"-H([0-9]+)$", r"-\1", prefix)
+                else:
+                    # if not, nevermind, just glom them together anyway
+                    row["lineage_group"] = "/".join(lineages)
+            else:
+                row["lineage_group"] = "/".join(lineages)
             row["lineage_group_category"] = "partis-grouped"
         else:
             # otherwise just use this row's one lineage as its group name,
             # ignoring partis' grouping
             row["lineage_group"] = row["lineage"]
             row["lineage_group_category"] = "manual"
+
+def _note_uca_diffs(out, uca_annots):
+    for row in out:
+        row["uca_seq_id"] = ""
+        row["uca_junction_aa_length_diff"] = None
+        # Prefer "UCA", then "RUA"
+        keys = [row["lineage_group"] + f"_{suf}" for suf in ("UCA", "RUA")]
+        for key in keys:
+            if (attrs := uca_annots.get(key)):
+                len_uca = int(attrs["junction_aa_length"])
+                len_ab = int(row["junction_aa_length"])
+                diff = len_ab - len_uca
+                diff = f"{diff:+}"
+                row["uca_seq_id"] = attrs["sequence_id"]
+                row["uca_junction_aa_length_diff"] = diff
+                break
+
+def _exclude_duke_pair_edge_cases(out):
+    # For instances where I have multiple antibody entries with the exact same
+    # heavy chain noted (not the same sequence content but literally the same
+    # observed heavy chain represented in more than one ab entry), as happens
+    # when Duke reported things like IGH+IGK+IGL, ensure I don't include the
+    # same one multiple times for a single lineage group.
+    # These are isolates with names like "CE89-Duke-H033694-K028155".
+    # If this issue comes up, and one of the duplicated cases has a light chain
+    # matching the lineage for other members, prefer that one.
+    def getlightlocus(row):
+        try:
+            return row["light_v_family"][2] # "K" or "L"
+        except IndexError:
+            return None
+    chunks = defaultdict(list)
+    for row in out:
+        chunks[row["lineage_group"]].append(row)
+    for rows in chunks.values():
+        duke_isol = defaultdict(list)
+        lights = defaultdict(int)
+        for row in rows:
+            if row["category"] == "isolate" and \
+                    (match := re.match(r".*-Duke-H([0-9]+)-[KL][0-9]+", row["sequence_id"])):
+                # for the Duke ones, group them by heavy ID
+                heavy_num = match.group(1)
+                duke_isol[heavy_num].append(row)
+            else:
+                # for the others, just note what light loci are present, if any
+                if (light_locus := getlightlocus(row)):
+                    lights[light_locus] += 1
+        for rows in duke_isol.values():
+            # for cases with more than one row for a Duke ab number, keep at
+            # most one row
+            if len(rows) > 1:
+                # is there a clear winner among light loci for the whole lineage?
+                # ("K" or "L" or "")
+                # if so, prefer that entry
+                light_here = sorted(((val, key) for val, key in lights.items()), reverse=True)
+                light_here = [pair for pair in light_here if pair[0] == light_here[0][0]]
+                light_here = light_here[0][1] if len(light_here) == 1 else None
+                rows = sorted(rows, key=lambda row, x=light_here: getlightlocus(row) != x)
+                # In any case just take the first one, once we're done with any sorting
+                seqid = rows[0]["sequence_id"]
+                if not light_here:
+                    rows[0]["notes"].append("arbitrarily selected "
+                        f"IG{getlightlocus(rows[0])} ab among duplicates")
+                for row in rows[1:]:
+                    row["exclusion_reason"] = ("duplicate heavy entry with "
+                        f"alternate light chain compared with {seqid}")
 
 def _finalize(out):
     for row in out:
@@ -296,7 +376,8 @@ def _finalize(out):
 def partis_seq_lineage_info(
         airr_in, csv_out,
         metadata_isolates=None, metadata_specimens=None, metadata_seqsets=None,
-        csv_custom_annots=None, airr_in_igblast=None, airr_in_isolate_light=None,
+        csv_custom_annots=None,
+        airr_in_igblast=None, airr_in_isolate_light=None, airr_in_uca=None,
         *, keep_all=False, auto_group_for=None):
     """Report sequences with partis clones overlapping with our isolates"""
     # name -> attrs
@@ -313,10 +394,17 @@ def partis_seq_lineage_info(
     # (This is purely to get some very basic attributes for the light chains so
     # we'll just track via sequence)
     isolate_light_annots = _load_igblast_airr(airr_in_isolate_light, "sequence")
+    # UCA/RUA seq ID -> AIRR attrs
+    # if provided, will note differences (just CDRH3 AA len currently) to UCA/RUA
+    uca_annots = _load_igblast_airr(airr_in_uca)
     clones, cloneids = _load_clones_from_partis_airr(airr_in, metadata, keep_all)
     out = _prep_seq_lineage_info(
             clones, metadata, custom_annots, igblast_annots, isolate_light_annots, cloneids)
+    _exclude_based_on_cell_barcodes(out)
+    _check_for_duplicated_isolates(out)
     _assign_lineage_groups(out, auto_group_for)
+    _note_uca_diffs(out, uca_annots)
+    _exclude_duke_pair_edge_cases(out)
     _finalize(out)
     keys_by_chain = ["v_family", "j_family", "v_identity", "junction_aa", "junction_aa_length"]
     keys = [
@@ -335,6 +423,8 @@ def partis_seq_lineage_info(
         "partis_clone_id",
         "lineage_group_category",
         "lineage",
+        "uca_seq_id",
+        "uca_junction_aa_length_diff",
         "exclusion_reason",
         "notes"]
     with open(csv_out, "w", encoding="ASCII") as f_out:
@@ -354,6 +444,7 @@ def main():
     arg("-n", "--custom-annotations", help="optional CSV with Lineage info for known sequences")
     arg("-A", "--igblast-airr", help="optional AIRR tsv.gz from IgBLAST to prefer for annotations")
     arg("-L", "--isolate-light-airr", help="optional AIRR tsv.gz for isolate light chain sequences")
+    arg("-U", "--uca-heavy-airr", help="optional AIRR tsv.gz for UCA heavy chain sequences")
     arg("-X", "--auto-group-for", nargs="+",
         help="category label(s) to allow merging lineage groups" \
         " even if all have assigned lineages already (e.g. isolate_10x)")
@@ -363,7 +454,7 @@ def main():
     partis_seq_lineage_info(
         args.input, args.output,
         args.metadata_isolates, args.metadata_specimens, args.metadata_seqsets,
-        args.custom_annotations, args.igblast_airr, args.isolate_light_airr,
+        args.custom_annotations, args.igblast_airr, args.isolate_light_airr, args.uca_heavy_airr,
         keep_all=args.all, auto_group_for=args.auto_group_for)
 
 if __name__ == "__main__":
