@@ -133,7 +133,7 @@ def _prep_cols(info):
     timepoints = sorted({int(row["timepoint"]) for row in info})
     cols = [
         "lineage_group", "names", "uca_seq_id", "uca_junction_aa_length_diff",
-        "lineage_attrs", "suspected_vddj"]
+        "lineage_attrs", "comments", "suspected_vddj"]
     for category in categories:
         for timepoint in timepoints:
             # member total at this timepoint for this category
@@ -198,6 +198,7 @@ def partis_lineages_summary(csv_in, csv_out, csv_in_lineage_attrs=None, *,
             "lineage_group": group,
             "names": _condense_names(rows),
             "lineage_attrs": "Y" if group in lin_attrs else "",
+            "comments": lin_attrs.get(group, {}).get("Comments"),
             "suspected_vddj": lin_attrs.get(group, {}).get("SuspectedVDDJ")}
         row_out.update(_prep_chain_attrs(rows, "heavy"))
         row_out.update(_prep_chain_attrs(rows, "light"))
