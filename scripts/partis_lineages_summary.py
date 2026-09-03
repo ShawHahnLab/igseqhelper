@@ -97,16 +97,23 @@ def _format_d_call(rows):
 
 def _prep_uca_cols(rows):
     uca_ids = set()
+    uca_seqs = set()
     diffs = set()
     for row in rows:
-        uca_ids.add(row["uca_seq_id"])
+        uca_ids.add(row["uca_sequence_id"])
+        uca_seqs.add(row["uca_sequence"])
         tp = row["timepoint"]
         diffs_here = set(row["uca_junction_aa_length_diff"].split(" ")) - {""}
         diffs = diffs | {f"wk{tp}{diff}" for diff in diffs_here}
     diffs = " ".join(sorted(diffs))
     assert len(uca_ids) == 1
+    assert len(uca_seqs) == 1
     uca_ids = uca_ids.pop()
-    return {"uca_seq_id": uca_ids, "uca_junction_aa_length_diff": diffs}
+    uca_seqs = uca_seqs.pop()
+    return {
+        "uca_sequence_id": uca_ids,
+        "uca_sequence": uca_seqs,
+        "uca_junction_aa_length_diff": diffs}
 
 def _add_summary_cols(row_out, rows, categories):
     totals = defaultdict(int)
@@ -132,7 +139,7 @@ def _prep_cols(info):
     categories = sorted({row["category"] for row in info})
     timepoints = sorted({int(row["timepoint"]) for row in info})
     cols = [
-        "lineage_group", "names", "uca_seq_id", "uca_junction_aa_length_diff",
+        "lineage_group", "names", "uca_sequence_id", "uca_sequence", "uca_junction_aa_length_diff",
         "lineage_attrs", "comments", "suspected_vddj"]
     for category in categories:
         for timepoint in timepoints:

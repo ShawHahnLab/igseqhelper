@@ -300,7 +300,8 @@ def _assign_lineage_groups(out, lin_prefix=None, auto_group_for=None):
 
 def _note_uca_diffs(out, uca_annots):
     for row in out:
-        row["uca_seq_id"] = ""
+        row["uca_sequence_id"] = ""
+        row["uca_sequence"] = ""
         row["uca_junction_aa_length_diff"] = None
         # Prefer "UCA", then "RUA"
         keys = [row["lineage_group"] + f"_{suf}" for suf in ("UCA", "RUA")]
@@ -310,7 +311,8 @@ def _note_uca_diffs(out, uca_annots):
                 len_ab = int(row["junction_aa_length"])
                 diff = len_ab - len_uca
                 diff = f"{diff:+}"
-                row["uca_seq_id"] = attrs["sequence_id"]
+                row["uca_sequence_id"] = attrs["sequence_id"]
+                row["uca_sequence"] = attrs["sequence"].replace("-", "")
                 row["uca_junction_aa_length_diff"] = diff
                 break
 
@@ -425,7 +427,8 @@ def partis_seq_lineage_info(
         "partis_clone_id",
         "lineage_group_category",
         "lineage",
-        "uca_seq_id",
+        "uca_sequence_id",
+        "uca_sequence",
         "uca_junction_aa_length_diff",
         "exclusion_reason",
         "notes"]
