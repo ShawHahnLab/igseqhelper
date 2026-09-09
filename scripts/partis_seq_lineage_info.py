@@ -283,7 +283,6 @@ def _assign_lineage_groups(out, lin_prefix=None, auto_group_for=None):
             duke_pattern2 = r"([A-Z0-9]+-Duke-clone[0-9]+)-[KL]$"
             row["lineage_group"] = "/".join(lineages)
             if len(lineages) > 1:
-                print(lineages)
                 if all(re.match(duke_pattern, lin) for lin in lineages):
                     prefix = re.match(duke_pattern, lineages[0]).group(1)
                     if all(lin.startswith(prefix) for lin in lineages):
