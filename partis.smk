@@ -294,9 +294,10 @@ rule partis_lineage_ucas:
         for subdir in Path(f"summary/{wildcards.subject}").glob("*"):
             name = subdir.name
             path = subdir/f"{name}_{chain}.fa"
+            names = (f"{name}_RUA", f"{name}_UCA", f"{name}_UCA_Draft")
             if path.exists():
                 for rec in SeqIO.parse(path, "fasta"):
-                    if rec.id in (f"{name}_RUA", f"{name}_UCA"):
+                    if rec.id in names:
                         ucas.append((name, rec.id, str(rec.seq).replace("-", "")))
         with open(output[0], "w", encoding="ASCII") as f_out:
             for lineage, seqid, seq in ucas:

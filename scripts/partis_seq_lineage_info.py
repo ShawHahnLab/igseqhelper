@@ -279,18 +279,25 @@ def _assign_lineage_groups(out, lin_prefix=None, auto_group_for=None):
             # "DI57-Duke-H035106-K028816/DI57-Duke-H035106-L028115"
             # will instead be like
             # "DI57-Duke-035106"
-            duke_pattern = r"([A-Z0-9]+-Duke-H[0-9]+)-[KL][0-9]+$"
-            if len(lineages) > 1 and all(re.match(duke_pattern, lin) for lin in lineages):
-                prefix = re.match(duke_pattern, lineages[0])
-                prefix = prefix.group(1)
-                if all(lin.startswith(prefix) for lin in lineages):
-                    # if all start like that, then use short form
-                    row["lineage_group"] = re.sub(r"-H([0-9]+)$", r"-\1", prefix)
-                else:
-                    # if not, nevermind, just glom them together anyway
-                    row["lineage_group"] = "/".join(lineages)
-            else:
-                row["lineage_group"] = "/".join(lineages)
+            duke_pattern = r"([A-Z0-9]+-Duke-H?[0-9]+)-[KL][0-9]*$"
+            duke_pattern2 = r"([A-Z0-9]+-Duke-clone[0-9]+)-[KL]$"
+            row["lineage_group"] = "/".join(lineages)
+            if len(lineages) > 1:
+                print(lineages)
+                if all(re.match(duke_pattern, lin) for lin in lineages):
+                    prefix = re.match(duke_pattern, lineages[0]).group(1)
+                    if all(lin.startswith(prefix) for lin in lineages):
+                        # if all start like that, then use short form
+                        row["lineage_group"] = re.sub(r"-H?([0-9]+)$", r"-\1", prefix)
+                elif all(re.match(duke_pattern2, lin) for lin in lineages):
+                    # or this
+                    # "DH17-Duke-clone103-K/DH17-Duke-clone103-L"
+                    # will instead be like
+                    # "DH17-Duke-clone103"
+                    prefix = re.match(duke_pattern2, lineages[0]).group(1)
+                    if all(lin.startswith(prefix) for lin in lineages):
+                        # if all start like that, then use short form
+                        row["lineage_group"] = prefix
             row["lineage_group_category"] = "partis-grouped"
         else:
             # otherwise just use this row's one lineage as its group name,
@@ -304,7 +311,7 @@ def _note_uca_diffs(out, uca_annots):
         row["uca_sequence"] = ""
         row["uca_junction_aa_length_diff"] = None
         # Prefer "UCA", then "RUA"
-        keys = [row["lineage_group"] + f"_{suf}" for suf in ("UCA", "RUA")]
+        keys = [row["lineage_group"] + f"_{suf}" for suf in ("UCA", "UCA_Draft", "RUA")]
         for key in keys:
             if (attrs := uca_annots.get(key)):
                 len_uca = int(attrs["junction_aa_length"])
