@@ -367,7 +367,7 @@ rule partis_lineages_summary:
         # Lineages at or above these values for heavy chain junction AA length
         # and total lineage member count will be sorted on top, and the rest
         # below.
-        sort_junct=23,
+        sort_junct=24,
         sort_total=2
     shell:
         """
