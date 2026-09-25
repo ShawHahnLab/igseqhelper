@@ -280,7 +280,7 @@ def _assign_lineage_groups(out, lin_prefix=None, auto_group_for=None):
             # will instead be like
             # "DI57-Duke-035106"
             duke_pattern = r"([A-Z0-9]+-Duke-H?[0-9]+)-[KL][0-9]*$"
-            duke_pattern2 = r"([A-Z0-9]+-Duke-clone[0-9]+)-[KL]$"
+            duke_pattern2 = r"([A-Z0-9]+-Duke-clone[0-9]+)-?[KL]$"
             row["lineage_group"] = "/".join(lineages)
             if len(lineages) > 1:
                 if all(re.match(duke_pattern, lin) for lin in lineages):
