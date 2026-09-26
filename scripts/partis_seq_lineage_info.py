@@ -66,6 +66,10 @@ def __infer_basics_from_metadata(seqid_in, metadata):
     cell_barcode = ""
     if (match := re.search(r"[-_]([ACTG]{16})[-_]", seqid_in)):
         cell_barcode = match.group(1)
+    elif (match := re.search(r"[-_]([ACTG]{16})[-_]", attrs.get("AltName", ""))):
+        # or, for isolate entries that are actually from 10x, note the barcode
+        # from that metadata if present.
+        cell_barcode = match.group(1)
     row_out = {
         "sequence_id": seqid_in,
         "sequence_id_original": seqid,
@@ -73,6 +77,7 @@ def __infer_basics_from_metadata(seqid_in, metadata):
         "category": category,
         "item": item,
         "timepoint": attrs.get("Timepoint", timepoint_seqid),
+        "exclusion_reason": "",
         "notes": [],
         "lineage": "",
         "sequence_light": ""}
@@ -88,6 +93,7 @@ def __infer_basics_from_metadata(seqid_in, metadata):
             row_out["item"] = ""
             row_out["sequence_id_original"] = attrs["Isolate"]
             row_out["lineage"] = attrs["Lineage"]
+            row_out["exclusion_reason"] = "isolate"
     if attrs.get("Skip") == "TRUE":
         # skip entries if that's noted in their metadata (isolates
         # we don't want to actually analyze, basically); generally
@@ -163,24 +169,31 @@ def _check_for_duplicated_isolates(out):
     # "seqsets" files and also stored as isolates.
     isolate_tally = defaultdict(int)
     for row in out:
-        if row["category"] == "isolate":
+        if "isolate" in row["category"] and not row["exclusion_reason"]:
             isolate_tally[row["sequence_id_original"]] += 1
     isolate_tally = {key: val for key, val in isolate_tally.items() if val > 1}
     if isolate_tally:
         print("Duplicated isolates in output!")
         for isolate, num in isolate_tally.items():
             print(f"  {isolate}: {num}")
+        print(isolate_tally)
+        raise ValueError("Duplicated isolates in output!")
 
 def _exclude_based_on_cell_barcodes(out):
     # for seqset rows with cell barcodes inferred, exclude duplicates, but
     # exclude all rows for the cell if the heavy chain sequences clash.
     exclude_extras = set()
     exclude_clashes = set()
-    # first, group those with barcodes, by barcodes
+    # first, group those with barcodes, by barcodes (if not already excluded)
     by_barcode = defaultdict(list)
     for row in out:
-        if row["cell_barcode"] and row["category"] == "seqset_10x":
+        #if row["cell_barcode"] and row["category"] == "seqset_10x":
+        if row["cell_barcode"] and not row["exclusion_reason"]:
             by_barcode[row["cell_barcode"]].append(row)
+    # only seqset_10x should be left for any multiples
+    for chunk in by_barcode.values():
+        if len(chunk) > 1:
+            assert all(row["category"] == "seqset_10x" for row in chunk)
     # Confirm only the item identifier and associated long seq ID differ, and
     # if so, mark all but the first for removal (...and excluding notes since I
     # make that a list object)
@@ -205,7 +218,6 @@ def _exclude_based_on_cell_barcodes(out):
             f"Excluding {len(exclude_clashes)} sequences "
             "with mismatched heavy chains within cells\n")
     for row in out:
-        row["exclusion_reason"] = ""
         if row["sequence_id"] in exclude_extras:
             row["exclusion_reason"] = "duplicate"
         if row["sequence_id"] in exclude_clashes:
