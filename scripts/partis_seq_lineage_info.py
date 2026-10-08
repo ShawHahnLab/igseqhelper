@@ -93,7 +93,8 @@ def __infer_basics_from_metadata(seqid_in, metadata):
             row_out["item"] = ""
             row_out["sequence_id_original"] = attrs["Isolate"]
             row_out["lineage"] = attrs["Lineage"]
-            row_out["exclusion_reason"] = "isolate"
+            # (Assuming the isolate is present within the partis output itself
+            # here, later we'll also set exclusion_reason for this one.)
     if attrs.get("Skip") == "TRUE":
         # skip entries if that's noted in their metadata (isolates
         # we don't want to actually analyze, basically); generally
@@ -180,20 +181,30 @@ def _check_for_duplicated_isolates(out):
         raise ValueError("Duplicated isolates in output!")
 
 def _exclude_based_on_cell_barcodes(out):
-    # for seqset rows with cell barcodes inferred, exclude duplicates, but
-    # exclude all rows for the cell if the heavy chain sequences clash.
+    # for rows with cell barcodes inferred, exclude duplicates, but exclude all
+    # rows for the cell if the heavy chain sequences clash.  The one exception
+    # is if we have a named isolate with one of those barcodes (keep that, with
+    # warning).
     exclude_extras = set()
     exclude_clashes = set()
     # first, group those with barcodes, by barcodes (if not already excluded)
     by_barcode = defaultdict(list)
     for row in out:
-        #if row["cell_barcode"] and row["category"] == "seqset_10x":
         if row["cell_barcode"] and not row["exclusion_reason"]:
             by_barcode[row["cell_barcode"]].append(row)
-    # only seqset_10x should be left for any multiples
+    # Handle case of duplicate pairs across isolate_10x and seqset_10x.  These
+    # should have been caught and noted when inferring details from the
+    # metadata earlier.  Previously I excluded rows there, but realized
+    # exclusion should only happen based on duplicates within this partis table
+    # and not the separate metadata.
     for chunk in by_barcode.values():
-        if len(chunk) > 1:
-            assert all(row["category"] == "seqset_10x" for row in chunk)
+        if len(chunk) == 2 and {row["category"] for row in chunk} == {"isolate_10x"}:
+            for row in chunk:
+                if "Matched to isolate via seqset entry seq ID" in row["notes"]:
+                    row["exclusion_reason"] = "isolate"
+    # leave out any freshly-excluded ones before checking the rest
+    by_barcode = {key: [row for row in rows if not row["exclusion_reason"]] \
+            for key, rows in by_barcode.items()}
     # Confirm only the item identifier and associated long seq ID differ, and
     # if so, mark all but the first for removal (...and excluding notes since I
     # make that a list object)
@@ -219,9 +230,17 @@ def _exclude_based_on_cell_barcodes(out):
             "with mismatched heavy chains within cells\n")
     for row in out:
         if row["sequence_id"] in exclude_extras:
-            row["exclusion_reason"] = "duplicate"
+            if "isolate" in row["category"]:
+                sys.stderr.write(
+                    f"Keeping {row['sequence_id']} despite duplicate barcode elsewhere\n")
+            else:
+                row["exclusion_reason"] = "duplicate"
         if row["sequence_id"] in exclude_clashes:
-            row["exclusion_reason"] = "clash"
+            if "isolate" in row["category"]:
+                sys.stderr.write(
+                    f"Keeping {row['sequence_id']} despite barcode clash\n")
+            else:
+                row["exclusion_reason"] = "clash"
 
 def _prep_seq_lineage_info(clones, metadata, custom_annots, igblast, isolate_light_annots, cloneids):
     # include everything that's listed under any of those clone IDs of
