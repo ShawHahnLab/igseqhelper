@@ -22,15 +22,10 @@ COLS_HEAVY =  [
     "junction_aa_length_min",
     "junction_aa_length_max"]
 COLS_LIGHT = [f"light_{col}" for col in COLS_HEAVY if col != "d_call"]
-COLS = [
-    "lineage_group",
-    "names"] + COLS_HEAVY + COLS_LIGHT + [
-    "timepoint",
-    "uca_sequence_id",
-    "uca_sequence",
-    "uca_junction_aa_length_diff",
-    "category",
-    "total"]
+COLS_UCA_HEAVY = ["uca_sequence_id", "uca_sequence", "uca_junction_aa_length_diff"]
+COLS_UCA_LIGHT = [f"{col}_light" for col in COLS_UCA_HEAVY]
+COLS = ["lineage_group", "names", "timepoint", "category", "total"] + \
+    COLS_HEAVY + COLS_LIGHT + COLS_UCA_HEAVY + COLS_UCA_LIGHT
 
 def _load_seq_info(csv_in):
     seq_info = []
@@ -46,6 +41,7 @@ def _load_seq_info(csv_in):
     return groups
 
 def condense_families(rows, key):
+    """Give a single string with /-separated unique values"""
     return "/".join(sorted({row[key] for row in rows if row[key]}))
 
 def get_junction_aa_lengths(rows, prefix):
@@ -101,6 +97,24 @@ def _group_rows(rows):
         chunk[(timepoint, category)].append(row)
     return chunk
 
+def _summarize_uca_info(rows, chain):
+    # condense per-seq UCA info: note UCA used (ensure only one) and
+    # the unique instances of any differing junction AA lengths
+    # compared to UCA
+    suffix = {"heavy": "", "light": "_light"}[chain]
+    uca_seq_id = {row[f"uca_sequence_id{suffix}"] for row in rows}
+    uca_seq = {row[f"uca_sequence{suffix}"] for row in rows}
+    assert len(uca_seq_id) == 1
+    assert len(uca_seq) == 1
+    uca_seq_id = uca_seq_id.pop()
+    uca_seq = uca_seq.pop()
+    uca_junct_diff = sorted({row[f"uca_junction_aa_length_diff{suffix}"] for row in rows} - {"+0"})
+    uca_junct_diff = " ".join(uca_junct_diff)
+    return {
+        f"uca_sequence_id{suffix}": uca_seq_id,
+        f"uca_sequence{suffix}": uca_seq,
+        f"uca_junction_aa_length_diff{suffix}": uca_junct_diff}
+
 def partis_lineages(csv_in, csv_out):
     """Summarize partis info per-lineage-group, one row per group+timepoint+category"""
     groups = _load_seq_info(csv_in)
@@ -113,23 +127,11 @@ def partis_lineages(csv_in, csv_out):
             names = ""
             names = {row["sequence_id_original"] for row in rows}
             names = "/".join(sorted(names)) if len(names) < 10 else "(many)"
-            # condense per-seq UCA info: note UCA used (ensure only one) and
-            # the unique instances of any differing junction AA lengths
-            # compared to UCA
-            uca_seq_id = {row["uca_sequence_id"] for row in rows}
-            uca_seq = {row["uca_sequence"] for row in rows}
-            assert len(uca_seq_id) == 1
-            assert len(uca_seq) == 1
-            uca_seq_id = uca_seq_id.pop()
-            uca_seq = uca_seq.pop()
-            uca_junct_diff = sorted({row["uca_junction_aa_length_diff"] for row in rows} - {"+0"})
-            uca_junct_diff = " ".join(uca_junct_diff)
             row_out = {
                 "lineage_group": lineage_group,
-                "names": names,
-                "uca_sequence_id": uca_seq_id,
-                "uca_sequence": uca_seq,
-                "uca_junction_aa_length_diff": uca_junct_diff}
+                "names": names}
+            row_out.update(_summarize_uca_info(rows, "heavy"))
+            row_out.update(_summarize_uca_info(rows, "light"))
             row_out.update(_get_chain_attrs(rows, "heavy", lineage_group))
             row_out.update(_get_chain_attrs(rows, "light", lineage_group))
             row_out.update({
