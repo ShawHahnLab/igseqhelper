@@ -284,24 +284,28 @@ rule partis_partition_airr:
 
 rule partis_lineage_ucas:
     """Gather any discovered UCA/RUA sequences across lineages for one subject"""
-    # Will use this to annotate changes relative to UCA, like CDRH3 indels
-    output: "analysis/partis/{subject}.{chain_type}/UCAs.fasta"
+    # Will use this to annotate changes relative to UCA, like junction indels
+    output: "analysis/partis/UCAs.{subject}.fasta"
     run:
-        chain = "heavy"
-        if wildcards.chain_type in ["kappa", "lambda"]:
-            chain = "light"
         ucas = []
         for subdir in Path(f"summary/{wildcards.subject}").glob("*"):
             name = subdir.name
-            path = subdir/f"{name}_{chain}.fa"
             names = (f"{name}_RUA", f"{name}_UCA", f"{name}_UCA_Draft")
-            if path.exists():
-                for rec in SeqIO.parse(path, "fasta"):
-                    if rec.id in names:
-                        ucas.append((name, rec.id, str(rec.seq).replace("-", "")))
+            for chain in ("heavy", "light"):
+                path = subdir/f"{name}_{chain}.fa"
+                if path.exists():
+                    for rec in SeqIO.parse(path, "fasta"):
+                        if rec.id in names:
+                            ucas.append((name, rec.id, chain, str(rec.seq).replace("-", "")))
+        out = {}
+        for lineage, seqid, chain, seq in ucas:
+            seqid = f"{seqid}_{chain}"
+            desc = lineage
+            assert seqid not in out
+            out[seqid] = (desc, seq)
         with open(output[0], "w", encoding="ASCII") as f_out:
-            for lineage, seqid, seq in ucas:
-                f_out.write(f">{seqid} {lineage}\n{seq}\n")
+            for seqid, entry in out.items():
+                f_out.write(f">{seqid} {entry[0]}\n{entry[1]}\n")
 
 rule isolates_light_fasta:
     output: temp("analysis/partis/isolates_light.fasta")
@@ -318,11 +322,12 @@ def input_for_partis_seq_lineage_info(w):
     path = Path(expand("analysis/partis/{subject}.{chain_type}", **w)[0])
     # ...and IgBLAST's AIRR too
     igblast_path = Path(expand("analysis/igblast/custom-{subject}.IGH/partis/{subject}.{chain_type}", **w)[0])
+    igblast_path_ucas = Path(expand("analysis/igblast/custom-musa/partis/UCAs.{subject}.fasta.tsv.gz", **w)[0])
     targets = {
         "airr": path/"partitions.airr.tsv",
         "airr_igblast": igblast_path/"combined.fasta.tsv.gz",
         "airr_isolates_light": "analysis/igblast/sonarramesh/partis/isolates_light.fasta.tsv.gz",
-        "airr_igblast_ucas": igblast_path/"UCAs.fasta.tsv.gz",
+        "airr_igblast_ucas": igblast_path_ucas,
         "specimens": "metadata/specimens.csv",
         "seqsets": "metadata/seqsets.csv",
         "isolates": "metadata/isolates.csv"}

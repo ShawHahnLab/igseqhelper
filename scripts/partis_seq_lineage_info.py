@@ -5,6 +5,10 @@ Report sequence and lineage info from partis, merging metadata for our seqs+isol
 
 This notes rows that seem like duplicates or conflicting sequences based on
 cell barcodes, for 10x, but doesn't actually remove them.
+
+If an AIRR TSV for UCA sequences is provided, the IDs should be formatted as
+{lineage_group}_{thing}_{chain} where {thing} is "UCA", "UCA_Draft", or "RUA"
+and {chain} is "heavy" or "light".
 """
 
 import re
@@ -340,18 +344,33 @@ def _note_uca_diffs(out, uca_annots):
         row["uca_sequence_id"] = ""
         row["uca_sequence"] = ""
         row["uca_junction_aa_length_diff"] = None
-        # Prefer "UCA", then "RUA"
-        keys = [row["lineage_group"] + f"_{suf}" for suf in ("UCA", "UCA_Draft", "RUA")]
-        for key in keys:
-            if (attrs := uca_annots.get(key)):
-                len_uca = int(attrs["junction_aa_length"])
-                len_ab = int(row["junction_aa_length"])
-                diff = len_ab - len_uca
-                diff = f"{diff:+}"
-                row["uca_sequence_id"] = attrs["sequence_id"]
-                row["uca_sequence"] = attrs["sequence"].replace("-", "")
-                row["uca_junction_aa_length_diff"] = diff
-                break
+        row["uca_sequence_id_light"] = ""
+        row["uca_sequence_light"] = ""
+        row["uca_junction_aa_length_diff_light"] = None
+        # When considering candidate sequence IDs for comparison, prefer "UCA",
+        # then "RUA"
+        prefixes = [row["lineage_group"] + f"_{suf}" for suf in ("UCA", "UCA_Draft", "RUA")]
+        for chain in ("heavy", "light"):
+            for prefix in prefixes:
+                key = f"{prefix}_{chain}"
+                if key == "CE89-linC_UCA_light":
+                    print(f"UCA key: {key}")
+                if (uca_attrs := uca_annots.get(key)):
+                    len_uca = int(uca_attrs["junction_aa_length"])
+                    junct_key = "junction_aa_length"
+                    if chain == "light":
+                        junct_key = "light_" + junct_key
+                    out_suffix = "" if chain == "heavy" else "_light"
+                    row[f"uca_sequence_id{out_suffix}"] = uca_attrs["sequence_id"]
+                    row[f"uca_sequence{out_suffix}"] = uca_attrs["sequence"].replace("-", "")
+                    if (len_ab := row[junct_key]):
+                        len_ab = int(len_ab)
+                        diff = len_ab - len_uca
+                        diff = f"{diff:+}"
+                        row[f"uca_junction_aa_length_diff{out_suffix}"] = diff
+                    # If we found a candidate sequence (UCA/UCA draft/RUA) for
+                    # this chain, stop looking and move on
+                    break
 
 def _exclude_duke_pair_edge_cases(out):
     # For instances where I have multiple antibody entries with the exact same
@@ -467,6 +486,9 @@ def partis_seq_lineage_info(
         "uca_sequence_id",
         "uca_sequence",
         "uca_junction_aa_length_diff",
+        "uca_sequence_id_light",
+        "uca_sequence_light",
+        "uca_junction_aa_length_diff_light",
         "exclusion_reason",
         "notes"]
     with open(csv_out, "w", encoding="ASCII") as f_out:
@@ -486,7 +508,7 @@ def main():
     arg("-n", "--custom-annotations", help="optional CSV with Lineage info for known sequences")
     arg("-A", "--igblast-airr", help="optional AIRR tsv.gz from IgBLAST to prefer for annotations")
     arg("-L", "--isolate-light-airr", help="optional AIRR tsv.gz for isolate light chain sequences")
-    arg("-U", "--uca-heavy-airr", help="optional AIRR tsv.gz for UCA heavy chain sequences")
+    arg("-U", "--uca-airr", help="optional AIRR tsv.gz for UCA sequences (heavy/light/both)")
     arg("-P", "--lineage-name-prefix",
         help="optional prefix for auto-named lineage groups (like subject ID)")
     arg("-X", "--auto-group-for", nargs="+",
@@ -498,7 +520,7 @@ def main():
     partis_seq_lineage_info(
         args.input, args.output,
         args.metadata_isolates, args.metadata_specimens, args.metadata_seqsets,
-        args.custom_annotations, args.igblast_airr, args.isolate_light_airr, args.uca_heavy_airr,
+        args.custom_annotations, args.igblast_airr, args.isolate_light_airr, args.uca_airr,
         lin_prefix=args.lineage_name_prefix, keep_all=args.all, auto_group_for=args.auto_group_for)
 
 if __name__ == "__main__":
