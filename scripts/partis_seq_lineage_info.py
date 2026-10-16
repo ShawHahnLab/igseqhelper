@@ -352,10 +352,7 @@ def _note_uca_diffs(out, uca_annots):
         prefixes = [row["lineage_group"] + f"_{suf}" for suf in ("UCA", "UCA_Draft", "RUA")]
         for chain in ("heavy", "light"):
             for prefix in prefixes:
-                key = f"{prefix}_{chain}"
-                if key == "CE89-linC_UCA_light":
-                    print(f"UCA key: {key}")
-                if (uca_attrs := uca_annots.get(key)):
+                if (uca_attrs := uca_annots.get(f"{prefix}_{chain}")):
                     len_uca = int(uca_attrs["junction_aa_length"])
                     junct_key = "junction_aa_length"
                     if chain == "light":
