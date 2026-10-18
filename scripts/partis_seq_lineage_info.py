@@ -144,7 +144,8 @@ def __include_igblast_attrs(row_out, igblast):
 
 def __include_custom_attrs(row_out, custom_annots):
     # Do we have our own manual annotations for this ID?  If so, take the
-    # lineage from there if not otherwise specified
+    # lineage from there if not otherwise specified, and add the comment, if
+    # there is one, to the list of notes.
     # (now using the same full, unambiguous ID used in my partis rules, so we
     # can generalize this beyond just the NGS rows)
     if (custom_attrs := custom_annots.get(row_out["sequence_id"])):
@@ -155,6 +156,8 @@ def __include_custom_attrs(row_out, custom_annots):
             print(row_out["sequence"])
             print(custom_attrs["sequence"])
             raise ValueError(f"Sequence mismatch for {row_out['sequence_id']}")
+        if (note := custom_attrs.get("comments")):
+            row_out["notes"].append(note)
         if not row_out["lineage"]:
             row_out["lineage"] = custom_attrs.get("Lineage", "")
 
