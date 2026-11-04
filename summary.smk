@@ -7,14 +7,27 @@ Everything here is just copying over lightweight files created in other rules.
 def set_chain_type(w):
     """Set the chain_type wildcard based on chain and lineage and return as dict"""
     w = dict(w)
+    lin = w["antibody_lineage"]
     for lineage, attrs in ANTIBODY_LINEAGES.items():
-        if w["antibody_lineage"] == lineage:
+        if lin == lineage:
             break
     else:
-        raise ValueError(f"Can't find lineage {antibody_lineage}")
-    w["chain_type"] = "gamma"
-    if w["chain"] != "heavy" and attrs["LightLocus"]:
+        raise ValueError(f"Can't find lineage {lin}")
+    if w["chain"] == "heavy":
+        w["chain_type"] = "gamma"
+    elif attrs["LightLocus"]:
         w["chain_type"] = {"IGK": "kappa", "IGL": "lambda"}[attrs["LightLocus"]]
+    else:
+        # For light chain, we need to know what the locus is to know the chain
+        # type!
+        #
+        # But, rather than raising an exception, just set things up for a
+        # non-existent path, since Snakemake input functions can be called for
+        # all sorts of things when setting up the DAG.  (This way it'll only be
+        # a problem if the relevant input is actually needed for the output
+        # requested, and unrelated chain type values can still be left blank in
+        # the metadata.)
+        w["chain_type"] = "light_locus_not_specified"
     return w
 
 def summary_setup_lineage_helper_rules():
