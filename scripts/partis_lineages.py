@@ -59,6 +59,14 @@ def get_juncts(rows, prefix):
 
 def _get_chain_attrs(rows, chain, lineage_group):
     prefix = {"heavy": "", "light": "light_"}[chain]
+    if chain == "light":
+        # (one special case: drop light chain details from entries where we had
+        # clashing light chains for the same heavy chain)
+        rows = list(filter(
+            lambda row: not re.search(
+                r"arbitrarily selected IG[KL] ab among duplicates",
+                row["notes"]),
+            rows))
     v_family = ""
     j_family = ""
     d_call = ""
