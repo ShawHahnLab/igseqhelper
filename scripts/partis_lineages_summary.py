@@ -4,6 +4,7 @@
 Summarize partis info per-lineage-group further, one row per lineage group.
 """
 
+import re
 import argparse
 from collections import defaultdict
 from csv import DictReader, DictWriter
@@ -60,6 +61,7 @@ def _prep_chain_attrs(rows, chain):
         f"{prefix}v_identity_min": juncts_min[0][0] if juncts_min else None,
         f"{prefix}v_identity_max": juncts_max[0][0] if juncts_max else None,
         f"{prefix}d_call": _format_d_call(rows) if chain == "heavy" else "",
+        f"{prefix}d_call_source": "igblast" if chain == "heavy" else "",
         f"{prefix}cdr3_aa_length_min": max(0, (junction_aa_length_min or 0) - 2),
         f"{prefix}cdr3_aa_length_max": max(0, (junction_aa_length_max or 0) - 2),
         f"{prefix}junction_aa_v_min": juncts_min[0][1] if juncts_min else None,
@@ -69,6 +71,7 @@ def _prep_chain_attrs(rows, chain):
         }
     if chain != "heavy":
         del attrs[f"{prefix}d_call"]
+        del attrs[f"{prefix}d_call_source"]
     return attrs
 
 def _format_vj_family(rows, key):
@@ -135,6 +138,21 @@ def _add_summary_cols(row_out, rows, categories):
     maxes = [max(vals) for vals in times.values() if vals]
     row_out["latest"] = max(maxes) if maxes else None
 
+def _override_d_call(row_out, lin_attrs):
+    # If we have a D call in the lineage attributes, use that instead of
+    # whatever we gathered up from the post-partis summarizing via IgBLAST
+    if (d_call := lin_attrs.get(row_out["lineage_group"], {}).get("DH")):
+        row_out["d_call"] = d_call
+        row_out["d_call_source"] = "lineage_attrs"
+
+def _label_d_call_ref(row_out, d_refs):
+    # there are some edge cases like where I've summarized differing IgBLAST
+    # calls with "IGHD.../IGHD..." or where I've labeled VDDJ cases with
+    # "IGHD...+IGHD..."
+    d_call_refs = [d_refs.get(part) for part in re.split(r"[/\+]+", row_out["d_call"] or "")]
+    out = d_call_refs[0] if len(set(d_call_refs)) == 1 else "/".join(d_call_refs)
+    row_out["d_call_ref"] = out
+
 def _prep_cols(info):
     # define categories, timepoints, output columns
     categories = sorted({row["category"] for row in info})
@@ -162,13 +180,15 @@ def _prep_cols(info):
         "v_identity_max", # (first since max identity means min divergence)
         "v_identity_min", # (ditto)
         "d_call",
+        "d_call_source",
+        "d_call_ref",
         "cdr3_aa_length_min",
         "cdr3_aa_length_max",
         "junction_aa_v_max", # (ditto)
         "junction_aa_v_min", # (ditto)
         "junction_aa_length_min",
         "junction_aa_length_max"]
-    cols += cols_heavy + [f"light_{col}" for col in cols_heavy if col != "d_call"]
+    cols += cols_heavy + [f"light_{col}" for col in cols_heavy if "d_call" not in col]
     return cols, categories
 
 def _write(csv_out, cols, out):
@@ -177,8 +197,29 @@ def _write(csv_out, cols, out):
         writer.writeheader()
         writer.writerows(out)
 
+def _load_d_refs(d_refs):
+    # given list of refname=refpath pairs, set up dictionary mapping seq ID =>
+    # ref name.  Requires all IDs to be unique across all refs.
+    d_ref_for_id = {}
+    if d_refs:
+        for d_ref in d_refs:
+            # parse custom ref name if present, otherwise just use path as name
+            parts = d_ref.split("=", 1)
+            if len(parts) == 1:
+                parts = [parts[0], parts[0]]
+            ref_name = parts[0]
+            ref_path = parts[1]
+            with open(ref_path, encoding="ASCII") as f_in:
+                for line in f_in:
+                    if not line.startswith(">"):
+                        continue
+                    seqid = line[1:].strip()
+                    assert seqid not in d_ref_for_id, f"clashing ID for {seqid}"
+                    d_ref_for_id[seqid] = ref_name
+    return d_ref_for_id
+
 def partis_lineages_summary(csv_in, csv_out, csv_in_lineage_attrs=None, *,
-        sort_junct_min=DEFAULT_SORT_JUNCT_MIN, sort_total_min=DEFAULT_SORT_TOTAL_MIN):
+        paths_d_refs=None, sort_junct_min=DEFAULT_SORT_JUNCT_MIN, sort_total_min=DEFAULT_SORT_TOTAL_MIN):
     """Summarize partis info per-lineage-group further, one row per lineage group
 
     Sorting is first into those above or below a juction length cutoff, then
@@ -196,6 +237,7 @@ def partis_lineages_summary(csv_in, csv_out, csv_in_lineage_attrs=None, *,
     if csv_in_lineage_attrs:
         with open(csv_in_lineage_attrs, encoding="ASCII") as f_in:
             lin_attrs = {row["Lineage"]: row for row in DictReader(f_in)}
+    d_refs = _load_d_refs(paths_d_refs)
     cols, categories = _prep_cols(info)
     # group by lineage group
     groups = defaultdict(list)
@@ -215,6 +257,8 @@ def partis_lineages_summary(csv_in, csv_out, csv_in_lineage_attrs=None, *,
         row_out.update(_prep_uca_cols(rows, "heavy"))
         row_out.update(_prep_uca_cols(rows, "light"))
         _add_summary_cols(row_out, rows, categories)
+        _override_d_call(row_out, lin_attrs)
+        _label_d_call_ref(row_out, d_refs)
         out.append(row_out)
     # sort with these things highest:
     #
@@ -238,11 +282,13 @@ def main():
     arg("output",
         help="CSV to write with one row per per lineage group")
     arg("-L", "--lineage-attrs", help="optional CSV with per-lineage metadata")
+    arg("-D", "--d-ref", action="append", help="optional FASTA(s) for alternate D ref names")
     arg("-J", "--sort-junct-min", type=int, default=DEFAULT_SORT_JUNCT_MIN, help="")
     arg("-T", "--sort-total-min", type=int, default=DEFAULT_SORT_TOTAL_MIN, help="")
     args = parser.parse_args()
     partis_lineages_summary(
         args.input, args.output, args.lineage_attrs,
+        paths_d_refs=args.d_ref,
         sort_junct_min=args.sort_junct_min,
         sort_total_min=args.sort_total_min)
 

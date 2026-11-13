@@ -366,7 +366,9 @@ rule partis_lineages_summary:
     output: "analysis/partis/{subject}.{chain_type}/lineage_groups_summary.csv"
     input:
         lin_groups="analysis/partis/{subject}.{chain_type}/lineage_groups.csv",
-        lin_attrs=ancient("metadata/lineages.csv")
+        lin_attrs=ancient("metadata/lineages.csv"),
+        d_musa="analysis/germline/musa/D.fasta",
+        d_kimdb="analysis/germline/kimdb/D.fasta"
     priority: 10
     params:
         # Lineages at or above these values for heavy chain junction AA length
@@ -377,5 +379,6 @@ rule partis_lineages_summary:
     shell:
         """
             partis_lineages_summary.py {input.lin_groups} {output} \
-                -L {input.lin_attrs} -J {params.sort_junct} -T {params.sort_total}
+                -L {input.lin_attrs} -D MUSA={input.d_musa} -D KIMDB={input.d_kimdb} \
+                -J {params.sort_junct} -T {params.sort_total}
         """
