@@ -22,7 +22,8 @@ COLS_HEAVY =  [
     "junction_aa_length_min",
     "junction_aa_length_max"]
 COLS_LIGHT = [f"light_{col}" for col in COLS_HEAVY if col != "d_call"]
-COLS_UCA_HEAVY = ["uca_sequence_id", "uca_sequence", "uca_junction_aa_length_diff"]
+COLS_UCA_HEAVY = ["uca_sequence_id", "uca_sequence"] + \
+    [f"uca_cdr{idx+1}_aa_length_diff" for idx in range(3)]
 COLS_UCA_LIGHT = [f"{col}_light" for col in COLS_UCA_HEAVY]
 COLS = ["lineage_group", "names", "timepoint", "category", "total"] + \
     COLS_HEAVY + COLS_LIGHT + COLS_UCA_HEAVY + COLS_UCA_LIGHT
@@ -106,9 +107,8 @@ def _group_rows(rows):
     return chunk
 
 def _summarize_uca_info(rows, chain):
-    # condense per-seq UCA info: note UCA used (ensure only one) and
-    # the unique instances of any differing junction AA lengths
-    # compared to UCA
+    # condense per-seq UCA info: note UCA used (ensure only one) and the unique
+    # instances of any differing CDR AA lengths compared to UCA
     suffix = {"heavy": "", "light": "_light"}[chain]
     uca_seq_id = {row[f"uca_sequence_id{suffix}"] for row in rows}
     uca_seq = {row[f"uca_sequence{suffix}"] for row in rows}
@@ -116,12 +116,13 @@ def _summarize_uca_info(rows, chain):
     assert len(uca_seq) == 1
     uca_seq_id = uca_seq_id.pop()
     uca_seq = uca_seq.pop()
-    uca_junct_diff = sorted({row[f"uca_junction_aa_length_diff{suffix}"] for row in rows} - {"+0"})
-    uca_junct_diff = " ".join(uca_junct_diff)
-    return {
+    out = {
         f"uca_sequence_id{suffix}": uca_seq_id,
-        f"uca_sequence{suffix}": uca_seq,
-        f"uca_junction_aa_length_diff{suffix}": uca_junct_diff}
+        f"uca_sequence{suffix}": uca_seq}
+    for idx in range(3):
+        diff = sorted({row[f"uca_cdr{idx+1}_aa_length_diff{suffix}"] for row in rows} - {"+0"})
+        out[f"uca_cdr{idx+1}_aa_length_diff{suffix}"] = " ".join(diff)
+    return out
 
 def partis_lineages(csv_in, csv_out):
     """Summarize partis info per-lineage-group, one row per group+timepoint+category"""

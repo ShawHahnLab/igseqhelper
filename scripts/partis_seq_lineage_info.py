@@ -85,6 +85,8 @@ def __infer_basics_from_metadata(seqid_in, metadata):
         "notes": [],
         "lineage": "",
         "sequence_light": ""}
+    if attrs.get("Comments"):
+        row_out["notes"].append(attrs.get("Comments"))
     # Catch the special case of seqset entries (10x) that have been added to
     # the isolates table.  Watch out for duplicates though.
     if category == "seqset":
@@ -141,6 +143,7 @@ def __include_igblast_attrs(row_out, igblast):
         "junction_aa": igblast_attrs["junction_aa"],
         "junction_aa_length":
             len(igblast_attrs["junction_aa"]) if igblast_attrs["sequence"] else None})
+    row_out.update({f"cdr{num}_aa": igblast_attrs[f"cdr{num}_aa"] for num in range(1, 4)})
 
 def __include_custom_attrs(row_out, custom_annots):
     # Do we have our own manual annotations for this ID?  If so, take the
@@ -170,6 +173,7 @@ def __include_isolate_light_attrs(row_out, isolate_light_annots):
     "light_junction_aa": attrs.get("junction_aa"),
     "light_junction_aa_length":
         len(attrs.get("junction_aa", "")) if row_out["sequence_light"] else None})
+    row_out.update({f"light_cdr{num}_aa": attrs.get(f"cdr{num}_aa") for num in range(1, 4)})
 
 def _check_for_duplicated_isolates(out):
     # Sanity-check the isolates to ensure we don't have duplicates.  I worry
@@ -268,7 +272,8 @@ def _prep_seq_lineage_info(clones, metadata, custom_annots, igblast, isolate_lig
                 # and (if applicable) manually-defined info on sequences
                 __include_igblast_attrs(row_out, igblast)
                 __include_custom_attrs(row_out, custom_annots)
-                __include_isolate_light_attrs(row_out, isolate_light_annots)
+                if not "mismatched light chain" in "".join(row_out["notes"]):
+                    __include_isolate_light_attrs(row_out, isolate_light_annots)
                 row_out.update({
                     "partis_clone_id": row["clone_id"] or "",
                     "lineage": row_out["lineage"] or ""})
@@ -344,30 +349,29 @@ def _assign_lineage_groups(out, lin_prefix=None, auto_group_for=None):
 
 def _note_uca_diffs(out, uca_annots):
     for row in out:
-        row["uca_sequence_id"] = ""
-        row["uca_sequence"] = ""
-        row["uca_junction_aa_length_diff"] = None
-        row["uca_sequence_id_light"] = ""
-        row["uca_sequence_light"] = ""
-        row["uca_junction_aa_length_diff_light"] = None
+        for suffix in ("", "_light"):
+            row[f"uca_sequence_id{suffix}"] = ""
+            row[f"uca_sequence{suffix}"] = ""
+            row.update({f"uca_cdr{num}_aa_length_diff{suffix}": None for num in range(1, 4)})
         # When considering candidate sequence IDs for comparison, prefer "UCA",
         # then "RUA"
         prefixes = [row["lineage_group"] + f"_{suf}" for suf in ("UCA", "UCA_Draft", "RUA")]
         for chain in ("heavy", "light"):
             for prefix in prefixes:
                 if (uca_attrs := uca_annots.get(f"{prefix}_{chain}")):
-                    len_uca = int(uca_attrs["junction_aa_length"])
-                    junct_key = "junction_aa_length"
-                    if chain == "light":
-                        junct_key = "light_" + junct_key
                     out_suffix = "" if chain == "heavy" else "_light"
                     row[f"uca_sequence_id{out_suffix}"] = uca_attrs["sequence_id"]
                     row[f"uca_sequence{out_suffix}"] = uca_attrs["sequence"].replace("-", "")
-                    if (len_ab := row[junct_key]):
-                        len_ab = int(len_ab)
-                        diff = len_ab - len_uca
-                        diff = f"{diff:+}"
-                        row[f"uca_junction_aa_length_diff{out_suffix}"] = diff
+                    for num in range(1, 4):
+                        len_uca = len(uca_attrs[f"cdr{num}_aa"])
+                        ab_key = f"cdr{num}_aa"
+                        if chain == "light":
+                            ab_key = "light_" + ab_key
+                        if (len_ab := row.get(ab_key)):
+                            len_ab = len(len_ab)
+                            diff = len_ab - len_uca
+                            diff = f"{diff:+}"
+                            row[f"uca_cdr{num}_aa_length_diff{out_suffix}"] = diff
                     # If we found a candidate sequence (UCA/UCA draft/RUA) for
                     # this chain, stop looking and move on
                     break
@@ -384,7 +388,7 @@ def _exclude_duke_pair_edge_cases(out):
     def getlightlocus(row):
         try:
             return row["light_v_family"][2] # "K" or "L"
-        except IndexError:
+        except (IndexError, KeyError):
             return None
     chunks = defaultdict(list)
     for row in out:
@@ -466,7 +470,9 @@ def partis_seq_lineage_info(
     _note_uca_diffs(out, uca_annots)
     _exclude_duke_pair_edge_cases(out)
     _finalize(out)
-    keys_by_chain = ["v_family", "j_family", "v_identity", "junction_aa", "junction_aa_length"]
+    keys_by_chain = [
+        "v_family", "j_family", "v_identity", "junction_aa", "junction_aa_length"] + \
+        [f"cdr{num}_aa" for num in range(1, 4)]
     keys = [
         "lineage_group",
         "sequence_id",
@@ -485,10 +491,14 @@ def partis_seq_lineage_info(
         "lineage",
         "uca_sequence_id",
         "uca_sequence",
-        "uca_junction_aa_length_diff",
+        "uca_cdr1_aa_length_diff",
+        "uca_cdr2_aa_length_diff",
+        "uca_cdr3_aa_length_diff",
         "uca_sequence_id_light",
         "uca_sequence_light",
-        "uca_junction_aa_length_diff_light",
+        "uca_cdr1_aa_length_diff_light",
+        "uca_cdr2_aa_length_diff_light",
+        "uca_cdr3_aa_length_diff_light",
         "exclusion_reason",
         "notes"]
     with open(csv_out, "w", encoding="ASCII") as f_out:

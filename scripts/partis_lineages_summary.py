@@ -102,22 +102,25 @@ def _prep_uca_cols(rows, chain):
     suffix = {"heavy": "", "light": "_light"}[chain]
     uca_ids = set()
     uca_seqs = set()
-    diffs = set()
+    diffs = (set(), set(), set())
     for row in rows:
         uca_ids.add(row[f"uca_sequence_id{suffix}"])
         uca_seqs.add(row[f"uca_sequence{suffix}"])
         tp = row["timepoint"]
-        diffs_here = set(row[f"uca_junction_aa_length_diff{suffix}"].split(" ")) - {""}
-        diffs = diffs | {f"wk{tp}{diff}" for diff in diffs_here}
-    diffs = " ".join(sorted(diffs))
+        for idx in range(3):
+            diffs_here = set(row[f"uca_cdr{idx+1}_aa_length_diff{suffix}"].split(" ")) - {""}
+            diffs[idx].update({f"wk{tp}{diff}" for diff in diffs_here})
+    diffs = tuple(" ".join(sorted(diff)) for diff in diffs)
     assert len(uca_ids) == 1
     assert len(uca_seqs) == 1
     uca_ids = uca_ids.pop()
     uca_seqs = uca_seqs.pop()
-    return {
+    out = {
         f"uca_sequence_id{suffix}": uca_ids,
-        f"uca_sequence{suffix}": uca_seqs,
-        f"uca_junction_aa_length_diff{suffix}": diffs}
+        f"uca_sequence{suffix}": uca_seqs}
+    out.update(
+        {f"uca_cdr{idx+1}_aa_length_diff{suffix}": diff for idx, diff in enumerate(diffs)})
+    return out
 
 def _add_summary_cols(row_out, rows, categories):
     totals = defaultdict(int)
@@ -157,10 +160,13 @@ def _prep_cols(info):
     # define categories, timepoints, output columns
     categories = sorted({row["category"] for row in info})
     timepoints = sorted({int(row["timepoint"]) for row in info})
+    # [f"uca_cdr{idx+1}_aa_length_diff{suffix}"
     cols = [
         "lineage_group", "names",
-        "uca_sequence_id", "uca_sequence", "uca_junction_aa_length_diff",
-        "uca_sequence_id_light", "uca_sequence_light", "uca_junction_aa_length_diff_light",
+        "uca_sequence_id", "uca_sequence"] + \
+            [f"uca_cdr{idx+1}_aa_length_diff" for idx in range(3)] + [
+        "uca_sequence_id_light", "uca_sequence_light"] + \
+            [f"uca_cdr{idx+1}_aa_length_diff_light" for idx in range(3)] + [
         "lineage_attrs", "comments", "suspected_vddj"]
     for category in categories:
         for timepoint in timepoints:
